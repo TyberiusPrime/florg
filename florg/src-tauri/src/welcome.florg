@@ -1,0 +1,48 @@
+Florg root entry.
+The first paragraph is the header you see.
+
+Welcome to florg!
+
+Everything after that first paragraph is the actual entry contents.
+
+Every entry has children, they're labeled a-z',.;- so you have 31 of them
+to fill in a diary.
+
+You can ripgrep search with _/_, fzf like search for hashtags with _#_.
+To navigate, press _A-Z,.;-_ to go downwards, _space_/_backspace_ to go upwards,
+_Home_ to go to the root, _g_ to go to the root and enter 'quicknav' mode 
+(leave with enter or esc).
+
+To edit in your $EDITOR, press enter. To add a node, either press _A-Z',.;-,_ then enter,
+or _o_ to add the next empty letter in the parent node. Pressing _O_ will add a node before this one in the parent node.
+")?;
+    Ok(())
+}
+
+fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
+    dbg!(git_binary);
+    std::process::Command::new(git_binary)
+        .arg("init")
+        .arg(".")
+        .current_dir(data_path)
+        .status()
+        .context("Git init failed")?;
+    std::process::Command::new(git_binary)
+        .arg("add")
+        .arg(".")
+        .arg("--all")
+        .current_dir(data_path)
+        .status()
+        .context("git add . --all failed")?;
+    std::process::Command::new(git_binary)
+        .arg("commit")
+        .arg("-m")
+        .arg("Capturing status quo on new florg data path")
+        .current_dir(data_path)
+        .status()
+        .context("git initial commit failed")?;
+
+    Ok(())
+}
+
+

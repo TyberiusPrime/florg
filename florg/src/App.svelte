@@ -5,6 +5,7 @@
   import Footer from "./lib/Footer.svelte";
   import * as KeyPress from "../dist/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
+  import { emit, listen } from "@tauri-apps/api/event";
 
   async function get_node(path) {
     return await invoke("get_node", { path });
@@ -32,6 +33,9 @@
     content_children = children;
     current_path = path;
     content_levels = node.levels;
+    let open_paths = await invoke("list_open_paths");
+    console.log("open paths", open_paths);
+    currently_edited = open_paths.indexOf(path) > -1;
   }
 
   let show_help = false;
@@ -42,6 +46,7 @@
   let content_title = "";
   let content_children;
   let current_path = "";
+  let currently_edited = false;
   let nav_mode_start = "";
 
   var listener_normal = new window.keypress.Listener();
@@ -81,6 +86,16 @@
     }
   });
 
+  listener_normal.register_combo({
+    keys: "enter",
+    prevent_repeat: true,
+    prevent_default: true,
+    on_keyup: async (ev) => {
+      enter_normal_mode();
+      edit_current_node();
+    },
+  });
+
   //help mode
   listener_nav.simple_combo("esc", () => {
     console.log("going back to", nav_mode_start);
@@ -110,6 +125,16 @@
     prevent_default: true,
     on_keyup: async (ev) => {
       enter_normal_mode();
+    },
+  });
+
+  listener_nav.register_combo({
+    keys: "enter",
+    prevent_repeat: true,
+    prevent_default: true,
+    on_keyup: async (ev) => {
+      enter_normal_mode();
+      edit_current_node();
     },
   });
 
@@ -152,20 +177,37 @@
       footer_msg =
         "Nav mode activated. <span class='hotkey'>Escape</span> to abort. <span class='hotkey'>Space</span> to accept. <span class='hotkey'>Enter</span> to edit. <span class='hotkey'>Backspace</span> to go up. <span class='hotkey'>Home</span> to go to root";
       mode = "nav";
-	  console.log("setting nav mode start", nav_mode_start);
+      console.log("setting nav mode start", nav_mode_start);
       nav_mode_start = current_path;
     }
   }
 
   function handle_toptree_load(ev) {
     load_node(ev.detail.path);
-	enter_normal_mode();
+    enter_normal_mode();
   }
 
   function handle_go_sub_node(ev) {
     load_node(current_path + ev.detail);
-	enter_normal_mode();
+    enter_normal_mode();
   }
+  async function edit_current_node() {
+    currently_edited = true;
+    return await invoke("edit_node", { path: current_path });
+  }
+
+  const unlisten_node_changed = listen("node-changed", (event) => {
+    // a specific node was reread
+    console.log(event.payload);
+    load_node(event.payload);
+    enter_normal_mode();
+  });
+
+  const unliste_node_unchanged = listen("node-unchanged", (event) => {
+    //some node was not changed / editing aborted.
+    //reload to refresh the currently edited thing
+    load_node(current_path);
+  });
 
   load_node("AA");
 </script>
@@ -193,6 +235,7 @@
       bind:mode
       bind:msg={footer_msg}
       bind:nav_table={content_children}
+      bind:currently_edited
       on:go_sub_node={handle_go_sub_node}
     />
   </div>

@@ -8,6 +8,7 @@
   export let show_help = false;
   export let mode = "normal";
   export let nav_table = [];
+  export let currently_edited = false;
 
   function event_go_sub_node(ev) {
   console.log("event_load_node", ev);
@@ -37,6 +38,10 @@
     {/if}
   </div>
   mode: {mode}
+  {#if currently_edited}
+  <span style="color:red">Currently edited</span>
+  {/if}
+
 </div>
 
 <style>

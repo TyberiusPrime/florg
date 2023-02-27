@@ -2,6 +2,7 @@
   import Greet from "./lib/Greet.svelte";
   import TopTree from "./lib/TopTree.svelte";
   import Content from "./lib/Content.svelte";
+  import DateMode from "./lib/DateMode.svelte";
   import Footer from "./lib/Footer.svelte";
   import * as KeyPress from "../dist/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
@@ -17,9 +18,9 @@
     if (node.node != null) {
       console.log(node);
       content_text = node.node.raw;
-      content_title = node.node.header.title;
+      content_title = node.node.header.title; //only used for root node.
     } else {
-      content_text = "(empty node)";
+      content_text = "(empty node - enter to create)";
       content_title = "(empty node)";
     }
     let children = [];
@@ -47,7 +48,11 @@
   let content_children;
   let current_path = "";
   let currently_edited = false;
+
   let nav_mode_start = "";
+
+  let date_mode_message = "";
+  let date_mode_action = "";
 
   var listener_normal = new window.keypress.Listener();
   listener_normal.reset();
@@ -56,6 +61,10 @@
   var listener_nav = new window.keypress.Listener();
   listener_nav.reset();
   listener_nav.stop_listening();
+
+  var listener_date = new window.keypress.Listener();
+  listener_date.reset();
+  listener_date.stop_listening();
 
   listener_normal.register_combo({
     keys: "space",
@@ -77,7 +86,7 @@
   });
   listener_normal.simple_combo("x", async (e, count, repeated) => {
     console.log("debug pressed");
-    window.location.reload();
+    enter_date_mode("goto", "Goto Date below #insert-hashtag");
   });
 
   listener_normal.simple_combo("backspace", async (e, count, repeated) => {
@@ -159,10 +168,20 @@
     },
   });
 
+  listener_date.register_combo({
+    keys: "esc",
+    prevent_repeat: true,
+    prevent_default: true,
+    on_keyup: async (ev) => {
+		enter_normal_mode();
+    },
+  })
+
   listener_normal.listen();
 
   function enter_normal_mode() {
     listener_nav.stop_listening();
+    listener_date.stop_listening();
     listener_normal.listen();
     footer_msg = "";
     mode = "normal";
@@ -173,6 +192,7 @@
     if (mode != "nav") {
       console.log("entering nav mode");
       listener_normal.stop_listening();
+      listener_date.stop_listening();
       listener_nav.listen();
       footer_msg =
         "Nav mode activated. <span class='hotkey'>Escape</span> to abort. <span class='hotkey'>Space</span> to accept. <span class='hotkey'>Enter</span> to edit. <span class='hotkey'>Backspace</span> to go up. <span class='hotkey'>Home</span> to go to root";
@@ -180,6 +200,16 @@
       console.log("setting nav mode start", nav_mode_start);
       nav_mode_start = current_path;
     }
+  }
+
+  function enter_date_mode(action, message) {
+    mode = "date";
+    date_mode_action = action;
+    date_mode_message = message;
+    nav_mode_start = current_path;
+    listener_normal.stop_listening();
+    listener_nav.stop_listening();
+	listener_date.listen();
   }
 
   function handle_toptree_load(ev) {
@@ -196,6 +226,7 @@
     return await invoke("edit_node", { path: current_path });
   }
 
+  //this is an event from rust
   const unlisten_node_changed = listen("node-changed", (event) => {
     // a specific node was reread
     console.log(event.payload);
@@ -209,6 +240,17 @@
     load_node(current_path);
   });
 
+  //this is an event from dispatch / jvaascript
+  async function handle_date_chosen(ev) {
+    console.log(ev);
+    enter_normal_mode();
+    if (ev.detail.action === null) {
+    } else if (ev.detail.action == "goto") {
+      let sub_path = await invoke("date_to_path", { dateStr: ev.detail.date });
+      load_node(current_path + sub_path);
+    }
+  }
+
   load_node("AA");
 </script>
 
@@ -220,21 +262,29 @@
       bind:title={content_title}
       bind:path={current_path}
       bind:levels={content_levels}
+      bind:mode
+      bind:nav_table={content_children}
       on:load_node={handle_toptree_load}
     />
   </div>
   <div class="content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
-      <Content bind:text={content_text} />
+      {#if mode == "normal" || mode == "nav"}
+        <Content bind:text={content_text} />
+      {:else}
+        <DateMode
+          bind:message={date_mode_message}
+          bind:action={date_mode_action}
+          on:date_chosen={handle_date_chosen}
+        />
+      {/if}
     </div>
   </div>
   <div class="footer">
     <Footer
       bind:show_help
-      bind:mode
       bind:msg={footer_msg}
-      bind:nav_table={content_children}
       bind:currently_edited
       on:go_sub_node={handle_go_sub_node}
     />

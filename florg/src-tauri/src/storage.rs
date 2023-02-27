@@ -80,8 +80,8 @@ impl Storage {
             .filter_map(|e| e.ok())
         {
             if !entry.file_type().is_dir() {
-                dbg!(data_path);
-                dbg!(entry.path());
+//                dbg!(data_path);
+ //               dbg!(entry.path());
                 let path = entry
                     .path()
                     .parent()

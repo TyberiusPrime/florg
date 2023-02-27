@@ -5,15 +5,15 @@
 
 mod storage;
 use anyhow::{Context, Result};
+use chrono::Datelike;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use signal_hook::iterator::Signals;
 use std::{
     env,
     path::PathBuf,
-    sync::{Condvar, Mutex},
-    thread::{self, sleep_ms},
-    time::Duration,
+    sync::Mutex,
+    thread::{self},
 };
 use storage::{Node, Storage};
 use tauri::Manager;
@@ -170,6 +170,63 @@ fn list_open_paths() -> Vec<String> {
         .collect()
 }
 
+#[tauri::command]
+fn date_to_path(date_str: &str) -> Option<String> {
+    dbg!(&date_str);
+    let date = chrono::NaiveDate::parse_from_str(date_str,"%Y-%m-%d").ok()?;
+    dbg!(date);
+    let path_month = match date.month() {
+        1 => "a",
+        2 => "b",
+        3 => "c",
+        4 => "d",
+        5 => "e",
+        6 => "f",
+        7 => "g",
+        8 => "h",
+        9 => "i",
+        10 => "j",
+        11 => "k",
+        12 => "l",
+        _ => unreachable!(),
+    };
+    let path_day = match date.day() {
+        1 => "a",
+        2 => "b",
+        3 => "c",
+        4 => "d",
+        5 => "e",
+        6 => "f",
+        7 => "g",
+        8 => "h",
+        9 => "i",
+        10 => "j",
+        11 => "k",
+        12 => "l",
+        13 => "m",
+        14 => "n",
+        15 => "o",
+        16 => "p",
+        17 => "q",
+        18 => "r",
+        19 => "s",
+        20 => "t",
+        21 => "u",
+        22 => "v",
+        23 => "w",
+        24 => "x",
+        25 => "y",
+        26 => "za",
+        27 => "zb",
+        28 => "zc",
+        29 => "zd",
+        30 => "ze",
+        31 => "zf",
+        _ => unreachable!(),
+    };
+    Some(format!("{}{}", path_month, path_day))
+}
+
 fn find_git_binary() -> Result<String> {
     Ok(std::str::from_utf8(
         &std::process::Command::new("which")
@@ -296,7 +353,7 @@ fn main() -> Result<()> {
 
     let jt = thread::spawn(move || {
         for sig in signals.forever() {
-            println!("received a signal {:?}", sig);
+            // println!("received a signal {:?}", sig);
             if sig == signal_hook::consts::SIGCHLD {
                 editor_ended()
             }
@@ -313,7 +370,8 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             edit_node,
             get_node,
-            list_open_paths
+            list_open_paths,
+            date_to_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

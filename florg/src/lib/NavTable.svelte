@@ -31,8 +31,8 @@
 </script>
 
 <div id="navtable">
-  <hr />
   {#if nav_table.length > 0}
+  Navigation mode:
     <table>
       {#each chunk_nav(nav_table) as row}
         <tr>
@@ -51,8 +51,9 @@
       {/if}
     </table>
   {:else}
-    (No children)
+    (No further children. a-z to create)
   {/if}
+  <hr />
 </div>
 
 <style>

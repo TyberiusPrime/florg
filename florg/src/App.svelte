@@ -2,6 +2,7 @@
   import Greet from "./lib/Greet.svelte";
   import TopTree from "./lib/TopTree.svelte";
   import NavTable from "./lib/NavTable.svelte";
+  import TinyNav from "./lib/TinyNav.svelte";
   import Content from "./lib/Content.svelte";
   import DateMode from "./lib/DateMode.svelte";
   import PickMode from "./lib/PickMode.svelte";
@@ -246,7 +247,7 @@
       bind:path={current_path}
       bind:levels={content_levels}
       bind:mode
-	  on:goto_node={handle_goto_node}
+      on:goto_node={handle_goto_node}
     />
     {#if mode == "nav"}
       <NavTable
@@ -281,6 +282,11 @@
     </div>
   </div>
   <div class="footer">
+    {#if mode == "normal"}
+      <TinyNav bind:nodes={content_children} on:goto_node={handle_goto_node} 
+	  bind:current_path
+	  />
+    {/if}
     <Footer bind:show_help bind:msg={footer_msg} bind:currently_edited />
   </div>
 </div>

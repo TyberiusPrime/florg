@@ -14,8 +14,10 @@
     "@tauri-apps/api": "^1.2.0",
     "chrono-node": "^2.5.0",
     "flatpickr": "^4.6.13",
+    "flowbite-svelte": "^0.30.5",
     "fzf": "^0.5.1",
-    "svelte-flatpickr": "^3.3.2"
+    "svelte-flatpickr": "^3.3.2",
+    "svelte-tooltip": "^1.2.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^2.0.0",

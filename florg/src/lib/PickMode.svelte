@@ -1,0 +1,62 @@
+<script lang="ts">
+  import { invoke } from "@tauri-apps/api/tauri";
+  import * as chrono from "chrono-node";
+  import { createEventDispatcher } from "svelte";
+  const dispatch = createEventDispatcher();
+  import * as KeyPress from "../../dist/keypress-2.1.5.min.js";
+  import { Fzf, byLengthAsc } from "fzf";
+
+  import PickerTable from "./PickerTable.svelte";
+
+  export let message = "";
+  export let action = "";
+  export let elements = [];
+
+  let focused = 0;
+  let input_text = "";
+  let last_text = "---";
+  let downstream_elements = [];
+
+
+  function handle_text_change(ev) {
+    const fzf = new Fzf(elements, {
+      selector: (item) => item.text,
+      tiebreakers: [byLengthAsc],
+    });
+    if (ev.key == "ArrowDown") {
+      ev.preventDefault();
+      if (focused < downstream_elements.length - 1) {
+        focused += 1;
+      }
+    } else if (ev.key == "ArrowUp") {
+      ev.preventDefault();
+      if (focused > 0) {
+        focused -= 1;
+      }
+    } else if (ev.key == "Escape") {
+      dispatch("picker_canceled", null);
+    } else if (ev.key == "Enter") {
+	  dispatch("picker_accepted", {cmd: downstream_elements[focused].cmd, action: action});
+    } else {
+	console.log(ev);
+      if (input_text != last_text) {
+        const entries = fzf.find(input_text);
+        downstream_elements = entries.map((entry) => entry.item);
+        focused = 0;
+        last_text = input_text;
+      }
+    }
+  }
+  downstream_elements = elements;
+</script>
+
+<div on:keyup={handle_text_change}>
+  {message}
+  <input id="typebox" autofocus bind:value={input_text} />
+  <PickerTable bind:focused bind:elements={downstream_elements} />
+  Action is :
+  {action}
+</div>
+
+<style>
+</style>

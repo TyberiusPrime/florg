@@ -19,6 +19,9 @@
       },
 	  "dialog": {
 		  "all": true
+	  },
+	  "process": {
+		  "all": true
 	  }
     },
     "bundle": {

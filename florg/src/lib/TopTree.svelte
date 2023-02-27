@@ -1,13 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { createEventDispatcher } from "svelte";
-  import NavTable from "./NavTable.svelte";
   const dispatch = createEventDispatcher();
 
   export let levels = [];
   export let title = "";
   export let path = "";
-  export let nav_table = [];
   export let mode;
 
   function goto_level(level) {
@@ -15,7 +13,8 @@
     for (let i = 0; i <= level; i++) {
       path += levels[i][0];
     }
-    dispatch("load_node", { path: path });
+    dispatch("goto_node", { path: path, 
+	normal_mode: mode != "nav" });
     console.log("goto level");
     console.log(path);
   }
@@ -23,16 +22,13 @@
   function indent(depth) {
     return "&nbsp;".repeat(depth);
   }
-  function event_go_sub_node(ev) {
-    console.log("event_load_node", ev);
-    dispatch("go_sub_node", ev.detail);
-  }
 </script>
 
-<div class="header">
+<div>
   Path: '{path}'
   <table>
     {#if levels.length > 0}
+	  <tr><td><a on:click={(ev) => goto_level(-1)}>(root node) {title} </a></td> </tr>
       {#each levels as level, index}
         {#if index < levels.length - 1}
           <tr
@@ -47,13 +43,10 @@
         {/if}
       {/each}
     {:else}
-      <tr><td><a href="#node-">(root node) {title}</a> </td> </tr>
+      <tr><td>(root node) {title} </td> </tr>
     {/if}
   </table>
   <hr />
-  {#if mode == "nav"}
-    <NavTable bind:nav_table on:go_sub_node={event_go_sub_node} />
-  {/if}
 </div>
 
 <style>

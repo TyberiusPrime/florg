@@ -1,19 +1,22 @@
 <script lang="ts">
   import Greet from "./lib/Greet.svelte";
   import TopTree from "./lib/TopTree.svelte";
+  import NavTable from "./lib/NavTable.svelte";
   import Content from "./lib/Content.svelte";
   import DateMode from "./lib/DateMode.svelte";
+  import PickMode from "./lib/PickMode.svelte";
   import Footer from "./lib/Footer.svelte";
   import * as KeyPress from "../dist/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
   import { emit, listen } from "@tauri-apps/api/event";
+  import { exit } from "@tauri-apps/api/process";
 
   async function get_node(path) {
     return await invoke("get_node", { path });
   }
 
   async function load_node(path) {
-    console.log("load node");
+    console.log("load node", path);
     let node = await get_node(path);
     if (node.node != null) {
       console.log(node);
@@ -54,13 +57,13 @@
   let date_mode_message = "";
   let date_mode_action = "";
 
+  let pick_mode_message = "";
+  let pick_mode_action = "";
+  let pick_mode_elements = "";
+
   var listener_normal = new window.keypress.Listener();
   listener_normal.reset();
   listener_normal.stop_listening();
-
-  var listener_nav = new window.keypress.Listener();
-  listener_nav.reset();
-  listener_nav.stop_listening();
 
   var listener_date = new window.keypress.Listener();
   listener_date.reset();
@@ -85,8 +88,15 @@
     },
   });
   listener_normal.simple_combo("x", async (e, count, repeated) => {
-    console.log("debug pressed");
     enter_date_mode("goto", "Goto Date below #insert-hashtag");
+  });
+
+  listener_normal.simple_combo("p", async (e, count, repeated) => {
+    enter_pick_mode("command", "Command palette", [
+      { cmd: "create_date_nodes", text: "create date nodes" },
+      { cmd: "exit", text: "Exit the app" },
+      { cmd: "reload", text: "Reload data from disk" },
+    ]);
   });
 
   listener_normal.simple_combo("backspace", async (e, count, repeated) => {
@@ -105,87 +115,26 @@
     },
   });
 
-  //help mode
-  listener_nav.simple_combo("esc", () => {
-    console.log("going back to", nav_mode_start);
-    load_node(nav_mode_start);
-    enter_normal_mode();
-    mode = "normal";
-  });
-
-  for (let letter of 
-    // prettier-ignore
-	  ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]) {
-	  listener_nav.register_combo({
-	  keys: letter,
-	  prevent_repeat: true,
-	  on_keyup: (async (ev) => {
-		console.log("key pressed" + letter);
-		await load_node(current_path + letter.toUpperCase());
-	  })
-	  }
-  );
-
-  }
-
-  listener_nav.register_combo({
-    keys: "space",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      enter_normal_mode();
-    },
-  });
-
-  listener_nav.register_combo({
-    keys: "enter",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      enter_normal_mode();
-      edit_current_node();
-    },
-  });
-
-  listener_nav.register_combo({
-    keys: "backspace",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      if (current_path.length > 0) {
-        load_node(current_path.slice(0, -1));
-      }
-    },
-  });
-  listener_nav.register_combo({
-    keys: "home",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      if (current_path.length > 0) {
-        load_node("");
-      }
-    },
-  });
-
   listener_date.register_combo({
     keys: "esc",
     prevent_repeat: true,
     prevent_default: true,
     on_keyup: async (ev) => {
-		enter_normal_mode();
+      enter_normal_mode();
     },
-  })
+  });
 
   listener_normal.listen();
 
   function enter_normal_mode() {
-    listener_nav.stop_listening();
     listener_date.stop_listening();
     listener_normal.listen();
     footer_msg = "";
     mode = "normal";
     nav_mode_start = "";
+    pick_mode_action = null;
+    pick_mode_elements = [];
+    date_mode_action = null;
   }
 
   function enter_nav_mode() {
@@ -193,7 +142,6 @@
       console.log("entering nav mode");
       listener_normal.stop_listening();
       listener_date.stop_listening();
-      listener_nav.listen();
       footer_msg =
         "Nav mode activated. <span class='hotkey'>Escape</span> to abort. <span class='hotkey'>Space</span> to accept. <span class='hotkey'>Enter</span> to edit. <span class='hotkey'>Backspace</span> to go up. <span class='hotkey'>Home</span> to go to root";
       mode = "nav";
@@ -208,19 +156,34 @@
     date_mode_message = message;
     nav_mode_start = current_path;
     listener_normal.stop_listening();
-    listener_nav.stop_listening();
-	listener_date.listen();
+    listener_date.listen();
   }
 
-  function handle_toptree_load(ev) {
+  function enter_pick_mode(action, message, elements) {
+    mode = "pick";
+    pick_mode_action = action;
+    pick_mode_message = message;
+    pick_mode_elements = elements;
+
+    listener_normal.stop_listening();
+    listener_date.stop_listening();
+  }
+
+  function handle_goto_node(ev) {
     load_node(ev.detail.path);
-    enter_normal_mode();
+    if (ev.detail.normal_mode) {
+      enter_normal_mode();
+    }
   }
 
-  function handle_go_sub_node(ev) {
-    load_node(current_path + ev.detail);
+  async function handle_nav_mode_leave(ev) {
+    console.log("leave", ev);
     enter_normal_mode();
+    if (ev.detail) {
+      await edit_current_node();
+    }
   }
+
   async function edit_current_node() {
     currently_edited = true;
     return await invoke("edit_node", { path: current_path });
@@ -242,7 +205,6 @@
 
   //this is an event from dispatch / jvaascript
   async function handle_date_chosen(ev) {
-    console.log(ev);
     enter_normal_mode();
     if (ev.detail.action === null) {
     } else if (ev.detail.action == "goto") {
@@ -251,7 +213,28 @@
     }
   }
 
-  load_node("AA");
+  async function handle_picker_canceled(ev) {
+    enter_normal_mode();
+    pick_mode_action = null;
+  }
+
+  async function handle_picker_accepted(ev) {
+    enter_normal_mode();
+    if (ev.detail.action === "command") {
+      if (ev.detail.cmd == "reload") {
+        await invoke("reload_data", {});
+        load_node(current_path);
+      } else if (ev.detail.cmd == "exit") {
+        await exit(1);
+      } else {
+        console.log("unhandlede command", ev.detail.cmd);
+        footer_msg = `<span class='error'>unhandled command ${ev.detail.cmd}</span>`;
+      }
+    }
+  }
+
+  load_node("A");
+  enter_normal_mode();
 </script>
 
 <svelte:window />
@@ -263,31 +246,42 @@
       bind:path={current_path}
       bind:levels={content_levels}
       bind:mode
-      bind:nav_table={content_children}
-      on:load_node={handle_toptree_load}
+	  on:goto_node={handle_goto_node}
     />
+    {#if mode == "nav"}
+      <NavTable
+        bind:nav_table={content_children}
+        on:goto_node={handle_goto_node}
+        on:leave={handle_nav_mode_leave}
+        bind:current_path
+        bind:nav_mode_start
+      />
+    {/if}
   </div>
   <div class="content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
       {#if mode == "normal" || mode == "nav"}
         <Content bind:text={content_text} />
-      {:else}
+      {:else if mode == "date"}
         <DateMode
           bind:message={date_mode_message}
           bind:action={date_mode_action}
           on:date_chosen={handle_date_chosen}
         />
+      {:else if mode == "pick"}
+        <PickMode
+          bind:message={pick_mode_message}
+          bind:action={pick_mode_action}
+          bind:elements={pick_mode_elements}
+          on:picker_canceled={handle_picker_canceled}
+          on:picker_accepted={handle_picker_accepted}
+        />
       {/if}
     </div>
   </div>
   <div class="footer">
-    <Footer
-      bind:show_help
-      bind:msg={footer_msg}
-      bind:currently_edited
-      on:go_sub_node={handle_go_sub_node}
-    />
+    <Footer bind:show_help bind:msg={footer_msg} bind:currently_edited />
   </div>
 </div>
 

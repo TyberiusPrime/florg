@@ -4,7 +4,7 @@
 )]
 
 mod storage;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::Datelike;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
@@ -38,6 +38,35 @@ impl RuntimeState {
             open_editors: Vec::new(),
             app_handle: handle,
         }
+    }
+}
+
+#[derive(Debug)]
+struct TauriError(anyhow::Error);
+
+#[derive(Debug, Serialize)]
+enum TauriResult<T> {
+    Ok(T),
+    Err(TauriError),
+}
+
+impl serde::Serialize for TauriError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ErrorInfo {
+            error_chain: Vec<String>,
+            //backtrace: String,
+        }
+
+        ErrorInfo {
+            error_chain: self.0.chain().map(ToString::to_string).collect(),
+            //backtrace: self.0.backtrace().to_string(),
+        }
+        .serialize(serializer)
     }
 }
 
@@ -172,9 +201,11 @@ fn list_open_paths() -> Vec<String> {
 
 #[tauri::command]
 fn date_to_path(date_str: &str) -> Option<String> {
-    dbg!(&date_str);
-    let date = chrono::NaiveDate::parse_from_str(date_str,"%Y-%m-%d").ok()?;
-    dbg!(date);
+    let date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()?;
+    Some(chrono_date_to_path(date))
+}
+
+fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
     let path_month = match date.month() {
         1 => "a",
         2 => "b",
@@ -224,7 +255,31 @@ fn date_to_path(date_str: &str) -> Option<String> {
         31 => "zf",
         _ => unreachable!(),
     };
-    Some(format!("{}{}", path_month, path_day))
+    format!("{}{}", path_month, path_day)
+}
+
+#[tauri::command]
+fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    if !ss.children_for(parent_path).is_empty() {
+        TauriResult::<()>::Err(TauriError(anyhow!(
+            "Node had children - not filling in calendar nodes"
+        )));
+    }
+    let start = chrono::NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
+    for date in start.iter_days().take_while(|x| x.year() == year) {
+        let path = format!("{parent_path}{}", chrono_date_to_path(date));
+        let text = date.format("%Y-%m-%d - %A, %e.%B %Y\n").to_string();
+        let node = Node::new(&path, &text);
+        ss.replace_node(node);
+    }
+    TauriResult::Ok(())
+}
+#[tauri::command]
+fn reload_data() {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    ss.reload();
+
 }
 
 fn find_git_binary() -> Result<String> {
@@ -372,6 +427,8 @@ fn main() -> Result<()> {
             get_node,
             list_open_paths,
             date_to_path,
+            create_calendar,
+            reload_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

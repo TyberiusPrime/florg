@@ -33,14 +33,20 @@ pub(crate) struct Storage {
 
 impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
-        let nodes = Self::parse_path(&data_path, None, None);
         let settings = Self::load_settings(&data_path).unwrap_or_else(|_| HashMap::new());
-        Storage {
+        let mut s = Storage {
             data_path,
-            nodes,
+            nodes: Vec::new(),
             git_binary,
             settings,
-        }
+        };
+        s.reload();
+        s
+    }
+
+    pub fn reload(&mut self) {
+        let nodes = Self::parse_path(&self.data_path, None, None);
+        self.nodes = nodes;
     }
 
     fn load_settings(data_path: &PathBuf) -> Result<HashMap<String, String>> {

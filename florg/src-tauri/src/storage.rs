@@ -2,7 +2,8 @@
 use anyhow::{Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
@@ -33,7 +34,8 @@ pub(crate) struct Storage {
 
 impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
-        let settings = Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
+        let settings =
+            Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
         let mut s = Storage {
             data_path,
             nodes: Vec::new(),
@@ -132,17 +134,36 @@ impl Storage {
         res
     }
 
+    fn get_letter_set(start: char, stop: char) -> HashSet<char> {
+        let mut res = HashSet::new();
+        for c in start..=stop {
+            res.insert(c);
+        }
+        res
+    }
+
+    pub(crate) fn find_next_empty_child(&self, path: &str) -> String {
+        let letters = Self::get_letter_set('A', 'Y');
+        let used: HashSet<char> = self
+            .children_for(path)
+            .iter()
+            .map(|node| node.path.chars().last().unwrap())
+            .collect();
+        let remaining = letters.difference(&used);
+        match remaining.min() {
+            Some(lowest) => format!("{path}{lowest}"),
+            None => self.find_next_empty_child(&format!("{path}Z")),
+        }
+    }
+
     pub(crate) fn replace_node(&mut self, node: Node, commit: bool) {
         self.nodes.retain(|x| x.path != node.path);
 
-        let mut filename = self.data_path.clone();
-        for p in node.path.chars() {
-            filename.push(p.to_string());
-        }
+        let mut filename = node.dirname(&self.data_path);
         std::fs::create_dir_all(&filename).expect("failed to create directory");
         filename.push("node.florg");
 
-        let existed = filename.exists();
+        let existed = filename.exists() && (std::fs::read_to_string(&filename).unwrap_or("".to_string()) != "(placeholder)");
         let msg = if existed {
             format!("Changed node {} '{}'", node.path, node.header.title)
         } else {
@@ -154,6 +175,42 @@ impl Storage {
             self.add_and_commit(&msg);
         }
         self.nodes.push(node);
+    }
+
+    pub(crate) fn remove_placeholder(&mut self, path: &str) {
+        let node = self.get_node(path);
+        let mut remove_path = None;
+        if let Some(node) = node {
+            if node.raw == "(placeholder)" {
+                let rd = std::fs::read_dir(&node.dirname(&self.data_path))
+                    .expect("Failed to read dir");
+                if rd
+                    .filter_map(|x| x.ok())
+                    .filter(|entry| {
+                        entry
+                            .path()
+                            .file_name()
+                            .unwrap_or_else(|| OsStr::new(""))
+                            .to_string_lossy()
+                            != "node.florg"
+                    })
+                    .next()
+                    .is_none()
+                {
+                    remove_path = Some(node.path.to_string())
+                }
+            }
+        }
+        if let Some(remove_path) = remove_path {
+            self.remove_node(&remove_path);
+        }
+    }
+
+    pub fn remove_node(&mut self, path: &str) {
+        let filename: PathBuf = Node::dirname_from_path(&self.data_path, path);
+        std::fs::remove_dir_all(filename).expect("Failed to unlink file");
+        self.nodes.retain(|x| x.path != path);
+        //copilot: unlink  filename
     }
 
     pub fn add_and_commit(&self, msg: &str) {
@@ -183,6 +240,17 @@ impl Node {
         }
     }
 
+    fn dirname(&self, data_path: &PathBuf) -> PathBuf {
+        Node::dirname_from_path(data_path, &self.path[..])
+    }
+    fn dirname_from_path(data_path: &PathBuf, path: &str) -> PathBuf {
+        let mut filename = data_path.clone();
+        for p in path.chars() {
+            // it's a d/i/r/e/c/t/o/r/y path
+            filename.push(p.to_string());
+        }
+        filename
+    }
     fn parse(path: String, file_path: &Path) -> Node {
         let raw = std::fs::read_to_string(file_path).unwrap();
         let header = Self::extract_header(&raw);

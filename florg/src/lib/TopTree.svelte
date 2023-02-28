@@ -28,7 +28,7 @@
   Path: '{path}'
   <table>
     {#if levels.length > 0}
-	  <tr><td><a on:click={(ev) => goto_level(-1)}>(root node) {title} </a></td> </tr>
+	  <tr><td><a on:click={(ev) => goto_level(-1)}>(root node) </a></td> </tr>
       {#each levels as level, index}
         {#if index < levels.length - 1}
           <tr

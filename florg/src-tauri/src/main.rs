@@ -24,6 +24,7 @@ static STORAGE: OnceCell<Mutex<Storage>> = OnceCell::new();
 pub struct OpenEditor {
     path: String,
     temp_file: tempfile::NamedTempFile,
+    org_content: String,
     process: std::process::Child,
 }
 
@@ -103,9 +104,19 @@ fn get_node(path: &str) -> NodeForJS {
         children,
     }
 }
+#[tauri::command]
+fn change_node_text(path: &str, text: &str) {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    let node = Node::new(path, text);
+    ss.replace_node(node, true);
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    lock.app_handle.emit_all("node-changed", path).ok();
+}
 
 #[tauri::command]
 fn edit_node(path: &str) -> bool {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+
     if RUNTIME_STATE
         .get()
         .unwrap()
@@ -136,30 +147,24 @@ fn edit_node(path: &str) -> bool {
                         "{} {}{}\n",
                         letter,
                         " ".repeat(ii),
-                        STORAGE
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .get_node(&so_far)
+                        ss.get_node(&so_far)
                             .map(|x| &x.header.title[..])
                             .unwrap_or("")
                     );
                     so_far.push(letter);
-                    skip_lines = ii + 3;
+                    skip_lines = ii + 4;
                 }
             }
             content += "-- Content after this line. First line = new title --\n\n";
-            let node = STORAGE
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .get_node(path)
-                .map(|x| x.clone());
+            let node = ss.get_node(path).map(|x| x.clone());
             content += node.as_ref().map(|x| &x.raw[..]).unwrap_or("");
             let tf_name = tf.path().to_str().expect("temp file was not unicode name?");
-            std::fs::write(&tf_name, content).expect("temp file write failure");
+            std::fs::write(&tf_name, &content).expect("temp file write failure");
+
+            if let None = node {
+                let place_holder = Node::new(path, "(placeholder)");
+                ss.replace_node(place_holder, false);
+            }
 
             let process = std::process::Command::new("kitty")
                 .arg("--")
@@ -177,6 +182,7 @@ fn edit_node(path: &str) -> bool {
                 .push(OpenEditor {
                     path: path.to_string(),
                     temp_file: tf,
+                    org_content: content,
                     process,
                 });
         }
@@ -213,7 +219,7 @@ fn edit_settings() -> bool {
             let skip_lines = 0;
 
             let tf_name = tf.path().to_str().expect("temp file was not unicode name?");
-            std::fs::write(&tf_name, content).expect("temp file write failure");
+            std::fs::write(&tf_name, &content).expect("temp file write failure");
 
             let process = std::process::Command::new("kitty")
                 .arg("--")
@@ -231,6 +237,7 @@ fn edit_settings() -> bool {
                 .push(OpenEditor {
                     path: path.to_string(),
                     temp_file: tf,
+                    org_content: content,
                     process,
                 });
         }
@@ -356,9 +363,15 @@ fn reload_data() {
 fn get_tags() -> Option<HashMap<String, String>> {
     get_from_settings_str_map("tags")
 }
+
 #[tauri::command]
 fn get_nav() -> Option<HashMap<String, String>> {
     get_from_settings_str_map("nav")
+}
+#[tauri::command]
+fn find_next_empty_child(path: &str) -> String {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    ss.find_next_empty_child(path)
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -419,7 +432,7 @@ fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
 }
 
 fn editor_ended() {
-    let mut remove: Vec<(usize, Option<(String, String)>)> = Vec::new();
+    let mut remove: Vec<(usize, String, Option<String>)> = Vec::new();
     {
         let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
         for (ii, entry) in lock.open_editors.iter_mut().enumerate() {
@@ -429,13 +442,13 @@ fn editor_ended() {
                         if exit_status.success() {
                             let raw = std::fs::read_to_string(entry.temp_file.path())
                                 .expect("Failed to read tempfile");
-                            if !raw.is_empty() {
-                                remove.push((ii, Some((entry.path.to_string(), raw))));
+                            if raw.is_empty() || (raw == entry.org_content) {
+                                remove.push((ii, entry.path.to_string(), None))
                             } else {
-                                remove.push((ii, None))
+                                remove.push((ii, entry.path.to_string(), Some(raw)));
                             }
                         } else {
-                            remove.push((ii, None))
+                            remove.push((ii, entry.path.to_string(), None))
                         }
                     }
                     None => {} // still processing
@@ -444,16 +457,16 @@ fn editor_ended() {
             }
         }
     }
-    for (ii, result) in remove {
+    for (ii, path, result) in remove {
         match result {
-            Some((path, raw)) => {
-                println!("Received {path}");
-                if !raw.is_empty() {
-                    update_from_edited_file(&path, raw);
-                }
+            Some(raw) => {
+                println!("Received {path}. nvim exit was success, content was there");
+                update_from_edited_file(&path, raw);
             }
             None => {
                 let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                let mut ss = STORAGE.get().unwrap().lock().unwrap();
+                ss.remove_placeholder(&path);
                 lock.app_handle.emit_all("node-unchanged", 0).ok();
             }
         }
@@ -485,11 +498,14 @@ fn update_from_edited_file(path: &str, raw_contents: String) {
             Some((_header, content)) => content.trim(),
             None => &raw_contents,
         };
+        println!("parsed contents");
 
         let node = storage::Node::new(path, content);
         ss.replace_node(node, true);
+        println!("Replaced node");
 
         lock.app_handle.emit_all("node-changed", path).ok();
+        println!("Told editor");
     }
 }
 
@@ -541,6 +557,7 @@ fn main() -> Result<()> {
         })
         .invoke_handler(tauri::generate_handler![
             edit_node,
+            change_node_text,
             get_node,
             list_open_paths,
             date_to_path,
@@ -549,6 +566,7 @@ fn main() -> Result<()> {
             edit_settings,
             get_tags,
             get_nav,
+            find_next_empty_child,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -12,6 +12,7 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { emit, listen } from "@tauri-apps/api/event";
   import { exit } from "@tauri-apps/api/process";
+  import { onMount, onDestroy } from "svelte";
 
   async function get_node(path) {
     return await invoke("get_node", { path });
@@ -41,6 +42,8 @@
     content_levels = node.levels;
     let open_paths = await invoke("list_open_paths");
     currently_edited = open_paths.indexOf(path) > -1;
+    let obj = document.getElementById("the_content");
+    obj.scrollTop = 0;
   }
 
   let show_help = false;
@@ -65,10 +68,11 @@
   let goto_mode_action = "";
   let goto_mode_entries = [];
   let goto_mode_text = "";
+  let goto_show_normal = false;
 
   var listener_normal = new window.keypress.Listener();
-  listener_normal.reset();
-  listener_normal.stop_listening();
+  //listener_normal.reset();
+  //listener_normal.stop_listening();
 
   listener_normal.register_combo({
     keys: "space",
@@ -93,11 +97,48 @@
   });
 
   listener_normal.simple_combo("g", async (e, count, repeated) => {
+    goto_nav("goto", "Goto");
+  });
+
+  listener_normal.simple_combo("z", async (e, count, repeated) => {
+    goto_nav("add", "Add node below");
+  });
+
+  listener_normal.simple_combo("m", async (e, count, repeated) => {
+    goto_nav("move", "Move to next empty node below");
+  });
+
+  listener_normal.simple_combo("t", async (e, count, repeated) => {
+    let entries = [];
+    let tags = await invoke("get_tags", {});
+    for (let key in tags) {
+      let hashtag = tags[key];
+      let present = content_text.includes(hashtag);
+      let text;
+      if (present) {
+        text = "-" + hashtag;
+      } else {
+        text = "+" + hashtag;
+      }
+      entries.push({
+        key: key,
+        target_path: hashtag,
+        text: text,
+      });
+    }
+    enter_goto_mode("tag", "Toggle tag", entries, true);
+  });
+
+  async function goto_nav(action, text) {
     let entries = [];
     let nav = await invoke("get_nav", {});
     for (let key in nav) {
       let target_path = nav[key];
-      let node = await get_node(target_path);
+      let query_path = target_path;
+      if (query_path.startsWith("#") || query_path.startsWith("!")) {
+        query_path = query_path.slice(1);
+      }
+      let node = await get_node(query_path);
       let text = target_path + " ";
       if (node.node != null) {
         text += node.node.header.title;
@@ -110,8 +151,8 @@
         text: text,
       });
     }
-    enter_goto_mode("goto", "Goto", entries);
-  });
+    enter_goto_mode(action, text, entries, false);
+  }
 
   listener_normal.simple_combo("p", async (e, count, repeated) => {
     enter_pick_mode("command", "Command palette", [
@@ -134,7 +175,7 @@
     prevent_default: true,
     on_keyup: async (ev) => {
       enter_normal_mode();
-      edit_current_node();
+      await edit_current_node();
     },
   });
 
@@ -168,12 +209,13 @@
     listener_normal.stop_listening();
   }
 
-  function enter_goto_mode(what, text, entries) {
+  function enter_goto_mode(what, text, entries, show_normal) {
+    listener_normal.stop_listening();
     mode = "goto";
     goto_mode_action = what;
     goto_mode_text = text;
     goto_mode_entries = entries;
-    listener_normal.stop_listening();
+    goto_show_normal = show_normal;
   }
 
   function enter_pick_mode(action, message, elements) {
@@ -205,23 +247,32 @@
   }
 
   //this is an event from rust
-  const unlisten_node_changed = listen("node-changed", (event) => {
+  const unlisten_node_changed = listen("node-changed", async (event) => {
     // a specific node was reread
-    console.log(event.payload);
-    load_node(event.payload);
+    console.log("node changed", event.payload);
+    await load_node(event.payload[0]);
     enter_normal_mode();
   });
 
-  const unliste_node_unchanged = listen("node-unchanged", (event) => {
+  const unliste_node_unchanged = listen("node-unchanged", async (event) => {
     //some node was not changed / editing aborted.
     //reload to refresh the currently edited thing?
-    load_node(current_path);
+    await load_node(current_path);
   });
 
   const unlisten_message = listen("message", (event) => {
     //some node was not changed / editing aborted.
     //reload to refresh the currently edited thing
     footer_msg = event.payload;
+  });
+  onDestroy(() => {
+    console.log("main app destroy");
+    unlisten_node_changed();
+    unliste_node_unchanged();
+    unlisten_message();
+
+    listener_normal.reset();
+    listener_normal.stop_listening();
   });
 
   //this is an event from dispatch / jvaascript
@@ -303,11 +354,54 @@
       await edit_current_node();
     }*/
   }
+
+  function iso_date(date: Date): String {
+    let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
+    let mo = new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
+    let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
+    return `${ye}-${mo}-${da}`;
+  }
+
   async function handle_goto_action(ev) {
-    if (goto_mode_action == "goto") {
-      enter_normal_mode();
-      load_node(ev.detail);
+    if (goto_mode_action == "tag") {
+      await toggle_tag_on_current_node(ev.detail);
+    } else {
+      let path = ev.detail;
+      if (path.startsWith("!")) {
+        let prefix = path.slice(1);
+        let date_suffix = await invoke("date_to_path", {
+          dateStr: iso_date(new Date()),
+        });
+        path = prefix + date_suffix;
+      } else if (ev.detail.startsWith("#")) {
+      }
+
+      if (goto_mode_action == "goto") {
+        enter_normal_mode();
+        load_node(path);
+      } else if (goto_mode_action == "add") {
+        enter_normal_mode();
+        let new_path = await invoke("find_next_empty_child", { path: path });
+        await load_node(new_path);
+        await edit_current_node();
+      } else {
+        enter_normal_mode();
+      }
     }
+  }
+
+  async function toggle_tag_on_current_node(tag) {
+    let re = new RegExp(tag + "(\\s|$)");
+    let new_text;
+    if (re.test(content_text)) {
+      new_text = content_text.replace(re, "").trim();
+    } else {
+      new_text = content_text + "\n" + tag;
+    }
+    await invoke("change_node_text", { path: current_path, text: new_text });
+    enter_normal_mode();
+    let obj = document.getElementById("the_content");
+    obj.scrollTop = obj.scrollHeight;
   }
 
   load_node("A");
@@ -335,7 +429,7 @@
         bind:nav_mode_start
       />
       <hr />
-    {:else if mode == "normal"}
+    {:else if mode == "normal" || (mode == "goto" && goto_show_normal)}
       <TinyNav
         bind:nodes={content_children}
         on:goto_node={handle_goto_node}
@@ -347,7 +441,7 @@
   <div class="content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
-      {#if mode == "normal" || mode == "nav"}
+      {#if mode == "normal" || mode == "nav" || (mode == "goto" && goto_show_normal)}
         <Content bind:text={content_text} />
       {:else if mode == "date"}
         <DateMode

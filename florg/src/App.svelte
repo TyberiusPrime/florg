@@ -13,6 +13,7 @@
   import { emit, listen } from "@tauri-apps/api/event";
   import { exit } from "@tauri-apps/api/process";
   import { onMount, onDestroy } from "svelte";
+  import { readText, writeText } from "@tauri-apps/api/clipboard";
 
   async function get_node(path) {
     return await invoke("get_node", { path });
@@ -129,6 +130,16 @@
     enter_goto_mode("tag", "Toggle tag", entries, true);
   });
 
+  listener_normal.simple_combo("c", async (e, count, repeated) => {
+    let entries = [
+      { key: "c", text: "link", target_path: "link" },
+      { key: "y", text: "content", target_path: "content" },
+      { key: "t", text: "title", target_path: "title" },
+      { key: "p", text: "node folder path", target_path: "path" },
+    ];
+    enter_goto_mode("copy", "Copy to clipboard...", entries, true);
+  });
+
   async function goto_nav(action, text) {
     let entries = [];
     let nav = await invoke("get_nav", {});
@@ -211,7 +222,11 @@
 
   function enter_goto_mode(what, text, entries, show_normal) {
     listener_normal.stop_listening();
-    mode = "goto";
+    if (show_normal) {
+      mode = "quick_pick";
+    } else {
+      mode = "goto";
+    }
     goto_mode_action = what;
     goto_mode_text = text;
     goto_mode_entries = entries;
@@ -265,11 +280,11 @@
     //reload to refresh the currently edited thing
     footer_msg = event.payload;
   });
-  onDestroy(() => {
+  onDestroy(async () => {
     console.log("main app destroy");
-    unlisten_node_changed();
-    unliste_node_unchanged();
-    unlisten_message();
+    (await unlisten_node_changed)();
+    (await unliste_node_unchanged)();
+    (await unlisten_message)();
 
     listener_normal.reset();
     listener_normal.stop_listening();
@@ -365,6 +380,8 @@
   async function handle_goto_action(ev) {
     if (goto_mode_action == "tag") {
       await toggle_tag_on_current_node(ev.detail);
+    } else if (goto_mode_action == "copy") {
+      await copy_to_clipboard(ev.detail);
     } else {
       let path = ev.detail;
       if (path.startsWith("!")) {
@@ -404,6 +421,26 @@
     obj.scrollTop = obj.scrollHeight;
   }
 
+  async function copy_to_clipboard(mode) {
+    console.log("copy_to_clipboard");
+    let out = null;
+    if (mode == "link") {
+      out = `[${content_title}](${current_path})`;
+    } else if (mode == "content") {
+      out = content_text;
+    } else if (mode == "title") {
+      out = content_title;
+    } else if (mode == "path") {
+	  out = await invoke ("get_node_folder_path", {path: current_path});
+	}else {
+	console.log("unknown copy_to_clipboard mode", mode);
+	}
+    if (out != null) {
+      await writeText(out);
+    }
+    enter_normal_mode();
+  }
+
   load_node("A");
   enter_normal_mode();
 </script>
@@ -429,7 +466,7 @@
         bind:nav_mode_start
       />
       <hr />
-    {:else if mode == "normal" || (mode == "goto" && goto_show_normal)}
+    {:else if mode == "normal" || mode == "quick_pick"}
       <TinyNav
         bind:nodes={content_children}
         on:goto_node={handle_goto_node}
@@ -441,7 +478,7 @@
   <div class="content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
-      {#if mode == "normal" || mode == "nav" || (mode == "goto" && goto_show_normal)}
+      {#if mode == "normal" || mode == "nav" || mode == "quick_pick"}
         <Content bind:text={content_text} />
       {:else if mode == "date"}
         <DateMode
@@ -462,7 +499,7 @@
   </div>
   <div class="footer">
     <hr />
-    {#if mode == "goto"}
+    {#if mode == "goto" || mode == "quick_pick"}
       <GotoMode
         bind:action={goto_mode_action}
         bind:text={goto_mode_text}

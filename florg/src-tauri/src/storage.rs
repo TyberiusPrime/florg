@@ -240,10 +240,11 @@ impl Node {
         }
     }
 
-    fn dirname(&self, data_path: &PathBuf) -> PathBuf {
+    pub fn dirname(&self, data_path: &PathBuf) -> PathBuf {
         Node::dirname_from_path(data_path, &self.path[..])
     }
-    fn dirname_from_path(data_path: &PathBuf, path: &str) -> PathBuf {
+
+    pub fn dirname_from_path(data_path: &PathBuf, path: &str) -> PathBuf {
         let mut filename = data_path.clone();
         for p in path.chars() {
             // it's a d/i/r/e/c/t/o/r/y path

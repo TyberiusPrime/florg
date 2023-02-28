@@ -17,12 +17,15 @@
         "all": false,
         "open": true
       },
-	  "dialog": {
-		  "all": true
-	  },
-	  "process": {
-		  "all": true
-	  }
+      "dialog": {
+        "all": true
+      },
+      "process": {
+        "all": true
+      },
+      "clipboard": {
+        "all": true
+      }
     },
     "bundle": {
       "active": true,

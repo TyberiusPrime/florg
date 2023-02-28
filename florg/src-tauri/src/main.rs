@@ -112,6 +112,11 @@ fn change_node_text(path: &str, text: &str) {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     lock.app_handle.emit_all("node-changed", path).ok();
 }
+#[tauri::command]
+fn get_node_folder_path(path: &str) -> String {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    Node::dirname_from_path(&ss.data_path, path).to_string_lossy().to_string()
+}
 
 #[tauri::command]
 fn edit_node(path: &str) -> bool {

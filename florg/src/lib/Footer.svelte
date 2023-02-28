@@ -11,7 +11,6 @@
   </script>
 
 <div id="footer">
-  <hr />
   {#if mode=="normal" && show_help}
     <div id="help">
       <table>

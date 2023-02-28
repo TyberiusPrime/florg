@@ -2948,6 +2948,7 @@ dependencies = [
  "indexmap",
  "itertools",
  "kstring",
+ "serde",
 ]
 
 [[package]]

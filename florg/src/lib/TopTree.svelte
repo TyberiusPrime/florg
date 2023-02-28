@@ -46,7 +46,6 @@
       <tr><td>(root node) {title} </td> </tr>
     {/if}
   </table>
-  <hr />
 </div>
 
 <style>

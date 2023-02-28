@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use serde::{ser::Serializer, Deserialize, Serialize};
 use anyhow::{Context, Result};
+use serde::{ser::Serializer, Deserialize, Serialize};
 
 use std::collections::HashMap;
 use std::{
@@ -25,15 +25,15 @@ pub(crate) struct Node {
 
 #[derive(Debug)]
 pub(crate) struct Storage {
-    data_path: PathBuf,
+    pub data_path: PathBuf,
     git_binary: String,
     nodes: Vec<Node>,
-    pub settings: HashMap<String, String>,
+    pub settings: toml_edit::Document,
 }
 
 impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
-        let settings = Self::load_settings(&data_path).unwrap_or_else(|_| HashMap::new());
+        let settings = Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
         let mut s = Storage {
             data_path,
             nodes: Vec::new(),
@@ -49,21 +49,21 @@ impl Storage {
         self.nodes = nodes;
     }
 
-    fn load_settings(data_path: &PathBuf) -> Result<HashMap<String, String>> {
-        use toml::Table;
-        let raw = std::fs::read_to_string(data_path.join("settings.toml"))?;
-        let parsed = raw.parse::<Table>()?;
-        let mut res = HashMap::new();
-        for (key, value) in parsed.iter() {
-            if let Some(v) = value.as_str() {
-                res.insert(key.to_string(), v.to_string());
-            }
-        }
-        Ok(res)
+    pub fn settings_filename(data_path: &PathBuf) -> PathBuf {
+        data_path.join("settings.toml")
+    }
+
+    pub fn load_settings(data_path: &PathBuf, raw: Option<String>) -> Result<toml_edit::Document> {
+        let raw = match raw {
+            Some(raw) => raw,
+            None => std::fs::read_to_string(Self::settings_filename(data_path))?,
+        };
+        let parsed = raw.parse::<toml_edit::Document>()?;
+        Ok(parsed)
     }
 
     pub fn store_settings(&self) {
-        let out = toml::to_string(&self.settings).unwrap();
+        let out = self.settings.to_string();
         std::fs::write(self.data_path.join("settings.toml"), out).expect("saving settings failed");
     }
 
@@ -86,8 +86,7 @@ impl Storage {
             .filter_map(|e| e.ok())
         {
             if !entry.file_type().is_dir() {
-//                dbg!(data_path);
- //               dbg!(entry.path());
+                //                dbg!(data_path);
                 let path = entry
                     .path()
                     .parent()
@@ -96,6 +95,7 @@ impl Storage {
                     .unwrap()
                     .to_string_lossy();
                 let path = path.replace("/", "");
+                //dbg!(entry.path(), &path);
                 nodes.push(Node::parse(path, entry.path()));
             }
         }
@@ -132,7 +132,7 @@ impl Storage {
         res
     }
 
-    pub(crate) fn replace_node(&mut self, node: Node) {
+    pub(crate) fn replace_node(&mut self, node: Node, commit: bool) {
         self.nodes.retain(|x| x.path != node.path);
 
         let mut filename = self.data_path.clone();
@@ -150,11 +150,13 @@ impl Storage {
         };
 
         std::fs::write(filename, node.raw.trim()).expect("Failed to write file");
-        self.add_and_commit(&msg);
+        if commit {
+            self.add_and_commit(&msg);
+        }
         self.nodes.push(node);
     }
 
-    fn add_and_commit(&self, msg: &str) {
+    pub fn add_and_commit(&self, msg: &str) {
         std::process::Command::new(&self.git_binary)
             .arg("add")
             .arg(".")

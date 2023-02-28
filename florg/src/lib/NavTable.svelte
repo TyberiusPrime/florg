@@ -126,7 +126,7 @@
           {/each}
         </tr>
       {/each}
-      {#if nav_table.length > 25}
+      {#if nav_table.length > 24}
         <tr>
           <td colspan="2"
             ><a on:click={(ev) => go_sub_node("z", false)}
@@ -139,7 +139,6 @@
   {:else}
     (No further children. a-z to create)
   {/if}
-  <hr />
 </div>
 
 <style>

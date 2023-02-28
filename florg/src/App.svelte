@@ -6,6 +6,7 @@
   import Content from "./lib/Content.svelte";
   import DateMode from "./lib/DateMode.svelte";
   import PickMode from "./lib/PickMode.svelte";
+  import GotoMode from "./lib/GotoMode.svelte";
   import Footer from "./lib/Footer.svelte";
   import * as KeyPress from "../dist/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
@@ -39,7 +40,6 @@
     current_path = path;
     content_levels = node.levels;
     let open_paths = await invoke("list_open_paths");
-    console.log("open paths", open_paths);
     currently_edited = open_paths.indexOf(path) > -1;
   }
 
@@ -62,13 +62,13 @@
   let pick_mode_action = "";
   let pick_mode_elements = "";
 
+  let goto_mode_action = "";
+  let goto_mode_entries = [];
+  let goto_mode_text = "";
+
   var listener_normal = new window.keypress.Listener();
   listener_normal.reset();
   listener_normal.stop_listening();
-
-  var listener_date = new window.keypress.Listener();
-  listener_date.reset();
-  listener_date.stop_listening();
 
   listener_normal.register_combo({
     keys: "space",
@@ -92,8 +92,30 @@
     enter_date_mode("goto", "Goto Date below #insert-hashtag");
   });
 
+  listener_normal.simple_combo("g", async (e, count, repeated) => {
+    let entries = [];
+    let nav = await invoke("get_nav", {});
+    for (let key in nav) {
+      let target_path = nav[key];
+      let node = await get_node(target_path);
+      let text = target_path + " ";
+      if (node.node != null) {
+        text += node.node.header.title;
+      } else {
+        text += " (empty node)";
+      }
+      entries.push({
+        key: key,
+        target_path: target_path,
+        text: text,
+      });
+    }
+    enter_goto_mode("goto", "Goto", entries);
+  });
+
   listener_normal.simple_combo("p", async (e, count, repeated) => {
     enter_pick_mode("command", "Command palette", [
+      { cmd: "settings", text: "Edit settings" },
       { cmd: "create_date_nodes", text: "create date nodes" },
       { cmd: "exit", text: "Exit the app" },
       { cmd: "reload", text: "Reload data from disk" },
@@ -116,19 +138,9 @@
     },
   });
 
-  listener_date.register_combo({
-    keys: "esc",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      enter_normal_mode();
-    },
-  });
-
   listener_normal.listen();
 
   function enter_normal_mode() {
-    listener_date.stop_listening();
     listener_normal.listen();
     footer_msg = "";
     mode = "normal";
@@ -140,13 +152,10 @@
 
   function enter_nav_mode() {
     if (mode != "nav") {
-      console.log("entering nav mode");
       listener_normal.stop_listening();
-      listener_date.stop_listening();
       footer_msg =
         "Nav mode activated. <span class='hotkey'>Escape</span> to abort. <span class='hotkey'>Space</span> to accept. <span class='hotkey'>Enter</span> to edit. <span class='hotkey'>Backspace</span> to go up. <span class='hotkey'>Home</span> to go to root";
       mode = "nav";
-      console.log("setting nav mode start", nav_mode_start);
       nav_mode_start = current_path;
     }
   }
@@ -157,7 +166,14 @@
     date_mode_message = message;
     nav_mode_start = current_path;
     listener_normal.stop_listening();
-    listener_date.listen();
+  }
+
+  function enter_goto_mode(what, text, entries) {
+    mode = "goto";
+    goto_mode_action = what;
+    goto_mode_text = text;
+    goto_mode_entries = entries;
+    listener_normal.stop_listening();
   }
 
   function enter_pick_mode(action, message, elements) {
@@ -165,9 +181,7 @@
     pick_mode_action = action;
     pick_mode_message = message;
     pick_mode_elements = elements;
-
     listener_normal.stop_listening();
-    listener_date.stop_listening();
   }
 
   function handle_goto_node(ev) {
@@ -200,8 +214,14 @@
 
   const unliste_node_unchanged = listen("node-unchanged", (event) => {
     //some node was not changed / editing aborted.
-    //reload to refresh the currently edited thing
+    //reload to refresh the currently edited thing?
     load_node(current_path);
+  });
+
+  const unlisten_message = listen("message", (event) => {
+    //some node was not changed / editing aborted.
+    //reload to refresh the currently edited thing
+    footer_msg = event.payload;
   });
 
   //this is an event from dispatch / jvaascript
@@ -222,15 +242,71 @@
   async function handle_picker_accepted(ev) {
     enter_normal_mode();
     if (ev.detail.action === "command") {
-      if (ev.detail.cmd == "reload") {
-        await invoke("reload_data", {});
-        load_node(current_path);
-      } else if (ev.detail.cmd == "exit") {
-        await exit(1);
-      } else {
-        console.log("unhandlede command", ev.detail.cmd);
-        footer_msg = `<span class='error'>unhandled command ${ev.detail.cmd}</span>`;
+      await handle_command(ev.detail.cmd);
+    }
+  }
+
+  async function handle_command(cmd) {
+    if (cmd == "reload") {
+      await invoke("reload_data", {});
+      console.log("reloaded");
+      await load_node(current_path);
+    } else if (cmd == "exit") {
+      await exit(1);
+    } else if (cmd == "create_date_nodes") {
+      await create_date_nodes();
+    } else if (cmd == "settings") {
+      await edit_settings();
+    } else {
+      console.log("unhandled command", cmd);
+      footer_msg = `<span class='error'>unhandled command ${cmd}</span>`;
+    }
+  }
+
+  async function edit_settings() {
+    return await invoke("edit_settings", {});
+  }
+
+  async function create_date_nodes() {
+    if (content_children.length > 0) {
+      footer_msg =
+        "<span class='error'>Can not create date nodes on an node that already has children</span>";
+    } else {
+      let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(
+        new Date()
+      );
+      let year = window.prompt(
+        "Please enter the year to create a calendar for",
+        ye
+      );
+      if (year != null) {
+        console.log(year);
+        let year_parsed = parseInt(year);
+        console.log(year_parsed);
+        if (!isNaN(year_parsed)) {
+          footer_msg = "Created calendar";
+          await invoke("create_calendar", {
+            parentPath: current_path,
+            year: year_parsed,
+          });
+          await invoke("reload_data", {});
+          await load_node(current_path);
+        }
       }
+    }
+  }
+
+  async function handle_goto_leave(ev) {
+    console.log("leave", ev);
+    enter_normal_mode();
+    /* if (ev.detail) {
+      await edit_current_node();
+    }*/
+  }
+  async function handle_goto_action(ev) {
+    if (goto_mode_action == "goto") {
+      enter_normal_mode();
+      load_node(ev.detail);
     }
   }
 
@@ -249,6 +325,7 @@
       bind:mode
       on:goto_node={handle_goto_node}
     />
+    <hr />
     {#if mode == "nav"}
       <NavTable
         bind:nav_table={content_children}
@@ -257,6 +334,14 @@
         bind:current_path
         bind:nav_mode_start
       />
+      <hr />
+    {:else if mode == "normal"}
+      <TinyNav
+        bind:nodes={content_children}
+        on:goto_node={handle_goto_node}
+        bind:current_path
+      />
+      <hr />
     {/if}
   </div>
   <div class="content">
@@ -282,10 +367,16 @@
     </div>
   </div>
   <div class="footer">
-    {#if mode == "normal"}
-      <TinyNav bind:nodes={content_children} on:goto_node={handle_goto_node} 
-	  bind:current_path
-	  />
+    <hr />
+    {#if mode == "goto"}
+      <GotoMode
+        bind:action={goto_mode_action}
+        bind:text={goto_mode_text}
+        bind:entries={goto_mode_entries}
+        on:leave={handle_goto_leave}
+        on:action={handle_goto_action}
+      />
+      <hr />
     {/if}
     <Footer bind:show_help bind:msg={footer_msg} bind:currently_edited />
   </div>

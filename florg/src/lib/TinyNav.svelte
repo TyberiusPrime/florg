@@ -14,6 +14,7 @@
 
 <div id="wrapper">
   Children:
+  {#if nodes.length > 0}
   {#each nodes as node, index}
     {#if index > 0}
       &nbsp;{/if}
@@ -22,6 +23,9 @@
       <a on:click={clicked_node(node.key)} id="node-{index}">{node.key}</a>
     </SvelteTooltip>
   {/each}
+  {:else}
+  (none)
+  {/if}
 </div>
 
 <style>

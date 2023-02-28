@@ -5,6 +5,7 @@
   import "flatpickr/dist/flatpickr.css";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
+  import * as KeyPress from "../../dist/keypress-2.1.5.min.js";
 
   export let message = "";
   export let action = "";
@@ -12,6 +13,10 @@
   let natural_date_input = "";
   let output_date = "";
   let date_input;
+var listener_date = new window.keypress.Listener();
+  listener_date.reset();
+  listener_date.stop_listening();
+
 
   function iso_date(date: Date): String {
     let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
@@ -65,6 +70,9 @@
     } else if (ev.key == "Enter" && natural_date_input == "") {
       natural_date_input = "today";
       parse_text_do_date();
+    } else if (ev.key == "Escape") {
+		cancel_date_select();
+
     } else {
       parse_text_do_date();
     }

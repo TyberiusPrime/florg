@@ -6,6 +6,7 @@
 mod storage;
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Datelike;
+use inotify::{EventMask, Inotify, WatchMask};
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use signal_hook::iterator::Signals;
@@ -23,7 +24,7 @@ static STORAGE: OnceCell<Mutex<Storage>> = OnceCell::new();
 
 pub struct OpenEditor {
     path: String,
-    temp_file: tempfile::NamedTempFile,
+    temp_file: PathBuf,
     org_content: String,
     process: std::process::Child,
 }
@@ -78,13 +79,19 @@ impl std::fmt::Debug for OpenEditor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OpenEditor")
             .field("path", &self.path)
-            .field("temp_file", &self.temp_file.path().file_name())
+            .field("temp_file", &self.temp_file.file_name())
             .field("process", &self.process.id())
             .finish()
     }
 }
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+fn parse_raw_content(raw_content: &str) -> &str {
+    match raw_content.split_once("\n--\n") {
+        Some((_header, content)) => content.trim(),
+        None => &raw_content,
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct NodeForJS {
@@ -115,18 +122,16 @@ fn change_node_text(path: &str, text: &str) {
 #[tauri::command]
 fn get_node_folder_path(path: &str) -> String {
     let ss = STORAGE.get().unwrap().lock().unwrap();
-    Node::dirname_from_path(&ss.data_path, path).to_string_lossy().to_string()
+    Node::dirname_from_path(&ss.data_path, path)
+        .to_string_lossy()
+        .to_string()
 }
 
 #[tauri::command]
 fn edit_node(path: &str) -> bool {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-
-    if RUNTIME_STATE
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
+    let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    if runtime_state
         .open_editors
         .iter()
         .filter(|entry| entry.path == path)
@@ -134,16 +139,16 @@ fn edit_node(path: &str) -> bool {
         .is_none()
     {
         {
-            let tf = tempfile::Builder::new()
-                .prefix("florg")
-                .suffix(".md")
-                .tempfile()
-                .expect("could not create tempfile?");
+            let node_folder = Node::dirname_from_path(&ss.data_path, path);
+            let tf_folder = node_folder;
+            std::fs::create_dir_all(&tf_folder).unwrap();
+            let tf = tf_folder.join(format!("{}.temp{}", path, storage::FLORG_SUFFIX));
+
             let mut content = "".to_string();
             let mut skip_lines = 0;
             if path.is_empty() {
                 content += "(root)\n";
-                skip_lines = 2;
+                skip_lines = 3;
             } else {
                 let mut so_far = "".to_string();
 
@@ -157,14 +162,14 @@ fn edit_node(path: &str) -> bool {
                             .unwrap_or("")
                     );
                     so_far.push(letter);
-                    skip_lines = ii + 4;
+                    skip_lines = ii + 5;
                 }
             }
-            content += "-- Content after this line. First line = new title --\n\n";
+            content += "Content after the next line. First line = new title \n--\n\n";
             let node = ss.get_node(path).map(|x| x.clone());
             content += node.as_ref().map(|x| &x.raw[..]).unwrap_or("");
-            let tf_name = tf.path().to_str().expect("temp file was not unicode name?");
-            std::fs::write(&tf_name, &content).expect("temp file write failure");
+            let tf_name = tf.to_str().expect("temp file was not unicode name?");
+            std::fs::write(&tf, &content).expect("temp file write failure");
 
             if let None = node {
                 let place_holder = Node::new(path, "(placeholder)");
@@ -178,18 +183,57 @@ fn edit_node(path: &str) -> bool {
                 .arg(tf_name)
                 .spawn()
                 .expect("Failed to spawn kitty&neovim");
-            RUNTIME_STATE
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .open_editors
-                .push(OpenEditor {
-                    path: path.to_string(),
-                    temp_file: tf,
-                    org_content: content,
-                    process,
-                });
+            let tf_name_for_thread = tf.file_name().map(|x| x.to_os_string()).unwrap();
+            let tf_for_thread = tf.clone();
+            let node_path = path.to_string();
+            thread::spawn(move || {
+                let mut inotify = Inotify::init().expect("inotify init failed");
+                inotify
+                    .add_watch(
+                        tf_folder,
+                        WatchMask::CLOSE_WRITE | WatchMask::DELETE | WatchMask::MOVED_TO,
+                    )
+                    .expect("inotify add watch failed");
+                loop {
+                    let mut buffer = [0; 1024];
+                    let events = inotify
+                        .read_events_blocking(&mut buffer)
+                        .expect("Error while reading events");
+
+                    for event in events {
+                        dbg!(&event);
+                        if event.mask.contains(EventMask::DELETE) {
+                            if let Some(event_filename) = event.name {
+                                if event_filename == tf_name_for_thread {
+                                    break;
+                                };
+                            }
+                        } else if event.mask.contains(EventMask::CLOSE_WRITE) {
+                            if let Some(event_filename) = event.name {
+                                if event_filename == tf_name_for_thread {
+                                    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                                    let content = std::fs::read_to_string(&tf_for_thread)
+                                        .expect("could not read temp file");
+                                    let content = parse_raw_content(&content);
+                                    //println!("Telling viewer about changed temp file");
+                                    lock.app_handle
+                                        .emit_all("node-temp-changed", (&node_path, content))
+                                        .ok();
+                                }
+                            }
+                        }
+                        dbg!(event);
+                        dbg!(&tf_name_for_thread);
+                        // Handle event
+                    }
+                }
+            });
+            runtime_state.open_editors.push(OpenEditor {
+                path: path.to_string(),
+                temp_file: tf,
+                org_content: content,
+                process,
+            });
         }
 
         true
@@ -213,17 +257,16 @@ fn edit_settings() -> bool {
         .is_none()
     {
         {
-            let tf = tempfile::Builder::new()
-                .prefix("florg-settings")
-                .suffix(".toml")
-                .tempfile()
-                .expect("could not create tempfile?");
             let ss = STORAGE.get().unwrap().lock().unwrap();
+            let tf_folder = ss.data_path.join("temp");
+            std::fs::create_dir_all(&tf_folder).unwrap();
+            let tf = tf_folder.join("settings.toml");
+
             dbg!(&ss.settings);
             let content = ss.settings.to_string();
             let skip_lines = 0;
 
-            let tf_name = tf.path().to_str().expect("temp file was not unicode name?");
+            let tf_name = tf.to_str().expect("temp file was not unicode name?");
             std::fs::write(&tf_name, &content).expect("temp file write failure");
 
             let process = std::process::Command::new("kitty")
@@ -445,8 +488,11 @@ fn editor_ended() {
                 Ok(res) => match res {
                     Some(exit_status) => {
                         if exit_status.success() {
-                            let raw = std::fs::read_to_string(entry.temp_file.path())
+                            let raw = std::fs::read_to_string(&entry.temp_file)
                                 .expect("Failed to read tempfile");
+                            //dbg!(raw == entry.org_content);
+                            //dbg!(&raw);
+                            //dbg!(&entry.org_content);
                             if raw.is_empty() || (raw == entry.org_content) {
                                 remove.push((ii, entry.path.to_string(), None))
                             } else {
@@ -472,10 +518,11 @@ fn editor_ended() {
                 let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
                 let mut ss = STORAGE.get().unwrap().lock().unwrap();
                 ss.remove_placeholder(&path);
-                lock.app_handle.emit_all("node-unchanged", 0).ok();
+                lock.app_handle.emit_all("node-unchanged", &path).ok();
             }
         }
         let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+        std::fs::remove_file(&lock.open_editors[ii].temp_file).ok();
         lock.open_editors.remove(ii);
     }
 }
@@ -499,10 +546,7 @@ fn update_from_edited_file(path: &str, raw_contents: String) {
             }
         }
     } else {
-        let content = match raw_contents.split_once("--\n") {
-            Some((_header, content)) => content.trim(),
-            None => &raw_contents,
-        };
+        let content = parse_raw_content(&raw_contents);
         println!("parsed contents");
 
         let node = storage::Node::new(path, content);
@@ -564,6 +608,7 @@ fn main() -> Result<()> {
             edit_node,
             change_node_text,
             get_node,
+            get_node_folder_path,
             list_open_paths,
             date_to_path,
             create_calendar,

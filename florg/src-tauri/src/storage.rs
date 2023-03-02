@@ -32,6 +32,9 @@ pub(crate) struct Storage {
     pub settings: toml_edit::Document,
 }
 
+pub const FLORG_FILENAME: &'static str = "node.adoc";
+pub const FLORG_SUFFIX: &'static str = ".adoc";
+
 impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
@@ -82,7 +85,7 @@ impl Storage {
                     || entry
                         .file_name()
                         .to_str()
-                        .map(|s| s == "node.florg")
+                        .map(|s| s == FLORG_FILENAME)
                         .unwrap_or(false)
             })
             .filter_map(|e| e.ok())
@@ -161,9 +164,10 @@ impl Storage {
 
         let mut filename = node.dirname(&self.data_path);
         std::fs::create_dir_all(&filename).expect("failed to create directory");
-        filename.push("node.florg");
+        filename.push(FLORG_FILENAME);
 
-        let existed = filename.exists() && (std::fs::read_to_string(&filename).unwrap_or("".to_string()) != "(placeholder)");
+        let existed = filename.exists()
+            && (std::fs::read_to_string(&filename).unwrap_or("".to_string()) != "(placeholder)");
         let msg = if existed {
             format!("Changed node {} '{}'", node.path, node.header.title)
         } else {
@@ -182,8 +186,8 @@ impl Storage {
         let mut remove_path = None;
         if let Some(node) = node {
             if node.raw == "(placeholder)" {
-                let rd = std::fs::read_dir(&node.dirname(&self.data_path))
-                    .expect("Failed to read dir");
+                let rd =
+                    std::fs::read_dir(&node.dirname(&self.data_path)).expect("Failed to read dir");
                 if rd
                     .filter_map(|x| x.ok())
                     .filter(|entry| {
@@ -192,7 +196,7 @@ impl Storage {
                             .file_name()
                             .unwrap_or_else(|| OsStr::new(""))
                             .to_string_lossy()
-                            != "node.florg"
+                            != FLORG_FILENAME
                     })
                     .next()
                     .is_none()
@@ -259,7 +263,7 @@ impl Node {
     }
     fn extract_header(contents: &str) -> Header {
         let title = match contents.split_once("\n") {
-            Some((first_line, _)) => first_line,
+            Some((first_line, _)) => first_line.trim_start_matches("= "),
             _ => contents,
         };
         let first_para = match contents.split_once("\n\n") {

@@ -50,7 +50,13 @@ a:hover {
 }
 
 h1 {
-  text-align: center;
+  line-height: 1em;
+  text-align: left;
+  margin-left: 1em;
+  text-decoration: underline;
+  text-decoration-style: double;
+  text-decoration-color: darkgrey;
+  margin-top: 0px;
 }
 
 input,
@@ -99,4 +105,10 @@ button {
     color: #ffffff;
     background-color: #0f0f0f98;
   }
+}
+
+pre {
+  overflow: scroll;
+  background: #fefefe;
+  padding: 5px;
 }

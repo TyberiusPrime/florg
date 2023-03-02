@@ -93,8 +93,9 @@
       }
     },
   });
-  listener_normal.simple_combo("x", async (e, count, repeated) => {
-    enter_date_mode("goto", "Goto Date below #insert-hashtag");
+  listener_normal.simple_combo("/", async (e, count, repeated) => {
+    //enter_date_mode("goto", "Goto Date below #insert-hashtag");
+	find("hello")
   });
 
   listener_normal.simple_combo("g", async (e, count, repeated) => {
@@ -265,16 +266,29 @@
   const unlisten_node_changed = listen("node-changed", async (event) => {
     // a specific node was reread
     console.log("node changed", event.payload);
-    await load_node(event.payload[0]);
+    await load_node(event.payload);
     enter_normal_mode();
   });
 
   const unliste_node_unchanged = listen("node-unchanged", async (event) => {
     //some node was not changed / editing aborted.
     //reload to refresh the currently edited thing?
-    await load_node(current_path);
+    console.log("node unchanged", event.payload);
+    if (event.payload == current_path) {
+      await load_node(current_path);
+    }
   });
-
+  const unliste_node_temp_changed = listen(
+    "node-temp-changed",
+    async (event) => {
+      //some node was edited, but not confirmed yet.
+      //reload to refresh the currently edited thing?
+      console.log("node temp-changed", event.payload[0]);
+      if (event.payload[0] == current_path) {
+        content_text = event.payload[1];
+      }
+    }
+  );
   const unlisten_message = listen("message", (event) => {
     //some node was not changed / editing aborted.
     //reload to refresh the currently edited thing
@@ -284,6 +298,7 @@
     console.log("main app destroy");
     (await unlisten_node_changed)();
     (await unliste_node_unchanged)();
+    (await unliste_node_temp_changed)();
     (await unlisten_message)();
 
     listener_normal.reset();
@@ -431,17 +446,17 @@
     } else if (mode == "title") {
       out = content_title;
     } else if (mode == "path") {
-	  out = await invoke ("get_node_folder_path", {path: current_path});
-	}else {
-	console.log("unknown copy_to_clipboard mode", mode);
-	}
+      out = await invoke("get_node_folder_path", { path: current_path });
+    } else {
+      console.log("unknown copy_to_clipboard mode", mode);
+    }
     if (out != null) {
       await writeText(out);
     }
     enter_normal_mode();
   }
 
-  load_node("A");
+  load_node("AA");
   enter_normal_mode();
 </script>
 
@@ -475,7 +490,7 @@
       <hr />
     {/if}
   </div>
-  <div class="content">
+  <div class="main_content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
       {#if mode == "normal" || mode == "nav" || mode == "quick_pick"}

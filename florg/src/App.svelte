@@ -7,6 +7,7 @@
   import DateMode from "./lib/DateMode.svelte";
   import PickMode from "./lib/PickMode.svelte";
   import GotoMode from "./lib/GotoMode.svelte";
+  import SearchMode from "./lib/SearchMode.svelte";
   import Footer from "./lib/Footer.svelte";
   import * as KeyPress from "../dist/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
@@ -71,6 +72,9 @@
   let goto_mode_text = "";
   let goto_show_normal = false;
 
+  let search_mode_start_pos = null;
+  let search_mode_term = "";
+
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
   //listener_normal.stop_listening();
@@ -94,8 +98,25 @@
     },
   });
   listener_normal.simple_combo("/", async (e, count, repeated) => {
-    //enter_date_mode("goto", "Goto Date below #insert-hashtag");
-	find("hello")
+    enter_search_mode();
+  });
+
+  listener_normal.register_combo({
+    keys: "n",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      window.find(search_mode_term, false, false, true, false);
+    },
+  });
+
+  listener_normal.register_combo({
+    prevent_repeat: true,
+    keys: "shift n",
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      window.find(search_mode_term, false, true, true, false);
+    },
   });
 
   listener_normal.simple_combo("g", async (e, count, repeated) => {
@@ -240,6 +261,13 @@
     pick_mode_message = message;
     pick_mode_elements = elements;
     listener_normal.stop_listening();
+  }
+  function enter_search_mode() {
+    listener_normal.stop_listening();
+    search_mode_start_pos = document.body.scrollTop;
+    footer_msg =
+      "Search mode. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+    mode = "search";
   }
 
   function handle_goto_node(ev) {
@@ -456,6 +484,19 @@
     enter_normal_mode();
   }
 
+  async function handle_search_mode_leave(ev) {
+    let ok = ev.detail;
+    console.log("handle_command_mode_leave", ok);
+    console.log(search_mode_term);
+    enter_normal_mode();
+    if (ok) {
+      window.find(search_mode_term, false, false, true, false);
+    } else {
+      document.body.scrollTo(search_mode_start_pos[1]);
+      search_mode_term = "";
+    }
+  }
+
   load_node("AA");
   enter_normal_mode();
 </script>
@@ -493,7 +534,7 @@
   <div class="main_content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
-      {#if mode == "normal" || mode == "nav" || mode == "quick_pick"}
+      {#if mode == "normal" || mode == "nav" || mode == "quick_pick" || mode == "search"}
         <Content bind:text={content_text} />
       {:else if mode == "date"}
         <DateMode
@@ -514,6 +555,12 @@
   </div>
   <div class="footer">
     <hr />
+    {#if mode == "search"}
+      <SearchMode
+        on:leave={handle_search_mode_leave}
+        bind:search_term={search_mode_term}
+      />
+    {/if}
     {#if mode == "goto" || mode == "quick_pick"}
       <GotoMode
         bind:action={goto_mode_action}

@@ -6,6 +6,8 @@
   import Content from "./lib/Content.svelte";
   import DateMode from "./lib/DateMode.svelte";
   import PickMode from "./lib/PickMode.svelte";
+  import MailListHeader from "./lib/MailListHeader.svelte";
+  import MailListContent from "./lib/MailListContent.svelte";
   import GotoMode from "./lib/GotoMode.svelte";
   import SearchMode from "./lib/SearchMode.svelte";
   import Footer from "./lib/Footer.svelte";
@@ -46,7 +48,8 @@
         },
       });
       let end_time = performance.now();
-      if (end_time - start_time > 100) { // probably just as fast to not cache...
+      if (end_time - start_time > 100) {
+        // probably just as fast to not cache...
         await invoke("set_cached_node", {
           path: path,
           raw: content_text,
@@ -103,6 +106,12 @@
   let search_mode_term = "";
   let search_mode_action = "";
 
+  let mail_mode_queries = [];
+  let mail_mode_query = null;
+  let mail_mode_focused = 0;
+  let mail_mode_elements = []; // unfiltered
+  let mail_mode_downstream_elements = []; //ad hoc filtered
+
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
   //listener_normal.stop_listening();
@@ -150,6 +159,10 @@
     on_keyup: (e, count, repeated) => {
       window.find(search_mode_term, false, true, true, false);
     },
+  });
+
+  listener_normal.simple_combo("x", async (e, count, repeated) => {
+    goto_mail_search();
   });
 
   listener_normal.simple_combo("g", async (e, count, repeated) => {
@@ -235,6 +248,27 @@
       load_node(current_path.slice(0, -1));
     }
   });
+
+  async function goto_mail_search() {
+    let entries = [];
+    let searches = await invoke("get_mail_search_folders", {});
+    if (searches == null) {
+      searches = {
+        a: "*",
+        m: "tag:inbox and tag:unread",
+        M: "tag:inbox",
+      };
+    }
+    for (let key in searches) {
+      let query = searches[key];
+      entries.push({
+        key: key,
+        target_path: query,
+        text: query,
+      });
+    }
+    enter_goto_mode("mail", "Mail search", entries, false);
+  }
 
   listener_normal.register_combo({
     keys: "enter",
@@ -470,6 +504,8 @@
       await toggle_tag_on_current_node(ev.detail);
     } else if (goto_mode_action == "copy") {
       await copy_to_clipboard(ev.detail);
+    } else if (goto_mode_action == "mail") {
+      await enter_mail_view(ev.detail);
     } else {
       let path = ev.detail;
       if (path.startsWith("!")) {
@@ -531,6 +567,26 @@
     enter_normal_mode();
   }
 
+  async function enter_mail_view(query) {
+    if (mail_mode_queries.length > 0 && mail_mode_queries.slice(-1) != query) {
+      mail_mode_queries.push(query);
+    }
+    mail_mode_query = query;
+    mode = "mail";
+    footer_msg =
+      "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
+    listener_normal.stop_listening();
+
+    let threads = await invoke("query_mail", { query: query });
+    mail_mode_elements = [];
+    mail_mode_downstream_elements = [];
+    for (let thread of threads) {
+      mail_mode_elements.push(thread);
+	  mail_mode_downstream_elements.push(thread);
+    }
+
+  }
+
   async function handle_search_mode_leave(ev) {
     let ok = ev.detail;
     enter_normal_mode();
@@ -585,6 +641,19 @@
     }
   }
 
+  function handle_mail_show(ev) {
+    console.log("mail show");
+  }
+
+  function handle_mail_leave(ev) {
+    mail_mode_queries.pop();
+    if (mail_mode_queries.length > 0) {
+      enter_mail_view(mail_mode_queries.slice(-1));
+    } else {
+      enter_normal_mode();
+    }
+  }
+
   load_node("AA");
   enter_normal_mode();
 </script>
@@ -617,6 +686,13 @@
         bind:current_path
       />
       <hr />
+    {:else if mode == "mail"}
+      <MailListHeader
+        bind:query={mail_mode_query}
+        on:leave={handle_mail_leave}
+        bind:elements={mail_mode_elements}
+        bind:downstream_elements={mail_mode_downstream_elements}
+      />
     {/if}
   </div>
   <div class="main_content">
@@ -637,6 +713,13 @@
           bind:elements={pick_mode_elements}
           on:picker_canceled={handle_picker_canceled}
           on:picker_accepted={handle_picker_accepted}
+        />
+      {:else if mode == "mail"}
+        <MailListContent
+          on:action={handle_mail_show}
+          on:leave={handle_mail_leave}
+          bind:downstream_elements={mail_mode_downstream_elements}
+
         />
       {/if}
     </div>

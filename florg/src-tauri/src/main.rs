@@ -3,7 +3,9 @@
     windows_subsystem = "windows"
 )]
 
+mod mail;
 mod storage;
+
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Datelike;
 use inotify::{EventMask, Inotify, WatchMask};
@@ -33,13 +35,15 @@ pub struct OpenEditor {
 struct RuntimeState {
     open_editors: Vec<OpenEditor>,
     app_handle: tauri::AppHandle,
+    notmuch_db: mail::MailStore,
 }
 
 impl RuntimeState {
-    fn new(handle: tauri::AppHandle) -> RuntimeState {
+    fn new(handle: tauri::AppHandle, notmuch_db: mail::MailStore) -> RuntimeState {
         RuntimeState {
             open_editors: Vec::new(),
             app_handle: handle,
+            notmuch_db,
         }
     }
 }
@@ -418,6 +422,11 @@ fn get_nav() -> Option<HashMap<String, String>> {
 }
 
 #[tauri::command]
+fn get_mail_search_folders() -> Option<HashMap<String, String>> {
+    get_from_settings_str_map("mail_search")
+}
+
+#[tauri::command]
 fn find_next_empty_child(path: &str) -> String {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     ss.find_next_empty_child(path)
@@ -511,6 +520,14 @@ fn set_cached_node(path: &str, raw: &str, rendered: &str) -> bool {
         Ok(_) => true,
         Err(_) => false, //todo: error handling
     }
+}
+
+#[tauri::command]
+fn query_mail(query: &str) -> Vec<mail::Thread> {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.query(query);
+    dbg!(&res);
+    res
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -699,11 +716,43 @@ fn main() -> Result<()> {
             }
         }
     });
+    fn get_mail_setting(key: &str) -> Option<String> {
+        let ss = STORAGE.get().unwrap().lock().unwrap();
+        Some(
+            ss.settings
+                .get("mail")?
+                .as_table()?
+                .get(key)?
+                .as_str()?
+                .to_string(),
+        )
+    }
+    let mail_path = get_mail_setting("mail_dir").unwrap_or_else(|| {
+        dirs::home_dir()
+            .expect(
+                "Could not find home dir, can't guess maildir, set mail.mail_dir in settings.toml",
+            )
+            .join("mail")
+            .to_string_lossy()
+            .to_string()
+    });
+    let config_path = get_mail_setting("config_path").unwrap_or_else(|| {
+        dirs::home_dir()
+            .expect(
+                "Could not find home dir, can't guess notmuch config path, \
+                                set mail.config_path in settings.toml",
+            )
+            .join(".notmuch-config")
+            .to_string_lossy()
+            .to_string()
+    });
+
+    let mail_store = mail::MailStore::new(&mail_path, &config_path);
 
     tauri::Builder::default()
         .setup(|app| {
             RUNTIME_STATE
-                .set(Mutex::new(RuntimeState::new(app.handle())))
+                .set(Mutex::new(RuntimeState::new(app.handle(), mail_store)))
                 .unwrap();
             Ok(())
         })
@@ -719,10 +768,12 @@ fn main() -> Result<()> {
             edit_settings,
             get_tags,
             get_nav,
+            get_mail_search_folders,
             find_next_empty_child,
             ripgrep_below_node,
             get_cached_node,
             set_cached_node,
+            query_mail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

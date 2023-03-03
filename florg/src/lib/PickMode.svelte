@@ -60,8 +60,6 @@
   {@html message} <br />
   filter: <input id="typebox" autofocus bind:value={input_text} />
   <PickerTable bind:focused bind:elements={downstream_elements} />
-  Action is :
-  {action}
 </div>
 
 <style>

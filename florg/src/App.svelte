@@ -111,6 +111,7 @@
   let mail_mode_focused = 0;
   let mail_mode_elements = []; // unfiltered
   let mail_mode_downstream_elements = []; //ad hoc filtered
+  let mail_mode_more_mail_available = false;
 
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
@@ -568,7 +569,7 @@
   }
 
   async function enter_mail_view(query) {
-    if (mail_mode_queries.length > 0 && mail_mode_queries.slice(-1) != query) {
+    if ((mail_mode_queries.length == 0) ||  (mail_mode_queries.length > 0 && mail_mode_queries.slice(-1) != query)) {
       mail_mode_queries.push(query);
     }
     mail_mode_query = query;
@@ -577,7 +578,10 @@
       "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
     listener_normal.stop_listening();
 
-    let threads = await invoke("query_mail", { query: query });
+    let mr = await invoke("query_mail", { query: query });
+	let threads = mr[0];
+	mail_mode_more_mail_available = mr[1];
+	console.log("more mail", mail_mode_more_mail_available);
     mail_mode_elements = [];
     mail_mode_downstream_elements = [];
     for (let thread of threads) {
@@ -648,10 +652,14 @@
   function handle_mail_leave(ev) {
     mail_mode_queries.pop();
     if (mail_mode_queries.length > 0) {
-      enter_mail_view(mail_mode_queries.slice(-1));
+      enter_mail_view(mail_mode_queries.pop());
     } else {
       enter_normal_mode();
     }
+  }
+
+  function handle_mail_refine_search(ev) {
+	enter_mail_view(mail_mode_query);
   }
 
   load_node("AA");
@@ -661,7 +669,7 @@
 <svelte:window />
 
 <div class="wrapper">
-  <div class="header">
+  <div class="header" id="header">
     <TopTree
       bind:title={content_title}
       bind:path={current_path}
@@ -689,7 +697,9 @@
     {:else if mode == "mail"}
       <MailListHeader
         bind:query={mail_mode_query}
+		bind:more_mail={mail_mode_more_mail_available}
         on:leave={handle_mail_leave}
+		on:refine_search={handle_mail_refine_search}
         bind:elements={mail_mode_elements}
         bind:downstream_elements={mail_mode_downstream_elements}
       />

@@ -16,13 +16,27 @@
 </script>
 
 <div >
-mails found
  <div style="overflow:scroll">
   <table id="mail_pick_table">
+  {#if downstream_elements.length == 0}
+nothing found.
+  {/if}
     {#each downstream_elements as el, index}
       <tr class={index == focused ? "chosen" : ""}>
-        <td>{JSON.stringify(el)}</td>
-        <td>{el.subject}</td>
+	  <td>{index}</td>
+        <td>
+		{#if el.unread}
+			<b>
+				{el.authors}<br />
+				({el.messages.length}) {el.subject}
+				</b>
+		{:else}
+				{el.authors}<br />
+				({el.messages.length}) {el.subject}
+		{/if}
+
+</td>
+
       </tr>
     {/each}
   </table>

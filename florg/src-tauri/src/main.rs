@@ -523,10 +523,9 @@ fn set_cached_node(path: &str, raw: &str, rendered: &str) -> bool {
 }
 
 #[tauri::command]
-fn query_mail(query: &str) -> Vec<mail::Thread> {
+fn query_mail(query: &str) -> (Vec<mail::Thread>, bool) {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.query(query);
-    dbg!(&res);
     res
 }
 

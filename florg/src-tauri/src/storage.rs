@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 use anyhow::{Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
 
@@ -33,6 +34,7 @@ pub(crate) struct Storage {
 }
 
 pub const FLORG_FILENAME: &'static str = "node.adoc";
+pub const FLORG_CACHE_FILENAME: &'static str = "node.cache";
 pub const FLORG_SUFFIX: &'static str = ".adoc";
 
 impl Storage {
@@ -50,7 +52,7 @@ impl Storage {
     }
 
     pub fn reload(&mut self) {
-        let nodes = Self::parse_path(&self.data_path, None, None);
+        let nodes = Self::parse_path(&self.data_path);
         self.nodes = nodes;
     }
 
@@ -74,8 +76,8 @@ impl Storage {
 
     fn parse_path(
         data_path: &PathBuf,
-        old_root: Option<Node>,
-        update_nodes: Option<Vec<String>>,
+        //old_root: Option<Node>,
+        //update_nodes: Option<Vec<String>>,
     ) -> Vec<Node> {
         let mut nodes = Vec::new();
         for entry in WalkDir::new(data_path)
@@ -231,6 +233,31 @@ impl Storage {
             .current_dir(&self.data_path)
             .status()
             .expect("git add failed");
+    }
+
+    pub(crate) fn set_cached_node(&mut self, path: &str, raw: &str, to_cache: &str) -> Result<()> {
+        let node_path = Node::dirname_from_path(&self.data_path, path).join(FLORG_CACHE_FILENAME);
+        let hash = sha256::digest(raw.as_bytes()).to_string();
+        let output = format!("{}\n{}", hash, to_cache);
+        Ok(std::fs::write(node_path, output)?)
+    }
+
+    pub(crate) fn get_cached_node(&mut self, path: &str) -> Option<String> {
+        let node = self.get_node(path)?;
+        let hash = sha256::digest(node.raw.as_bytes()).to_string();
+        let input = std::fs::read_to_string(
+            Node::dirname_from_path(&self.data_path, path).join(FLORG_CACHE_FILENAME),
+        )
+        .ok()?;
+        dbg!("Read cache");
+        let (stored_hash, content) = input.split_once("\n")?;
+        if stored_hash == hash {
+        dbg!("hash match");
+            Some(content.to_string())
+        } else {
+        dbg!("hash mismatch", &hash, &stored_hash);
+            None
+        }
     }
 }
 

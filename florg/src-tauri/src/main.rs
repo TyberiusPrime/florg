@@ -498,6 +498,20 @@ fn ripgrep_below_node(path: &str, search_term: &str) -> Option<Vec<RipgrepResult
         }
     }
 }
+#[tauri::command]
+fn get_cached_node(path: &str) -> Option<String> {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    ss.get_cached_node(path)
+}
+
+#[tauri::command]
+fn set_cached_node(path: &str, raw: &str, rendered: &str) -> bool {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    match ss.set_cached_node(path, raw, rendered) {
+        Ok(_) => true,
+        Err(_) => false, //todo: error handling
+    }
+}
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
@@ -707,6 +721,8 @@ fn main() -> Result<()> {
             get_nav,
             find_next_empty_child,
             ripgrep_below_node,
+            get_cached_node,
+            set_cached_node,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

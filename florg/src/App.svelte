@@ -15,6 +15,9 @@
   import { exit } from "@tauri-apps/api/process";
   import { onMount, onDestroy } from "svelte";
   import { readText, writeText } from "@tauri-apps/api/clipboard";
+  import asciidoctor from "asciidoctor";
+
+  let Asciidoctor = asciidoctor();
 
   async function get_node(path) {
     return await invoke("get_node", { path });
@@ -31,6 +34,29 @@
       content_text = "(empty node - enter to create)";
       content_title = "(empty node)";
     }
+    let rendered_cached = await invoke("get_cached_node", { path });
+    if (rendered_cached == null) {
+      let start_time = performance.now();
+      content_rendered = Asciidoctor.convert(content_text, {
+        attributes: {
+          doctype: "article",
+          showtitle: true,
+          "source-highlighter": "highlight.js",
+          "highlightjs-languages": "rust, swift",
+        },
+      });
+      let end_time = performance.now();
+      if (end_time - start_time > 100) { // probably just as fast to not cache...
+        await invoke("set_cached_node", {
+          path: path,
+          raw: content_text,
+          rendered: content_rendered,
+        });
+      }
+    } else {
+      content_rendered = rendered_cached;
+    }
+
     let children = [];
     node.children.forEach((c) => {
       children.push({
@@ -52,6 +78,7 @@
   let mode = "normal";
   let footer_msg = "";
   let content_text = "";
+  let content_rendered = "";
   let content_levels = "";
   let content_title = "";
   let content_children;
@@ -268,7 +295,8 @@
     pick_mode_message = message;
     pick_mode_elements = elements;
     listener_normal.stop_listening();
-	footer_msg = "<span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span> to cancel";
+    footer_msg =
+      "<span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span> to cancel";
   }
 
   function enter_search_mode(action) {
@@ -531,13 +559,14 @@
           }
 
           text += "<br />";
-		  let counter = 0;
+          let counter = 0;
           for (let line of result.lines) {
             text += line[0] + ": " + line[1] + "<br />";
-			counter += 1;
-			if (counter > 7) { 
-			text += "...";
-			break; }
+            counter += 1;
+            if (counter > 7) {
+              text += "...";
+              break;
+            }
           }
           translated_results.push({
             cmd: result.path,
@@ -546,7 +575,7 @@
         }
         enter_pick_mode(
           "search",
-		  `Search results for <i>${search_mode_term}</i>`,
+          `Search results for <i>${search_mode_term}</i>`,
           translated_results
         );
       }
@@ -594,7 +623,7 @@
     <div class="sticky-spacer" />
     <div class="sticky-content">
       {#if mode == "normal" || mode == "nav" || mode == "quick_pick" || mode == "search"}
-        <Content bind:text={content_text} />
+        <Content bind:rendered={content_rendered} />
       {:else if mode == "date"}
         <DateMode
           bind:message={date_mode_message}

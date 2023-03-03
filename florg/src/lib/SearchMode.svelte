@@ -5,10 +5,12 @@
 
   export let search_term = "";
 
-  async function handle(e) {
-    if (e.key == "Enter") {
+  async function handle(event) {
+    if (event.key == "Enter") {
+	  event.stopPropagation();
       dispatch("leave", true);
-    } else if (e.key == "Escape") {
+    } else if (event.key == "Escape") {
+	  event.stopPropagation();
       dispatch("leave", false);
     }
   }
@@ -19,7 +21,7 @@
       id="search_input-input"
       bind:value={search_term}
       placeholder="search text"
-      on:keypress={handle}
+      on:keyup={handle}
       autofocus
     />
 </div>

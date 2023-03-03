@@ -17,12 +17,30 @@
   let last_text = "---";
   let downstream_elements = [];
 
-
   function handle_text_change(ev) {
+    console.log(ev);
     const fzf = new Fzf(elements, {
       selector: (item) => item.text,
       tiebreakers: [byLengthAsc],
     });
+    if (ev.key == "Escape") {
+      dispatch("picker_canceled", null);
+    } else if (ev.key == "Enter") {
+      dispatch("picker_accepted", {
+        cmd: downstream_elements[focused].cmd,
+        action: action,
+      });
+    } else {
+      if (input_text != last_text) {
+        const entries = fzf.find(input_text);
+        downstream_elements = entries.map((entry) => entry.item);
+        focused = 0;
+        last_text = input_text;
+      }
+    }
+  }
+
+  function handle_key_down(ev) {
     if (ev.key == "ArrowDown") {
       ev.preventDefault();
       if (focused < downstream_elements.length - 1) {
@@ -33,26 +51,14 @@
       if (focused > 0) {
         focused -= 1;
       }
-    } else if (ev.key == "Escape") {
-      dispatch("picker_canceled", null);
-    } else if (ev.key == "Enter") {
-	  dispatch("picker_accepted", {cmd: downstream_elements[focused].cmd, action: action});
-    } else {
-	console.log(ev);
-      if (input_text != last_text) {
-        const entries = fzf.find(input_text);
-        downstream_elements = entries.map((entry) => entry.item);
-        focused = 0;
-        last_text = input_text;
-      }
     }
   }
   downstream_elements = elements;
 </script>
 
-<div on:keyup={handle_text_change}>
-  {message}
-  <input id="typebox" autofocus bind:value={input_text} />
+<div on:keyup={handle_text_change} on:keydown={handle_key_down}>
+  {@html message} <br />
+  filter: <input id="typebox" autofocus bind:value={input_text} />
   <PickerTable bind:focused bind:elements={downstream_elements} />
   Action is :
   {action}

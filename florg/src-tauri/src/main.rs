@@ -416,10 +416,87 @@ fn get_tags() -> Option<HashMap<String, String>> {
 fn get_nav() -> Option<HashMap<String, String>> {
     get_from_settings_str_map("nav")
 }
+
 #[tauri::command]
 fn find_next_empty_child(path: &str) -> String {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     ss.find_next_empty_child(path)
+}
+
+#[derive(Serialize, Debug)]
+struct RipgrepResult {
+    path: String,
+    title: String,
+    parent_titles: Vec<String>,
+    lines: Vec<(u32, String)>,
+}
+
+#[tauri::command]
+fn ripgrep_below_node(path: &str, search_term: &str) -> Option<Vec<RipgrepResult>> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    let search_path = Node::dirname_from_path(&ss.data_path, path);
+    let ok = &std::process::Command::new("rg")
+        .arg("--type-add")
+        .arg("adoc:*.adoc")
+        .arg("-t")
+        .arg("adoc")
+        .arg("-i")
+        .arg("--line-number")
+        .arg("--heading")
+        .arg(search_term)
+        .current_dir(search_path)
+        .output();
+    match ok {
+        Ok(output) => {
+            let stdout = std::str::from_utf8(&output.stdout).unwrap();
+            let mut result = Vec::new();
+            for block in stdout.split("\n\n") {
+                let mut lines = block.split("\n");
+                let filename = lines.next();
+                let path = match filename {
+                    Some(filename) => {
+                        let filename = filename.trim_end_matches(storage::FLORG_FILENAME);
+                        filename.replace("/", "")
+                    }
+                    None => continue,
+                };
+                let title = ss
+                    .get_node(&path)
+                    .map(|x| x.header.title.clone())
+                    .unwrap_or_else(|| "(empty node)".to_string());
+                let mut parent_titles = Vec::new();
+                let mut cpath = path.clone();
+                while !cpath.is_empty() {
+                    cpath.pop();
+                    parent_titles.push(
+                        ss.get_node(&cpath)
+                            .map(|x| x.header.title.clone())
+                            .unwrap_or_else(|| "(empty node)".to_string()),
+                    );
+                }
+                let mut hits = Vec::new();
+                for further in lines {
+                    let (line_no, hit) = match further.split_once(":") {
+                        Some((line_no, hit)) => (line_no, hit),
+                        None => continue,
+                    };
+                    hits.push((line_no.parse::<u32>().unwrap_or(0), hit.to_string()));
+                }
+                result.push(RipgrepResult {
+                    path,
+                    title,
+                    parent_titles,
+                    lines: hits,
+                })
+            }
+            result.sort_by(|a, b| a.path.cmp(&b.path));
+            Some(result)
+        }
+        Err(e) => {
+            println!("error running ripgrep: {}", e);
+            None
+        }
+    }
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -477,6 +554,15 @@ fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
         .context("git initial commit failed")?;
 
     Ok(())
+}
+
+fn init_data_path_gitignore(data_path: &PathBuf) -> Result<()> {
+    Ok(std::fs::write(
+        data_path.join(".gitignore"),
+        "
+                   *.temp.adoc
+                   ",
+    )?)
 }
 
 fn editor_ended() {
@@ -581,6 +667,9 @@ fn main() -> Result<()> {
     if !(data_path.join(".git")).exists() {
         init_data_path_git(&data_path, &git_binary).expect("failed to init git dir");
     }
+    if !(data_path.join(".gitignore")).exists() {
+        init_data_path_gitignore(&data_path).expect("failed to init gitignore");
+    }
 
     let s = Mutex::new(Storage::new(data_path, git_binary));
     STORAGE.set(s).unwrap();
@@ -617,6 +706,7 @@ fn main() -> Result<()> {
             get_tags,
             get_nav,
             find_next_empty_child,
+            ripgrep_below_node,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

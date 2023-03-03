@@ -17,11 +17,11 @@
     {#each elements as el, index}
       {#if index == focused}
         <tr class="chosen" data-command={el.cmd}>
-          <td>{el.text}</td>
+          <td>{@html el.text}</td>
         </tr>
       {:else}
         <tr data-command={el.cmd}>
-          <td>{el.text}</td>
+          <td>{@html el.text}</td>
         </tr>
       {/if}
     {/each}

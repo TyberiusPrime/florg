@@ -261,6 +261,7 @@ impl Node {
         let header = Self::extract_header(&raw);
         Node { path, header, raw }
     }
+
     fn extract_header(contents: &str) -> Header {
         let title = match contents.split_once("\n") {
             Some((first_line, _)) => first_line.trim_start_matches("= "),

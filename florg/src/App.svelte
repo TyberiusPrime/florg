@@ -74,6 +74,7 @@
 
   let search_mode_start_pos = null;
   let search_mode_term = "";
+  let search_mode_action = "";
 
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
@@ -97,8 +98,13 @@
       }
     },
   });
+
   listener_normal.simple_combo("/", async (e, count, repeated) => {
-    enter_search_mode();
+    enter_search_mode("in_page");
+  });
+
+  listener_normal.simple_combo("s", async (e, count, repeated) => {
+    enter_search_mode("global");
   });
 
   listener_normal.register_combo({
@@ -158,6 +164,7 @@
       { key: "y", text: "content", target_path: "content" },
       { key: "t", text: "title", target_path: "title" },
       { key: "p", text: "node folder path", target_path: "path" },
+      { key: "r", text: "rendered_content", target_path: "rendered_content" },
     ];
     enter_goto_mode("copy", "Copy to clipboard...", entries, true);
   });
@@ -261,12 +268,20 @@
     pick_mode_message = message;
     pick_mode_elements = elements;
     listener_normal.stop_listening();
+	footer_msg = "<span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span> to cancel";
   }
-  function enter_search_mode() {
+
+  function enter_search_mode(action) {
     listener_normal.stop_listening();
     search_mode_start_pos = document.body.scrollTop;
-    footer_msg =
-      "Search mode. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+    if (action == "in_page") {
+      footer_msg =
+        "In page search mode. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+    } else if (action == "global") {
+      footer_msg =
+        "Global search. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+    }
+    search_mode_action = action;
     mode = "search";
   }
 
@@ -352,6 +367,8 @@
     enter_normal_mode();
     if (ev.detail.action === "command") {
       await handle_command(ev.detail.cmd);
+    } else if (ev.detail.action === "search") {
+      load_node(ev.detail.cmd);
     }
   }
 
@@ -471,6 +488,8 @@
       out = `[${content_title}](${current_path})`;
     } else if (mode == "content") {
       out = content_text;
+    } else if (mode == "rendered_content") {
+      out = document.getElementById("the_content").innerHTML;
     } else if (mode == "title") {
       out = content_title;
     } else if (mode == "path") {
@@ -486,14 +505,54 @@
 
   async function handle_search_mode_leave(ev) {
     let ok = ev.detail;
-    console.log("handle_command_mode_leave", ok);
-    console.log(search_mode_term);
     enter_normal_mode();
-    if (ok) {
-      window.find(search_mode_term, false, false, true, false);
-    } else {
-      document.body.scrollTo(search_mode_start_pos[1]);
+    if (search_mode_action == "in_page") {
+      if (ok) {
+        window.find(search_mode_term, false, false, true, false);
+      } else {
+        document.body.scrollTo(search_mode_start_pos[1]);
+        search_mode_term = "";
+      }
+    } else if (search_mode_action == "global") {
+      if (ok) {
+        let rg_results = await invoke("ripgrep_below_node", {
+          path: "",
+          searchTerm: search_mode_term,
+        });
+        let translated_results = [];
+        for (let result of rg_results) {
+          let pretty_path = result.path;
+          if (pretty_path == "") {
+            pretty_path = "(root)";
+          }
+          let text = `${pretty_path}: <strong>${result.title}</strong>`;
+          for (let pt of result.parent_titles) {
+            text += " / " + pt;
+          }
+
+          text += "<br />";
+		  let counter = 0;
+          for (let line of result.lines) {
+            text += line[0] + ": " + line[1] + "<br />";
+			counter += 1;
+			if (counter > 7) { 
+			text += "...";
+			break; }
+          }
+          translated_results.push({
+            cmd: result.path,
+            text: text,
+          });
+        }
+        enter_pick_mode(
+          "search",
+		  `Search results for <i>${search_mode_term}</i>`,
+          translated_results
+        );
+      }
       search_mode_term = "";
+    } else {
+      console.log("unknown search action", search_mode_action);
     }
   }
 
@@ -571,7 +630,12 @@
       />
       <hr />
     {/if}
-    <Footer bind:show_help bind:msg={footer_msg} bind:currently_edited />
+    <Footer
+      bind:show_help
+      bind:msg={footer_msg}
+      bind:currently_edited
+      bind:mode
+    />
   </div>
 </div>
 

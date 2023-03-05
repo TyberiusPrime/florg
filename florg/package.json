@@ -18,6 +18,8 @@
     "flowbite-svelte": "^0.30.5",
     "fzf": "^0.5.1",
     "highlight.js": "^11.7.0",
+    "html2plaintext": "^2.1.4",
+    "postal-mime": "^1.0.15",
     "svelte-flatpickr": "^3.3.2",
     "svelte-tooltip": "^1.2.0"
   },

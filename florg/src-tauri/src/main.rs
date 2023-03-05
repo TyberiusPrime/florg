@@ -13,7 +13,7 @@ use once_cell::sync::OnceCell;
 use serde::Serialize;
 use signal_hook::iterator::Signals;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env,
     path::PathBuf,
     sync::Mutex,
@@ -525,8 +525,17 @@ fn set_cached_node(path: &str, raw: &str, rendered: &str) -> bool {
 #[tauri::command]
 fn query_mail(query: &str) -> (Vec<mail::Thread>, bool) {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-    let res = lock.notmuch_db.query(query);
+    let mut filtered_authors = HashSet::new();
+    filtered_authors.insert("Florian Finkernagel".to_string()); //todo: read from settings
+    let res = lock.notmuch_db.query(query, &filtered_authors);
     res
+}
+
+#[tauri::command]
+fn get_mail_message(id: &str) -> Option<String> {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.get_message(id);
+    res.ok()
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -773,6 +782,7 @@ fn main() -> Result<()> {
             get_cached_node,
             set_cached_node,
             query_mail,
+            get_mail_message,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

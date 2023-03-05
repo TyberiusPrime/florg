@@ -3,16 +3,14 @@
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
   import { onMount, onDestroy } from "svelte";
-  import '../..//dist/highlight.js/styles/github.css'
+  import '../styles/highlight.js/github.css'
   // {@html Asciidoctor.convert(text)}
 
   export let rendered = "content...";
 
   onMount(async () => {
-    console.log("hh");
     document.querySelectorAll("pre code").forEach((el) => {
       hljs.highlightElement(el);
-      console.log(el);
     });
   });
 </script>

@@ -5,7 +5,7 @@
   import "flatpickr/dist/flatpickr.css";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
-  import * as KeyPress from "../../dist/keypress-2.1.5.min.js";
+  import * as KeyPress from "../js/keypress-2.1.5.min.js";
 
   export let message = "";
   export let action = "";

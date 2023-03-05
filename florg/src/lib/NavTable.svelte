@@ -101,12 +101,10 @@
   });
 
   onMount(async () => {
-    console.log("navtree mount");
     listener_nav.listen();
   });
 
   onDestroy(() => {
-    console.log("navtree destroy");
     listener_nav.stop_listening();
   });
 </script>

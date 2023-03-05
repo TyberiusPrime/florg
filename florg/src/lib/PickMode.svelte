@@ -3,7 +3,6 @@
   import * as chrono from "chrono-node";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
-  import * as KeyPress from "../../dist/keypress-2.1.5.min.js";
   import { Fzf, byLengthAsc } from "fzf";
 
   import PickerTable from "./PickerTable.svelte";

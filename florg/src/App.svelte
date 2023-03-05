@@ -8,16 +8,18 @@
   import PickMode from "./lib/PickMode.svelte";
   import MailListHeader from "./lib/MailListHeader.svelte";
   import MailListContent from "./lib/MailListContent.svelte";
+  import MailMessage from "./lib/MailMessage.svelte";
   import GotoMode from "./lib/GotoMode.svelte";
   import SearchMode from "./lib/SearchMode.svelte";
   import Footer from "./lib/Footer.svelte";
-  import * as KeyPress from "../dist/keypress-2.1.5.min.js";
+  import * as KeyPress from "./js/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
   import { emit, listen } from "@tauri-apps/api/event";
   import { exit } from "@tauri-apps/api/process";
   import { onMount, onDestroy } from "svelte";
   import { readText, writeText } from "@tauri-apps/api/clipboard";
   import asciidoctor from "asciidoctor";
+  import PostalMime from "postal-mime";
 
   let Asciidoctor = asciidoctor();
 
@@ -74,7 +76,9 @@
     let open_paths = await invoke("list_open_paths");
     currently_edited = open_paths.indexOf(path) > -1;
     let obj = document.getElementById("the_content");
-    obj.scrollTop = 0;
+    if (obj != null) {
+      obj.scrollTop = 0;
+    }
   }
 
   let show_help = false;
@@ -112,6 +116,9 @@
   let mail_mode_elements = []; // unfiltered
   let mail_mode_downstream_elements = []; //ad hoc filtered
   let mail_mode_more_mail_available = false;
+  let mail_mode_view = "threads";
+
+  let single_mail_mode_message = null;
 
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
@@ -140,8 +147,22 @@
     enter_search_mode("in_page");
   });
 
-  listener_normal.simple_combo("s", async (e, count, repeated) => {
-    enter_search_mode("global");
+  listener_normal.register_combo({
+    keys: "s",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      enter_search_mode("global");
+    },
+  });
+
+  listener_normal.register_combo({
+    keys: "shift s",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      enter_search_mode("mail");
+    },
   });
 
   listener_normal.register_combo({
@@ -163,6 +184,12 @@
   });
 
   listener_normal.simple_combo("x", async (e, count, repeated) => {
+    enter_mail_view(
+      "message:16780397160.6f1Bf6.105158@composer.zfsonlinux.topicbox.com"
+    );
+  });
+
+  listener_normal.simple_combo("i", async (e, count, repeated) => {
     goto_mail_search();
   });
 
@@ -343,7 +370,11 @@
     } else if (action == "global") {
       footer_msg =
         "Global search. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+    } else if (action == "mail") {
+      footer_msg =
+        "Mail query. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
     }
+
     search_mode_action = action;
     mode = "search";
   }
@@ -569,26 +600,64 @@
   }
 
   async function enter_mail_view(query) {
-    if ((mail_mode_queries.length == 0) ||  (mail_mode_queries.length > 0 && mail_mode_queries.slice(-1) != query)) {
+    if (
+      mail_mode_queries.length == 0 ||
+      (mail_mode_queries.length > 0 && mail_mode_queries.slice(-1) != query)
+    ) {
       mail_mode_queries.push(query);
     }
     mail_mode_query = query;
     mode = "mail";
-    footer_msg =
-      "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
     listener_normal.stop_listening();
 
-    let mr = await invoke("query_mail", { query: query });
-	let threads = mr[0];
-	mail_mode_more_mail_available = mr[1];
-	console.log("more mail", mail_mode_more_mail_available);
-    mail_mode_elements = [];
-    mail_mode_downstream_elements = [];
-    for (let thread of threads) {
-      mail_mode_elements.push(thread);
-	  mail_mode_downstream_elements.push(thread);
-    }
+    mail_mode_elements.length = 0;
+    mail_mode_downstream_elements.length = 0;
 
+    if (query.startsWith("message:")) {
+      mode = "single_mail";
+      console.log(query.slice(8));
+      let raw_message = await invoke("get_mail_message", {
+        id: query.slice(8),
+      });
+      if (raw_message != null) {
+		  const parser = new PostalMime();
+		const email = await parser.parse(raw_message);
+        single_mail_mode_message = email;
+      } else {
+        single_mail_mode_message = null;
+      }
+
+    footer_msg =
+	  "<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images.";
+    } else {
+
+    footer_msg =
+      "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
+      if (query.startsWith("thread:")) {
+        let mr = await invoke("query_mail", { query: query });
+        let threads = mr[0];
+        mail_mode_view = "messages";
+        for (let thread of threads) {
+          for (let msg of thread.messages) {
+            mail_mode_elements.push(msg);
+            mail_mode_downstream_elements.push(msg);
+          }
+        }
+        mail_mode_more_mail_available = false;
+      } else {
+        let mr = await invoke("query_mail", { query: query });
+        let threads = mr[0];
+        for (let thread of threads) {
+          mail_mode_elements.push(thread);
+          mail_mode_downstream_elements.push(thread);
+        }
+
+        mail_mode_view = "threads";
+        mail_mode_more_mail_available = mr[1];
+      }
+      mail_mode_elements = mail_mode_elements;
+      mail_mode_downstream_elements = mail_mode_downstream_elements;
+    }
   }
 
   async function handle_search_mode_leave(ev) {
@@ -640,26 +709,37 @@
         );
       }
       search_mode_term = "";
+    } else if (search_mode_action == "mail") {
+      if (ok) {
+        await enter_mail_view(search_mode_term);
+      } else {
+        search_mode_term = "";
+      }
     } else {
       console.log("unknown search action", search_mode_action);
     }
   }
 
-  function handle_mail_show(ev) {
-    console.log("mail show");
+  async function handle_mail_action(ev) {
+    console.log("mail show", ev.detail);
+    if (ev.detail.single_message) {
+      await enter_mail_view("message:" + ev.detail.id);
+    } else {
+      await enter_mail_view("thread:" + ev.detail.id);
+    }
   }
 
-  function handle_mail_leave(ev) {
+  async function handle_mail_leave(ev) {
     mail_mode_queries.pop();
     if (mail_mode_queries.length > 0) {
-      enter_mail_view(mail_mode_queries.pop());
+      await enter_mail_view(mail_mode_queries.pop());
     } else {
       enter_normal_mode();
     }
   }
 
-  function handle_mail_refine_search(ev) {
-	enter_mail_view(mail_mode_query);
+  async function handle_mail_refine_search(ev) {
+    await enter_mail_view(mail_mode_query);
   }
 
   load_node("AA");
@@ -697,11 +777,14 @@
     {:else if mode == "mail"}
       <MailListHeader
         bind:query={mail_mode_query}
-		bind:more_mail={mail_mode_more_mail_available}
+        bind:more_mail={mail_mode_more_mail_available}
         on:leave={handle_mail_leave}
-		on:refine_search={handle_mail_refine_search}
+        on:refine_search={handle_mail_refine_search}
         bind:elements={mail_mode_elements}
         bind:downstream_elements={mail_mode_downstream_elements}
+        bind:focused={mail_mode_focused}
+        on:action={handle_mail_action}
+        bind:view_mode={mail_mode_view}
       />
     {/if}
   </div>
@@ -726,10 +809,16 @@
         />
       {:else if mode == "mail"}
         <MailListContent
-          on:action={handle_mail_show}
+          on:action={handle_mail_action}
           on:leave={handle_mail_leave}
           bind:downstream_elements={mail_mode_downstream_elements}
-
+          bind:focused={mail_mode_focused}
+          bind:view_mode={mail_mode_view}
+        />
+      {:else if mode == "single_mail"}
+        <MailMessage
+          bind:message={single_mail_mode_message}
+          on:leave={handle_mail_leave}
         />
       {/if}
     </div>

@@ -8,6 +8,8 @@
   const dispatch = createEventDispatcher();
 
   export let message = null;
+  export let message_id = null;
+  export let message_tags = null;
   let show_html = false;
   let show_images = false;
 
@@ -37,7 +39,9 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      show_html = !show_html;
+      if (message.html != null) {
+        show_html = !show_html;
+      }
     },
   });
   listener.register_combo({
@@ -45,12 +49,16 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      show_images = !show_images;
-	  show_html = false;
-	  //we need it to retrigger building the iframe
-	  //we can't reload the iframe,
-	  //because of it's sandbox *rolleyes*
-	  window.setTimeout(() => {show_html = true;}, 10);
+      if (message.html != null) {
+        show_images = !show_images;
+        show_html = false;
+        //we need it to retrigger building the iframe
+        //we can't reload the iframe,
+        //because of it's sandbox *rolleyes*
+        window.setTimeout(() => {
+          show_html = true;
+        }, 10);
+      }
     },
   });
 
@@ -101,6 +109,37 @@
     //return new DOMParser().parseFromString(html, "text/html").documentElement .textContent;
     return html2plaintext(html);
   }
+  const many_cat_colors = [
+    "#1C86EE",
+    "#E31A1C", // red
+    "#008B00",
+    "#6A3D9A", // purple
+    "#FF7F00", // orange
+    "#4D4D4D",
+    "#FFD700",
+    "#7EC0EE",
+    "#FB9A99", // lt pink
+    "#90EE90",
+    "#FDBF6F", // lt orange
+    "#B3B3B3",
+    "#EEE685",
+    "#B03060",
+    "#FF83FA",
+    "#FF1493",
+    "#00008F",
+    "#36648B",
+    "#00CED1",
+    "#008F00",
+    "#8B8B00",
+    "#CDCD00",
+    "#A52A2A",
+  ];
+
+  function find_color(tag) {
+    let first_letter = tag.slice(0, 1);
+    let index = first_letter.charCodeAt(0) - 97;
+    return many_cat_colors[index % many_cat_colors.length];
+  }
 </script>
 
 <div>
@@ -140,6 +179,16 @@
           </tr>
         {/if}
       {/each}
+      <tr>
+        <th>Tags</th>
+        <td>
+          {#each message_tags as tag}
+            <div class="tags" style="background-color:{find_color(tag)}">
+              {tag}
+            </div>
+          {/each}
+        </td>
+      </tr>
     </table>
     {#if show_html}
       <iframe
@@ -166,6 +215,19 @@
   th {
     text-align: left;
     padding-right: 10px;
-	vertical-align:top;
+    vertical-align: top;
+  }
+
+  /*todo: combine with MailContent*/
+  .tags {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #eee;
+    background-color: #3b9cff;
+    float: left;
   }
 </style>

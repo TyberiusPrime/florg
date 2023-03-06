@@ -532,10 +532,26 @@ fn query_mail(query: &str) -> (Vec<mail::Thread>, bool) {
 }
 
 #[tauri::command]
-fn get_mail_message(id: &str) -> Option<String> {
+fn get_mail_message(id: &str) -> Option<(String, Vec<String>)> {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.get_message(id);
+    if !res.is_ok() {
+        dbg!(&res);
+    }
     res.ok()
+}
+#[tauri::command]
+fn mail_message_add_tags(id: &str, tags: Vec<String>) -> bool {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.add_tags(id, &tags);
+    res.is_ok()
+}
+#[tauri::command]
+fn mail_message_remove_tags(id: &str, tags: Vec<String>) -> bool {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.remove_tags(id, &tags);
+    dbg!("removed tags", &id, &tags, &res);
+    res.is_ok()
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -783,6 +799,8 @@ fn main() -> Result<()> {
             set_cached_node,
             query_mail,
             get_mail_message,
+            mail_message_add_tags,
+            mail_message_remove_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -119,6 +119,8 @@
   let mail_mode_view = "threads";
 
   let single_mail_mode_message = null;
+  let single_mail_mode_message_tags = null;
+  let single_mail_mode_message_id = null;
 
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
@@ -189,8 +191,14 @@
     );
   });
 
-  listener_normal.simple_combo("i", async (e, count, repeated) => {
-    goto_mail_search();
+  listener_normal.register_combo({
+    keys: "i",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      goto_mail_search();
+      window.find(search_mode_term, false, false, true, false);
+    },
   });
 
   listener_normal.simple_combo("g", async (e, count, repeated) => {
@@ -599,6 +607,14 @@
     enter_normal_mode();
   }
 
+  function removeItemOnce(arr, value) {
+  var index = arr.indexOf(value);
+  if (index > -1) {
+    arr.splice(index, 1);
+  }
+  return arr;
+}
+
   async function enter_mail_view(query) {
     if (
       mail_mode_queries.length == 0 ||
@@ -615,24 +631,37 @@
 
     if (query.startsWith("message:")) {
       mode = "single_mail";
-      console.log(query.slice(8));
-      let raw_message = await invoke("get_mail_message", {
-        id: query.slice(8),
+      let mail_id = query.slice(8);
+      let tup = await invoke("get_mail_message", {
+        id: mail_id,
       });
-      if (raw_message != null) {
-		  const parser = new PostalMime();
-		const email = await parser.parse(raw_message);
-        single_mail_mode_message = email;
-      } else {
-        single_mail_mode_message = null;
+      let raw_message = tup[0];
+      let tags = tup[1];
+      if (tags.indexOf("unread") > -1) {
+        console.log("unread");
+        await invoke("mail_message_remove_tags", {
+          id: mail_id,
+          tags: ["unread"],
+        });
+		removeItemOnce(tags, "unread");
       }
 
-    footer_msg =
-	  "<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images.";
-    } else {
+      if (raw_message != null) {
+        const parser = new PostalMime();
+        const email = await parser.parse(raw_message);
+        single_mail_mode_message = email;
+        single_mail_mode_message_tags = tags;
+        single_mail_mode_message_id = mail_id;
+      } else {
+        single_mail_mode_message = null;
+        single_mail_mode_message_id = null;
+      }
 
-    footer_msg =
-      "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
+      footer_msg =
+        "<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images.";
+    } else {
+      footer_msg =
+        "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
       if (query.startsWith("thread:")) {
         let mr = await invoke("query_mail", { query: query });
         let threads = mr[0];
@@ -818,6 +847,8 @@
       {:else if mode == "single_mail"}
         <MailMessage
           bind:message={single_mail_mode_message}
+          bind:message_tags={single_mail_mode_message_tags}
+          bind:message_id={single_mail_mode_message_id}
           on:leave={handle_mail_leave}
         />
       {/if}

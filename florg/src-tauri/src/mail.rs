@@ -3,10 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context;
 use chrono::NaiveDateTime;
 use notmuch;
 use serde::Serialize;
-use anyhow::Context;
 
 #[derive(Serialize, Debug)]
 pub struct Message {
@@ -43,13 +43,7 @@ impl MailStore {
     }
 
     pub fn query(&self, query: &str, filtered_authors: &HashSet<String>) -> (Vec<Thread>, bool) {
-        let database = notmuch::Database::open_with_config(
-            Some(&self.database_path),
-            notmuch::DatabaseMode::ReadOnly,
-            Some(&self.config_path),
-            None,
-        )
-        .expect("failed to open notmuch database");
+        let database = self.open_db();
         let query = database.create_query(query).unwrap();
         query.set_sort(notmuch::Sort::NewestFirst);
         let mut result = Vec::new();
@@ -97,18 +91,45 @@ impl MailStore {
         (result, more)
     }
 
-    pub fn get_message(&self, msg_id: &str) -> anyhow::Result<String> {
-        let database = notmuch::Database::open_with_config(
+    fn open_db(&self) -> notmuch::Database {
+        notmuch::Database::open_with_config(
             Some(&self.database_path),
-            notmuch::DatabaseMode::ReadOnly,
+            notmuch::DatabaseMode::ReadWrite,
             Some(&self.config_path),
             None,
         )
-        .expect("failed to open notmuch database");
+        .expect("failed to open notmuch database")
+    }
+
+    pub fn get_message(&self, msg_id: &str) -> anyhow::Result<(String, Vec<String>)> {
+        let database = self.open_db();
         let message = database.find_message(msg_id)?.context("not found")?;
         let raw = std::fs::read_to_string(message.filename())?;
-        Ok(raw)
-//        let parsed_message = mail_parser::Message::parse(&raw).context("failed to parse")?;
- //       Ok(serde_json::to_string_pretty(&parsed_message)?)
+        Ok((raw, message.tags().collect()))
+        //        let parsed_message = mail_parser::Message::parse(&raw).context("failed to parse")?;
+        //       Ok(serde_json::to_string_pretty(&parsed_message)?)
+    }
+
+    pub fn add_tags(&self, msg_id: &str, tags: &Vec<String>) -> anyhow::Result<()> {
+        let database = self.open_db();
+
+        let message = database.find_message(msg_id)?.context("not found")?;
+        message.freeze()?;
+        for tag in tags {
+            message.add_tag(tag)?;
+        }
+        message.thaw()?;
+        Ok(())
+    }
+    pub fn remove_tags(&self, msg_id: &str, tags: &Vec<String>) -> anyhow::Result<()> {
+        let database = self.open_db();
+
+        let message = database.find_message(msg_id)?.context("not found")?;
+        message.freeze()?;
+        for tag in tags {
+            message.remove_tag(tag)?;
+        }
+        message.thaw()?;
+        Ok(())
     }
 }

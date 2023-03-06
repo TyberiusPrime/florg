@@ -16,7 +16,7 @@
 
   const dispatch = createEventDispatcher();
 
-  const many_cat_colors = [
+  const many_cat_colors = [ //todO: combine with the one in MailMessages
     "#1C86EE",
     "#E31A1C", // red
     "#008B00",

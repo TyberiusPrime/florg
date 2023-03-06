@@ -16,7 +16,8 @@
 
   const dispatch = createEventDispatcher();
 
-  const many_cat_colors = [ //todO: combine with the one in MailMessages
+  const many_cat_colors = [
+    //todO: combine with the one in MailMessages
     "#1C86EE",
     "#E31A1C", // red
     "#008B00",
@@ -94,31 +95,30 @@
   }
 
   function handle_double_click(ev) {
-  console.log("double click");
-        if (view_mode == "threads") {
-        if (downstream_elements[focused].messages.length == 1) {
-          dispatch("action", {
-            id: downstream_elements[focused].messages[0].id,
-            single_message: true,
-          });
-        } else {
-          dispatch("action", {
-            id: downstream_elements[focused].id,
-            single_message: false,
-          });
-        }
-      } else if (view_mode == "messages") {
+    console.log("double click");
+    if (view_mode == "threads") {
+      if (downstream_elements[focused].messages.length == 1) {
         dispatch("action", {
-          id: downstream_elements[focused].id,
+          id: downstream_elements[focused].messages[0].id,
           single_message: true,
         });
+      } else {
+        dispatch("action", {
+          id: downstream_elements[focused].id,
+          single_message: false,
+        });
       }
-
+    } else if (view_mode == "messages") {
+      dispatch("action", {
+        id: downstream_elements[focused].id,
+        single_message: true,
+      });
+    }
   }
 </script>
 
 <div>
-  <div style="overflow:scroll">
+  <div style="overflow:scroll" on:click={(e) => focus_node(index)}>
     <table id="mail_pick_table">
       {#if downstream_elements.length == 0}
         nothing found.
@@ -161,7 +161,7 @@
             on:click={(e) => focus_node(index)}
             on:dblclick={handle_double_click}
           >
-			<td class="date">{@html format_date(Date.parse(el.date))}</td>
+            <td class="date">{@html format_date(Date.parse(el.date))}</td>
             <td>
               <div class="fromsubject">
                 <div class="subject {is_unread(el) > 0 ? 'new' : ''}">

@@ -4,6 +4,7 @@
   import { onMount, onDestroy } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
+  import Expander from "./Expander.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -12,6 +13,7 @@
   export let message_tags = null;
   let show_html = false;
   let show_images = false;
+  let all_headers = false;
 
   var listener = new window.keypress.Listener();
   listener.reset();
@@ -44,6 +46,17 @@
       }
     },
   });
+  listener.register_combo({
+    keys: "shift h",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (message.html != null) {
+        all_headers = !all_headers;
+      }
+    },
+  });
+
   listener.register_combo({
     keys: "i",
     prevent_default: true,
@@ -140,6 +153,19 @@
     let index = first_letter.charCodeAt(0) - 97;
     return many_cat_colors[index % many_cat_colors.length];
   }
+
+  function format_to(to) {
+    return to
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "")
+      .split(",")
+      .map((x) => {
+        return x.trim();
+      })
+      .sort()
+      .join("<br />");
+  }
 </script>
 
 <div>
@@ -153,7 +179,7 @@
       </tr>
       <tr>
         <th>To</th>
-        <td>{get_header(message, "to")}</td>
+        <td><Expander text={format_to(get_header(message, "to"))} /></td>
       </tr>
       <tr>
         <th>Subject</th>
@@ -190,6 +216,19 @@
         </td>
       </tr>
     </table>
+    {#if all_headers}
+	<hr />
+      <table>
+        {#each message.headers as header}
+          <tr>
+            <th>{header.key}</th>
+            <td>{header.value}</td>
+          </tr>
+        {/each}
+      </table>
+    {/if}
+	<hr />
+
     {#if show_html}
       <iframe
         srcdoc={csp(message.html)}

@@ -16,6 +16,11 @@
       <table>
         <tr> <td class="hotkey">h</td><td>Show/hide help</td> </tr>
         <tr><td class="hotkey">space</td><td>Nav mode</td> </tr>
+        <tr><td class="hotkey">Enter</td><td>Edit node</td> </tr>
+        <tr><td class="hotkey">s</td><td>Search nodes</td> </tr>
+        <tr><td class="hotkey">S</td><td>Search emails</td> </tr>
+        <tr><td class="hotkey">i</td><td>Email queries (from settings)</td> </tr>
+        <tr><td class="hotkey">o</td><td>ChatGPT</td> </tr>
         <tr><td class="hotkey">/</td><td>Search</td> </tr>
       </table>
     </div>

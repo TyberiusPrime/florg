@@ -658,7 +658,7 @@
       }
 
       footer_msg =
-        "<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images.";
+		"<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images. <span class='hotkey'>H</span> to view all headers";
     } else {
       footer_msg =
         "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
@@ -779,6 +779,7 @@
 
 <div class="wrapper">
   <div class="header" id="header">
+    {#if mode == "nav" | mode == "normal" || mode == "quick_pick"}
     <TopTree
       bind:title={content_title}
       bind:path={current_path}
@@ -787,6 +788,7 @@
       on:goto_node={handle_goto_node}
     />
     <hr />
+	{/if}
     {#if mode == "nav"}
       <NavTable
         bind:nav_table={content_children}

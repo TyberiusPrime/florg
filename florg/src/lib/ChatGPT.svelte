@@ -62,7 +62,7 @@
     for (let ii = 0; ii < convo.messages.length; ii++) {
       let m = convo.messages[ii];
       if (m[0] == "output") {
-        let mm = JSON.parse(m[1]);
+        let mm = m[1];
         let cb_input = document.getElementById("include_msg_input_" + ii);
         let cb_output = document.getElementById("include_msg_output_" + ii);
         if (cb_input !== null && cb_input.checked) {
@@ -126,7 +126,7 @@
         let res = response.data;
         res.usage.prompt_tokens_netto =
           res.usage.prompt_tokens - last_input_tokens;
-        convo.messages.push(["output", JSON.stringify(res)]);
+        convo.messages.push(["output", res]);
         response = res.choices[0].message.content;
       }
       await save_convo();
@@ -198,17 +198,17 @@
   }
 
   async function hide(index) {
-    let m = JSON.parse(convo.messages[index][1]);
+    let m = convo.messages[index][1];
     m["hide"] = true;
-    convo.messages[index][1] = JSON.stringify(m);
+    convo.messages[index][1] = m;
     convo = convo;
     await save_convo();
   }
 
   async function unhide(index) {
-    let m = JSON.parse(convo.messages[index][1]);
+    let m = convo.messages[index][1];
     m["hide"] = false;
-    convo.messages[index][1] = JSON.stringify(m);
+    convo.messages[index][1] = m;
     convo = convo;
     await save_convo();
   }
@@ -261,7 +261,7 @@
     </tr>
     {#each convo.messages as message, index}
       {#if message[0] == "input"}
-        {#if index > convo.messages.length - 1 || convo.messages[index + 1][0] != "output" || JSON.parse(convo.messages[index + 1][1]).hide !== true}
+        {#if index > convo.messages.length - 1 || convo.messages[index + 1][0] != "output" || convo.messages[index + 1][1].hide !== true}
           <tr>
             <th
               style="background-color:#eb86bf;color:#EEEEEE;border-radius:.5em;"
@@ -272,7 +272,7 @@
         {:else}{/if}
       {/if}
       {#if message[0] == "output"}
-        {@const output = JSON.parse(message[1])}
+        {@const output = message[1]}
         {#if output.hide !== true}
           <tr>
             <th

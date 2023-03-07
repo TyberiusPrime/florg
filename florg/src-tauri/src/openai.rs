@@ -15,7 +15,7 @@ pub struct Conversation {
     pub title: Option<String>,
     pub date: chrono::NaiveDateTime,
     pub prompt: String,
-    pub messages: Vec<(String, String)>,
+    pub messages: Vec<(String, serde_json::Value)>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConversationListEntry {

@@ -16,11 +16,11 @@
 
   export let convo = null;
   export let filename = null;
+  export let input = "";
 
   let items = [];
   let chosen = null;
   let prompt = "I am a helpful assistant.";
-  let input = "";
   let processing = false;
   let output;
   let last_input_tokens = 0;

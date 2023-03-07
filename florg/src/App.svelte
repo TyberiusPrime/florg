@@ -128,6 +128,7 @@
 
   let chatgpt_mode_convo = null;
   let chatgpt_mode_filename = null;
+  let chatgpt_mode_input = "";
 
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
@@ -523,6 +524,7 @@
     if (filename == "") {
       convo = await invoke("chatgpt_new_conversation", {});
       filename = new Date().toISOString() + ".json";
+	  chatgpt_mode_input = content_text;
     } else {
       convo = await invoke("chatgpt_get_conversation", { filename: filename });
     }
@@ -962,6 +964,7 @@
         <ChatGPT
           bind:convo={chatgpt_mode_convo}
           bind:filename={chatgpt_mode_filename}
+		  bind:input={chatgpt_mode_input}
           on:leave={handle_chatgpt_leave}
         />
       {/if}

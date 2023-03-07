@@ -13,8 +13,7 @@
     for (let i = 0; i <= level; i++) {
       path += levels[i][0];
     }
-    dispatch("goto_node", { path: path, 
-	normal_mode: mode != "nav" });
+    dispatch("goto_node", { path: path, normal_mode: mode != "nav" });
     console.log("goto level");
     console.log(path);
   }
@@ -27,7 +26,7 @@
 <div>
   <table>
     {#if levels.length > 0}
-	  <tr><td><a on:click={(ev) => goto_level(-1)}>(root node) </a></td> </tr>
+      <tr><td><a on:click={(ev) => goto_level(-1)}>(root node) </a></td> </tr>
       {#each levels as level, index}
         {#if index < levels.length - 1}
           <tr

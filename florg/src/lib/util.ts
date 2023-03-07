@@ -1,4 +1,5 @@
 import { readText, writeText } from "@tauri-apps/api/clipboard";
+import { invoke } from "@tauri-apps/api/tauri";
 
 export function format_date(date: any, br = false) {
   //todo :centralize / dry
@@ -62,4 +63,7 @@ export function no_text_inputs_focused(): Boolean {
     document.activeElement.tagName != "INPUT" &&
     document.activeElement.tagName != "TEXTAREA"
   );
+}
+export async function get_node(path: string) {
+  return await invoke("get_node", { path });
 }

@@ -8,12 +8,18 @@
   import { marked } from "marked";
   import hljs from "highlight.js";
   import "../styles/highlight.js/github.css";
-  import { format_date, escape_html, add_code_clipboards } from "./util.ts";
+  import {
+    format_date,
+    escape_html,
+    add_code_clipboards,
+    no_text_inputs_focused,
+  } from "./util.ts";
   import DOMPurify from "dompurify";
   import SvelteTooltip from "svelte-tooltip";
 
   const dispatch = createEventDispatcher();
 
+  export let overlay_mode;
   export let convo = null;
   export let filename = null;
   export let input = "";
@@ -31,11 +37,59 @@
   listener.stop_listening();
 
   listener.simple_combo("esc", () => {
-    dispatch("leave", false);
+    if (overlay_mode == "") {
+      dispatch("leave", false);
+    }
   });
 
   listener.simple_combo("shift enter", async () => {
     await query_chat_gtp(input, true);
+  });
+
+  listener.simple_combo("s", async (e, count, repeated) => {
+    if (no_text_inputs_focused()) {
+      dispatch("search", {});
+    }
+  });
+
+  listener.simple_combo("i", async (e, count, repeated) => {
+    if (no_text_inputs_focused()) {
+      dispatch("mail_search", {});
+    }
+  });
+
+
+  listener.register_combo({
+    keys: "h",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+        dispatch("overlay_change", { overlay: "toggle_help" });
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "n",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+        dispatch("in_page_search", true);
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "shift n",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+        dispatch("in_page_search", false);
+      }
+    },
   });
 
   async function save_convo() {
@@ -324,13 +378,11 @@
         {:else}
           <tr
             ><td colspan="2">
-              <SvelteTooltip
-                color="#DFDFDF;border:1px dashed grey;"
-              >
-			  <div slot="custom-tip" class="hover">
-				{convo.messages[index-1][1]}<br />
-				{output.choices[0].message.content}
-			  </div>
+              <SvelteTooltip color="#DFDFDF;border:1px dashed grey;">
+                <div slot="custom-tip" class="hover">
+                  {convo.messages[index - 1][1]}<br />
+                  {output.choices[0].message.content}
+                </div>
                 <button
                   class="small_button"
                   on:click={() => {
@@ -361,8 +413,9 @@
       <th>New input</th>
       <td>
         <a on:click={disable_all}>Disable previous</a>
-        <textarea id="input" bind:value={input} rows="10" autofocus /></td
-      >
+        <textarea id="input" bind:value={input} rows="10" autofocus />
+        <button> Submit</button>
+      </td>
     </tr>
   </table>
 </div>

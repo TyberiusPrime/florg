@@ -201,7 +201,11 @@
         {#if get_header(message, opt_header) != null}
           <tr>
             <th>{opt_header}</th>
-            <td>{get_header(message, opt_header)}</td>
+            {#if opt_header == "cc"}
+              <td>{fomat_to(get_header(message, opt_header))}</td>
+            {:else}
+              <td>{get_header(message, opt_header)}</td>
+            {/if}
           </tr>
         {/if}
       {/each}
@@ -217,7 +221,7 @@
       </tr>
     </table>
     {#if all_headers}
-	<hr />
+      <hr />
       <table>
         {#each message.headers as header}
           <tr>
@@ -227,7 +231,7 @@
         {/each}
       </table>
     {/if}
-	<hr />
+    <hr />
 
     {#if show_html}
       <iframe

@@ -50,3 +50,16 @@ export function escape_html(html: String) {
     document.createTextNode(html),
   ).parentNode.innerHTML;
 }
+
+export function iso_date(date: Date): String {
+  let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
+  let mo = new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
+  let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
+  return `${ye}-${mo}-${da}`;
+}
+export function no_text_inputs_focused(): Boolean {
+  return (
+    document.activeElement.tagName != "INPUT" &&
+    document.activeElement.tagName != "TEXTAREA"
+  );
+}

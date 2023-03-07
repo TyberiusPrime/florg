@@ -23,7 +23,7 @@
   import PostalMime from "postal-mime";
   import { fetch } from "@tauri-apps/api/http";
   import { parse as csv_parse } from "csv-parse/browser/esm";
-  import { format_date } from "./lib/util.ts";
+  import { format_date, iso_date } from "./lib/util.ts";
 
   let Asciidoctor = asciidoctor();
 
@@ -85,8 +85,8 @@
     }
   }
 
-  let show_help = false;
   let mode = "normal";
+  let overlay_mode = "";
   let footer_msg = "";
   let content_text = "";
   let content_rendered = "";
@@ -110,7 +110,7 @@
   let goto_mode_text = "";
   let goto_show_normal = false;
 
-  let search_mode_start_pos = null;
+  //let search_mode_start_pos = null;
   let search_mode_term = "";
   let search_mode_action = "";
 
@@ -147,31 +147,43 @@
     is_unordered: true,
     on_keydown: (e, count, repeated) => {
       if (!repeated) {
-        console.log("help mode");
-        show_help = !show_help;
+        toggle_help();
       }
     },
   });
 
+  function toggle_help() {
+    if (overlay_mode == "help") {
+      end_overlay_mode();
+    } else {
+      overlay_mode = "help";
+    }
+  }
+
   listener_normal.simple_combo("/", async (e, count, repeated) => {
     enter_search_mode("in_page");
   });
+
+  listener_normal.simple_combo("ctrl+/", async (e, count, repeated) => {
+    enter_search_mode("in_page");
+  });
+
+  function pick_search() {
+    let entries = [
+      { key: "g", target_path: "node", text: "Node search" },
+      { key: "m", target_path: "mail", text: "Mail search" },
+      { key: "p", target_path: "in_page", text: "in page" },
+    ];
+    search_mode_term = "";
+    enter_goto_mode("search", "Search", entries, true);
+  }
 
   listener_normal.register_combo({
     keys: "s",
     prevent_repeat: true,
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
-      enter_search_mode("global");
-    },
-  });
-
-  listener_normal.register_combo({
-    keys: "shift s",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
-      enter_search_mode("mail");
+      pick_search();
     },
   });
 
@@ -180,7 +192,7 @@
     prevent_repeat: true,
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
-      window.find(search_mode_term, false, false, true, false);
+      in_page_search(true);
     },
   });
 
@@ -189,9 +201,15 @@
     keys: "shift n",
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
-      window.find(search_mode_term, false, true, true, false);
+      in_page_search(false);
     },
   });
+
+  function in_page_search(forward) {
+    if (search_mode_term) {
+      window.find(search_mode_term, false, !forward, true, false);
+    }
+  }
 
   listener_normal.simple_combo("x", async (e, count, repeated) => {
     enter_mail_view(
@@ -205,7 +223,6 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       goto_mail_search();
-      window.find(search_mode_term, false, false, true, false);
     },
   });
 
@@ -361,14 +378,22 @@
 
   listener_normal.listen();
 
+  const default_normal_footer = "";
   function enter_normal_mode() {
     listener_normal.listen();
-    footer_msg = "";
+    footer_msg = default_normal_footer;
     mode = "normal";
-    nav_mode_start = "";
-    pick_mode_action = null;
-    pick_mode_elements = [];
-    date_mode_action = null;
+
+    //todo: distribute this.
+    overlay_mode = false;
+  }
+
+  function end_overlay_mode() {
+    overlay_mode = false;
+    if (mode == "normal") {
+      footer_msg = default_normal_footer;
+      listener_normal.listen();
+    }
   }
 
   function enter_nav_mode() {
@@ -392,7 +417,7 @@
   function enter_goto_mode(what, text, entries, show_normal) {
     listener_normal.stop_listening();
     if (show_normal) {
-      mode = "quick_pick";
+      overlay_mode = "quick_pick";
     } else {
       mode = "goto";
     }
@@ -414,20 +439,20 @@
 
   function enter_search_mode(action) {
     listener_normal.stop_listening();
-    search_mode_start_pos = document.body.scrollTop;
+    //search_mode_start_pos = document.body.scrollTop;
     if (action == "in_page") {
       footer_msg =
         "In page search mode. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
-    } else if (action == "global") {
+    } else if (action == "node") {
       footer_msg =
-        "Global search. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+        "Node search. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
     } else if (action == "mail") {
       footer_msg =
-        "Mail query. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
+        "Mail search, notmuch search query. <span class='hotkey'>Enter</span> to accept, <span class='hotkey'>Esc</span>";
     }
 
     search_mode_action = action;
-    mode = "search";
+    overlay_mode = "search";
   }
 
   function handle_goto_node(ev) {
@@ -439,6 +464,7 @@
 
   async function handle_nav_mode_leave(ev) {
     console.log("leave", ev);
+    nav_mode_start = "";
     enter_normal_mode();
     if (ev.detail) {
       await edit_current_node();
@@ -503,6 +529,7 @@
 
   //this is an event from dispatch / jvaascript
   async function handle_date_chosen(ev) {
+    date_mode_action = null;
     enter_normal_mode();
     if (ev.detail.action === null) {
     } else if (ev.detail.action == "goto") {
@@ -513,7 +540,9 @@
 
   async function handle_picker_canceled(ev) {
     enter_normal_mode();
+    pick_mode_message = "";
     pick_mode_action = null;
+    pick_mode_elements = [];
   }
 
   async function handle_picker_accepted(ev) {
@@ -542,8 +571,7 @@
     chatgpt_mode_filename = filename;
     mode = "chatgpt";
     listener_normal.stop_listening();
-    footer_msg =
-      "ChatGPT mode. <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Shift-Enter to submit query</span>";
+    footer_msg = default_normal_footer;
   }
 
   async function handle_command(cmd) {
@@ -638,18 +666,12 @@
   }
 
   async function handle_goto_leave(ev) {
-    console.log("leave", ev);
-    enter_normal_mode();
-    /* if (ev.detail) {
-      await edit_current_node();
-    }*/
-  }
-
-  function iso_date(date: Date): String {
-    let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
-    let mo = new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
-    let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
-    return `${ye}-${mo}-${da}`;
+    console.log("leave", mode);
+    if (mode == "goto") {
+      enter_normal_mode();
+    } else {
+      end_overlay_mode();
+    }
   }
 
   async function handle_goto_action(ev) {
@@ -659,6 +681,8 @@
       await copy_to_clipboard(ev.detail);
     } else if (goto_mode_action == "mail") {
       await enter_mail_view(ev.detail);
+    } else if (goto_mode_action == "search") {
+      enter_search_mode(ev.detail);
     } else {
       let path = ev.detail;
       if (path.startsWith("!")) {
@@ -804,15 +828,15 @@
 
   async function handle_search_mode_leave(ev) {
     let ok = ev.detail;
-    enter_normal_mode();
+    end_overlay_mode();
     if (search_mode_action == "in_page") {
       if (ok) {
         window.find(search_mode_term, false, false, true, false);
       } else {
-        document.body.scrollTo(search_mode_start_pos[1]);
+        // document.body.scrollTo(search_mode_start_pos[1]);
         search_mode_term = "";
       }
-    } else if (search_mode_action == "global") {
+    } else if (search_mode_action == "node") {
       if (ok) {
         let rg_results = await invoke("ripgrep_below_node", {
           path: "",
@@ -888,6 +912,25 @@
     await enter_mail_view(mail_mode_query);
   }
 
+  async function handle_overlay_change(ev) {
+    let info = ev.detail;
+    console.log(ev.detail);
+    if (info.overlay == "search") {
+      enter_search_mode(info.search_mode);
+    } else if (info.overlay == "toggle_help") {
+      toggle_help();
+    }
+  }
+
+  async function handle_in_page_search(ev) {
+  console.log("handle in page search", ev);
+    in_page_search(ev.detail);
+  }
+
+  async function handle_search(ev) {
+    pick_search();
+  }
+
   load_node("AA");
   enter_normal_mode();
 </script>
@@ -896,7 +939,7 @@
 
 <div class="wrapper">
   <div class="header" id="header">
-    {#if (mode == "nav") | (mode == "normal") || mode == "quick_pick"}
+    {#if (mode == "nav") | (mode == "normal")}
       <TopTree
         bind:title={content_title}
         bind:path={current_path}
@@ -915,7 +958,7 @@
         bind:nav_mode_start
       />
       <hr />
-    {:else if mode == "normal" || mode == "quick_pick"}
+    {:else if mode == "normal"}
       <TinyNav
         bind:nodes={content_children}
         on:goto_node={handle_goto_node}
@@ -939,7 +982,7 @@
   <div class="main_content">
     <div class="sticky-spacer" />
     <div class="sticky-content">
-      {#if mode == "normal" || mode == "nav" || mode == "quick_pick" || mode == "search"}
+      {#if mode == "normal" || mode == "nav"}
         <Content bind:rendered={content_rendered} />
       {:else if mode == "date"}
         <DateMode
@@ -976,19 +1019,24 @@
           bind:filename={chatgpt_mode_filename}
           bind:input={chatgpt_mode_input}
           on:leave={handle_chatgpt_leave}
+          on:overlay_change={handle_overlay_change}
+          on:in_page_search={handle_in_page_search}
+          on:search={handle_search}
+		  on:mail_search={goto_mail_search}
+		  bind:overlay_mode
         />
       {/if}
     </div>
   </div>
   <div class="footer">
     <hr />
-    {#if mode == "search"}
+    {#if overlay_mode == "search"}
       <SearchMode
         on:leave={handle_search_mode_leave}
         bind:search_term={search_mode_term}
       />
     {/if}
-    {#if mode == "goto" || mode == "quick_pick"}
+    {#if mode == "goto" || overlay_mode == "quick_pick"}
       <GotoMode
         bind:action={goto_mode_action}
         bind:text={goto_mode_text}
@@ -998,11 +1046,37 @@
       />
       <hr />
     {/if}
+
+    {#if overlay_mode == "help"}
+      <div id="help">
+        {#if mode == "normal"}
+          <table>
+            <tr> <td class="hotkey">h</td><td>Show/hide help</td> </tr>
+            <tr><td class="hotkey">space</td><td>Nav mode</td> </tr>
+            <tr><td class="hotkey">Enter</td><td>Edit node</td> </tr>
+            <tr><td class="hotkey">s</td><td>Search nodes</td> </tr>
+            <tr><td class="hotkey">S</td><td>Search emails</td> </tr>
+            <tr
+              ><td class="hotkey">i</td><td>Email queries (from settings)</td>
+            </tr>
+            <tr><td class="hotkey">o</td><td>ChatGPT</td> </tr>
+            <tr><td class="hotkey">/</td><td>Search</td> </tr>
+          </table>
+        {:else if mode == "chatgpt"}
+          <table>
+            <tr> <td class="hotkey">Shift-Enter</td><td>Submit</td> </tr>
+            <tr> <td class="hotkey">Esc</td><td>Leave</td> </tr>
+            <tr> <td class="hotkey">"/"</td><td>Search in page</td> </tr>
+            <tr> <td class="hotkey">"s"</td><td>Search</td> </tr>
+          </table>
+        {/if}
+      </div>
+    {/if}
     <Footer
-      bind:show_help
       bind:msg={footer_msg}
       bind:currently_edited
       bind:mode
+      bind:overlay_mode
     />
   </div>
 </div>

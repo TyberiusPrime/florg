@@ -4,6 +4,7 @@
 )]
 
 mod mail;
+mod openai;
 mod storage;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -423,7 +424,7 @@ fn get_nav() -> Option<HashMap<String, String>> {
 
 #[tauri::command]
 fn get_mail_search_folders() -> Option<HashMap<String, String>> {
-    get_from_settings_str_map("mail_search")
+    get_from_settings_str_map("mail_queries")
 }
 
 #[tauri::command]
@@ -552,6 +553,81 @@ fn mail_message_remove_tags(id: &str, tags: Vec<String>) -> bool {
     let res = lock.notmuch_db.remove_tags(id, &tags);
     dbg!("removed tags", &id, &tags, &res);
     res.is_ok()
+}
+
+#[tauri::command]
+fn chatgpt_get_prompts() -> HashMap<String, HashMap<String, String>> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        gpt.get_all_prompts().unwrap_or_default()
+    } else {
+        HashMap::new()
+    }
+}
+
+#[tauri::command]
+fn chatgpt_update_prompts(key: &str, prompts: HashMap<String, String>) {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        let ref_prompts: HashMap<&str, &str> =
+            prompts.iter().map(|(k, v)| (&k[..], &v[..])).collect();
+        gpt.update_prompts(key, ref_prompts).unwrap();
+    }
+}
+#[tauri::command]
+fn chatgpt_list_conversations() -> Option<Vec<openai::ConversationListEntry>> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        let mut convos = gpt.list_conversations().unwrap_or_default();
+        convos.sort_by_key(|x| x.date);
+        convos.reverse();
+        dbg!(&convos);
+        Some(convos)
+    } else {
+        None
+    }
+}
+#[tauri::command]
+fn chatgpt_new_conversation() -> openai::Conversation {
+    use chrono::prelude::*;
+    let local: DateTime<Local> = Local::now();
+    openai::Conversation {
+        title: None,
+        date: local.naive_local(),
+        prompt: "You are a a helpful assistant".to_string(),
+        messages: Vec::new(),
+    }
+}
+
+#[tauri::command]
+fn chatgpt_get_conversation(filename: &str) -> Option<openai::Conversation> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        gpt.get_conversation(filename).ok()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn chatgpt_save_conversation(filename: &str, conversation: openai::Conversation) {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        gpt.save_conversation(filename, &conversation).unwrap();
+        ss.add_and_commit(&format!(
+            "saved chatgpt conversation {}",
+            &conversation.title.unwrap_or("".to_string())
+        ));
+    }
+}
+#[tauri::command]
+fn chatgpt_get_api_key() -> Option<String> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    if let Some(gpt) = &ss.chatgpt {
+        Some(gpt.get_api_key())
+    } else {
+        None
+    }
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -801,6 +877,13 @@ fn main() -> Result<()> {
             get_mail_message,
             mail_message_add_tags,
             mail_message_remove_tags,
+            chatgpt_get_prompts,
+            chatgpt_update_prompts,
+            chatgpt_list_conversations,
+            chatgpt_get_conversation,
+            chatgpt_new_conversation,
+            chatgpt_save_conversation,
+            chatgpt_get_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

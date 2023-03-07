@@ -2,6 +2,7 @@
 #![allow(unused_imports)]
 use anyhow::{Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
+use crate::openai;
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -31,6 +32,8 @@ pub(crate) struct Storage {
     git_binary: String,
     nodes: Vec<Node>,
     pub settings: toml_edit::Document,
+
+    pub (crate) chatgpt: Option<openai::ChatGPT>
 }
 
 pub const FLORG_FILENAME: &'static str = "node.adoc";
@@ -41,11 +44,15 @@ impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
             Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
+        let chatgpt = settings["chatgpt"]["api_key"].as_str().map(|s| {
+            openai::ChatGPT::new(s.to_string(), data_path.clone())
+        });
         let mut s = Storage {
             data_path,
             nodes: Vec::new(),
             git_binary,
             settings,
+            chatgpt
         };
         s.reload();
         s

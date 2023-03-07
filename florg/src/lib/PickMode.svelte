@@ -4,6 +4,7 @@
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
   import { Fzf, byLengthAsc } from "fzf";
+  import { onMount, onDestroy } from "svelte";
 
   import PickerTable from "./PickerTable.svelte";
 
@@ -29,7 +30,14 @@
         cmd: downstream_elements[focused].cmd,
         action: action,
       });
-    } else {
+	  }
+    else if (ev.key == "ArrowDown") {
+		ev.preventDefault();
+    } 
+    else if (ev.key == "ArrowUp") {
+		ev.preventDefault();
+    } 
+	else {
       if (input_text != last_text) {
         const entries = fzf.find(input_text);
         downstream_elements = entries.map((entry) => entry.item);
@@ -44,6 +52,7 @@
       ev.preventDefault();
       if (focused < downstream_elements.length - 1) {
         focused += 1;
+		console.log("focused now", focused);
       }
     } else if (ev.key == "ArrowUp") {
       ev.preventDefault();
@@ -53,6 +62,7 @@
     }
   }
   downstream_elements = elements;
+
 </script>
 
 <div on:keyup={handle_text_change} on:keydown={handle_key_down}>

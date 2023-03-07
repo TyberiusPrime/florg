@@ -60,7 +60,7 @@
     }
     return latest;
   }
-  function format_date(date) {
+  function format_date(date) { //todo :centralize / dry
     //return date as y-md<br />h:m:s
     let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
     let mo = new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
@@ -69,6 +69,7 @@
     let mm = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
     return `${ye}&#8209;${mo}&#8209;${da}<br />${hh}:${mm}`;
   }
+
   function count_unread(entry) {
     let counter = 0;
     for (let i = 0; i < entry.messages.length; i++) {

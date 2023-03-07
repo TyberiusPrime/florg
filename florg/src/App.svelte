@@ -12,6 +12,7 @@
   import GotoMode from "./lib/GotoMode.svelte";
   import SearchMode from "./lib/SearchMode.svelte";
   import Footer from "./lib/Footer.svelte";
+  import ChatGPT from "./lib/ChatGPT.svelte";
   import * as KeyPress from "./js/keypress-2.1.5.min.js";
   import { invoke } from "@tauri-apps/api/tauri";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -20,6 +21,9 @@
   import { readText, writeText } from "@tauri-apps/api/clipboard";
   import asciidoctor from "asciidoctor";
   import PostalMime from "postal-mime";
+  import { fetch } from "@tauri-apps/api/http";
+  import { parse as csv_parse } from "csv-parse/browser/esm";
+  import { format_date } from "./lib/util.ts";
 
   let Asciidoctor = asciidoctor();
 
@@ -122,6 +126,9 @@
   let single_mail_mode_message_tags = null;
   let single_mail_mode_message_id = null;
 
+  let chatgpt_mode_convo = null;
+  let chatgpt_mode_filename = null;
+
   var listener_normal = new window.keypress.Listener();
   //listener_normal.reset();
   //listener_normal.stop_listening();
@@ -201,6 +208,35 @@
     },
   });
 
+  listener_normal.register_combo({
+    keys: "o",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      enter_chat_gpt();
+    },
+  });
+
+  async function enter_chat_gpt() {
+    let conversations = [{ text: "New conversation", cmd: "" }];
+    let old_convos = await invoke("chatgpt_list_conversations", {});
+    if (old_convos != null) {
+      for (let convo of old_convos) {
+        let title = `${convo.title != null? convo.title : "(no title)"} (${format_date(convo.date)})`;
+        conversations.push({ text: title, cmd: convo.filename });
+      }
+    } else {
+      footer_msg =
+        "<span class='error'>Error: No chatgtp configured. Does your settings contain chatgtp.api_key?</span>";
+      return;
+    }
+    enter_pick_mode(
+      "ChatGPT",
+      `Pick a chat to start a conversation with ChatGPT`,
+      conversations
+    );
+  }
+
   listener_normal.simple_combo("g", async (e, count, repeated) => {
     goto_nav("goto", "Goto");
   });
@@ -276,6 +312,10 @@
       { cmd: "create_date_nodes", text: "create date nodes" },
       { cmd: "exit", text: "Exit the app" },
       { cmd: "reload", text: "Reload data from disk" },
+      {
+        cmd: "download_awesome_chatpgt_prompts",
+        text: "Update awesome chatgpt prompts",
+      },
     ]);
   });
 
@@ -471,10 +511,31 @@
       await handle_command(ev.detail.cmd);
     } else if (ev.detail.action === "search") {
       load_node(ev.detail.cmd);
+    } else if (ev.detail.action === "ChatGPT") {
+      await enter_chatgpt_convo(ev.detail.cmd);
+    } else {
+      console.log("unknown action", ev.detail.action);
     }
   }
 
+  async function enter_chatgpt_convo(filename) {
+    let convo = null;
+    if (filename == "") {
+      convo = await invoke("chatgpt_new_conversation", {});
+      filename = new Date().toISOString() + ".json";
+    } else {
+      convo = await invoke("chatgpt_get_conversation", { filename: filename });
+    }
+    chatgpt_mode_convo = convo;
+    chatgpt_mode_filename = filename;
+    mode = "chatgpt";
+    listener_normal.stop_listening();
+    footer_msg =
+      "ChatGPT mode. <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Shift-Enter to submit query</span>";
+  }
+
   async function handle_command(cmd) {
+    //todo: replace with callback?
     if (cmd == "reload") {
       await invoke("reload_data", {});
       console.log("reloaded");
@@ -485,9 +546,49 @@
       await create_date_nodes();
     } else if (cmd == "settings") {
       await edit_settings();
+    } else if (cmd == "download_awesome_chatpgt_prompts") {
+      await download_awesome_chatpgt_prompts();
     } else {
       console.log("unhandled command", cmd);
       footer_msg = `<span class='error'>unhandled command ${cmd}</span>`;
+    }
+  }
+
+  function splitOnce(s, on) {
+    let [first, ...rest] = s.split(on);
+    return [first, rest.length > 0 ? rest.join(on) : null];
+  }
+
+  async function download_awesome_chatpgt_prompts() {
+    let url =
+      "https://github.com/f/awesome-chatgpt-prompts/raw/main/prompts.csv";
+    const response = await fetch(url, {
+      method: "GET",
+      timeout: 10,
+      responseType: 2,
+    });
+    if (response.ok) {
+      csv_parse(
+        response.data,
+        {
+          columns: true,
+          skip_empty_lines: true,
+        },
+        async (error, records) => {
+          let prompts = {};
+          for (let record of records) {
+            prompts[record["act"]] = record["prompt"];
+          }
+          console.log(prompts);
+          await invoke("chatgpt_update_prompts", {
+            key: "awesome",
+            prompts: prompts,
+          });
+        }
+      );
+      footer_msg = "Downloaded awesome chatgpt prompt & stored in prompts.toml";
+    } else {
+      footer_msg = `<span class='error'>error downloading prompts. ${response.status}</span>`;
     }
   }
 
@@ -608,12 +709,12 @@
   }
 
   function removeItemOnce(arr, value) {
-  var index = arr.indexOf(value);
-  if (index > -1) {
-    arr.splice(index, 1);
+    var index = arr.indexOf(value);
+    if (index > -1) {
+      arr.splice(index, 1);
+    }
+    return arr;
   }
-  return arr;
-}
 
   async function enter_mail_view(query) {
     if (
@@ -643,7 +744,7 @@
           id: mail_id,
           tags: ["unread"],
         });
-		removeItemOnce(tags, "unread");
+        removeItemOnce(tags, "unread");
       }
 
       if (raw_message != null) {
@@ -658,7 +759,7 @@
       }
 
       footer_msg =
-		"<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images. <span class='hotkey'>H</span> to view all headers";
+        "<span class='hotkey'>Esc</span> to go back. <span class='hotkey'>h</span> to enable html view. <span class='hotkey'>i</span> to enable images. <span class='hotkey'>H</span> to view all headers";
     } else {
       footer_msg =
         "<span class='hotkey'>Enter</span> to select, <span class='hotkey'>Esc</span> to cancel. <span class='hotkey'>Ctrl-r</span> to refine.";
@@ -767,6 +868,10 @@
     }
   }
 
+  async function handle_chatgpt_leave(ev) {
+    enter_normal_mode();
+  }
+
   async function handle_mail_refine_search(ev) {
     await enter_mail_view(mail_mode_query);
   }
@@ -779,16 +884,16 @@
 
 <div class="wrapper">
   <div class="header" id="header">
-    {#if mode == "nav" | mode == "normal" || mode == "quick_pick"}
-    <TopTree
-      bind:title={content_title}
-      bind:path={current_path}
-      bind:levels={content_levels}
-      bind:mode
-      on:goto_node={handle_goto_node}
-    />
-    <hr />
-	{/if}
+    {#if (mode == "nav") | (mode == "normal") || mode == "quick_pick"}
+      <TopTree
+        bind:title={content_title}
+        bind:path={current_path}
+        bind:levels={content_levels}
+        bind:mode
+        on:goto_node={handle_goto_node}
+      />
+      <hr />
+    {/if}
     {#if mode == "nav"}
       <NavTable
         bind:nav_table={content_children}
@@ -853,6 +958,12 @@
           bind:message_id={single_mail_mode_message_id}
           on:leave={handle_mail_leave}
         />
+      {:else if mode == "chatgpt"}
+        <ChatGPT
+          bind:convo={chatgpt_mode_convo}
+          bind:filename={chatgpt_mode_filename}
+          on:leave={handle_chatgpt_leave}
+        />
       {/if}
     </div>
   </div>
@@ -890,4 +1001,9 @@
 <footer> <Footer bind:show_help /></footer>
   -->
 <style>
-</style>
+  :global body,
+  :global .footer,
+  :global .header {
+    background-color: #eeeeee;
+  }
+ </style>

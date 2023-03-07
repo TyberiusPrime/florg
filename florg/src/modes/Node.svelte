@@ -44,6 +44,7 @@
     { key: "g", text: "goto" },
     { key: "z", text: "new node below" },
     { key: "m", text: "move node to node below" },
+    { key: "p", text: "command palette" },
   ];
 
   async function load_node(path, edit_afterwards = false) {
@@ -146,11 +147,22 @@
   });
 
   listener.register_combo({
+    keys: "backspace",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: async (e, count, repeated) => {
+      if (current_path.length > 0)
+        await enter_mode("node", { path: current_path.slice(0, -1) }, false);
+    },
+  });
+  listener.register_combo({
     keys: "esc",
     is_unordered: true,
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
+      console.log("from esc in listener");
       leave_mode();
     },
   });
@@ -190,6 +202,26 @@
 
   listener.register_combo({
     keys: "g",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      overlay = "goto";
+    },
+  });
+
+  listener.register_combo({
+    keys: "z",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      overlay = "new_below";
+    },
+  });
+
+  listener.register_combo({
+    keys: "p",
     is_unordered: true,
     prevent_default: true,
     prevent_repeat: true,
@@ -263,19 +295,31 @@
     return "";
   }
 
+  async function parse_path(path) {
+    if (path.startsWith("!")) {
+      let prefix = path.slice(1);
+      let date_suffix = await invoke("date_to_path", {
+        dateStr: iso_date(new Date()),
+      });
+      path = prefix + date_suffix;
+    } else if (path.startsWith("#")) {
+      //TODO
+    }
+    return path;
+  }
+
   async function handle_goto_action(ev) {
-  let path = ev.detail;
-   if (path.startsWith("!")) {
-        let prefix = path.slice(1);
-        let date_suffix = await invoke("date_to_path", {
-          dateStr: iso_date(new Date()),
-        });
-        path = prefix + date_suffix;
-      } else if (ev.detail.startsWith("#")) {
-	  //TODO
-      }
+    let path = await parse_path(ev.detail);
     load_node(path);
-	overlay = "";
+    overlay = "";
+  }
+
+  async function handle_new_node_below(ev) {
+    let path = await parse_path(ev.detail);
+    console.log(path);
+    let new_path = await invoke("find_next_empty_child", { path: path });
+    load_node(new_path, true);
+    overlay = "";
   }
 </script>
 
@@ -299,7 +343,11 @@
         {:else if overlay == "search"}
           <Search bind:mode bind:overlay bind:in_page_search_term />
         {:else if overlay == "goto"}
+          Goto node:
           <Goto on:action={handle_goto_action} />
+        {:else if overlay == "new_below"}
+          Create new node below
+          <Goto on:action={handle_new_node_below} />
         {:else if overlay == ""}
           Press <span class="hotkey">h</span> for help.
         {:else}

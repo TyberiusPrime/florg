@@ -2,7 +2,6 @@
   import View from "./lib/View.svelte";
   import {
     enter_mode,
-    leave_mode,
     assign_last_mode,
     mode as mode_store,
     mode_args as mode_args_store,

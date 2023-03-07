@@ -20,6 +20,8 @@
     { key: "Enter", text: "Open&Edit current node" },
   ];
   var listener = new window.keypress.Listener();
+  listener.reset();
+  listener.stop_listening();
 
   listener.register_combo({
     keys: "esc",
@@ -28,6 +30,7 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
+        console.log("listener nav leave");
         leave_mode();
       }
     },
@@ -86,10 +89,33 @@
 
   onMount(async () => {
     await handle_input_changed();
+    listener.listen();
+  });
+
+  onDestroy(async () => {
+    listener.stop_listening();
   });
 
   function indent(depth) {
     return "&nbsp;".repeat(depth);
+  }
+
+  function goto_level(index) {
+    let new_path = "";
+    for (let ii = 0; ii < index + 1; ii++) {
+      new_path += current_node.levels[ii][0];
+    }
+    path = new_path;
+    handle_input_changed();
+  }
+
+  function descend(letter) {
+    path += letter;
+    handle_input_changed();
+  }
+
+  function accept_current_node() {
+    enter_mode("node", { path: path }, false);
   }
 </script>
 
@@ -128,11 +154,13 @@
             (root)
           {/if} <br />
           Current node:
-		  {#if current_node.node !== null }
-          {current_node.node.header.title}
-		  {:else}
-		  (Empty node)
-		  {/if}
+          <a on:click={accept_current_node}>
+            {#if current_node.node !== null}
+              {current_node.node.header.title}
+            {:else}
+              (Empty node)
+            {/if}
+          </a>
           <br />
           <br />
 
@@ -140,8 +168,12 @@
           <table>
             {#each current_node.children as child}
               <tr>
-                <th class="hotkey">{child.path.slice(-1)}</th>
-                <td>{child.header.title}</td>
+                <a on:click={descend(child.path.slice(-1))}>
+                  <th class="hotkey">
+                    {child.path.slice(-1)}
+                  </th>
+                  <td>{child.header.title}</td>
+                </a>
               </tr>
             {/each}
           </table>

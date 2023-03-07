@@ -223,7 +223,9 @@
     let old_convos = await invoke("chatgpt_list_conversations", {});
     if (old_convos != null) {
       for (let convo of old_convos) {
-        let title = `${convo.title != null? convo.title : "(no title)"} (${format_date(convo.date)})`;
+        let title = `${
+          convo.title != null ? convo.title : "(no title)"
+        } (${format_date(convo.date)})`;
         conversations.push({ text: title, cmd: convo.filename });
       }
     } else {
@@ -472,6 +474,14 @@
       console.log("node temp-changed", event.payload[0]);
       if (event.payload[0] == current_path) {
         content_text = event.payload[1];
+        content_rendered = Asciidoctor.convert(content_text, {
+          attributes: {
+            doctype: "article",
+            showtitle: true,
+            "source-highlighter": "highlight.js",
+            "highlightjs-languages": "rust, swift",
+          },
+        });
       }
     }
   );
@@ -524,7 +534,7 @@
     if (filename == "") {
       convo = await invoke("chatgpt_new_conversation", {});
       filename = new Date().toISOString() + ".json";
-	  chatgpt_mode_input = content_text;
+      chatgpt_mode_input = content_text;
     } else {
       convo = await invoke("chatgpt_get_conversation", { filename: filename });
     }
@@ -964,7 +974,7 @@
         <ChatGPT
           bind:convo={chatgpt_mode_convo}
           bind:filename={chatgpt_mode_filename}
-		  bind:input={chatgpt_mode_input}
+          bind:input={chatgpt_mode_input}
           on:leave={handle_chatgpt_leave}
         />
       {/if}
@@ -1009,4 +1019,4 @@
   :global .header {
     background-color: #eeeeee;
   }
- </style>
+</style>

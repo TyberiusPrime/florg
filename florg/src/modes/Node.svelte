@@ -226,7 +226,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      overlay = "goto";
+	enter_mode("palette", {}, true);
     },
   });
 

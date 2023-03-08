@@ -193,8 +193,6 @@
     </div>
   </View>
 
-  Nav mode!
-  {JSON.stringify(mode_args)};
 </div>
 
 <style>

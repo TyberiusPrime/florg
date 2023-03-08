@@ -26,6 +26,6 @@ export let mode_args;
   :global .footer,
   :global .header {
     background-color: #eeeeee;
-	border: 1px solid blue;
+	border-bottom:2px dashed grey;
   }
 </style>

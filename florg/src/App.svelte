@@ -41,6 +41,7 @@
 
   import ModeNode from "./modes/Node.svelte";
   import NavMode from "./modes/Nav.svelte";
+  import PaletteMode from "./modes/Palette.svelte";
 
   let mode;
   let mode_args;
@@ -64,6 +65,8 @@
     <ModeNode {mode} {mode_args} />
   {:else if mode == "nav"}
     <NavMode {mode} {mode_args} />
+  {:else if mode == "palette"}
+    <PaletteMode {mode} {mode_args} />
   {:else}
     unknown mode {JSON.stringify(mode)}
   {/if}

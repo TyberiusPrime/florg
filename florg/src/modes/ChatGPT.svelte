@@ -1,4 +1,12 @@
 <script lang="ts">
+  import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
+  import { toast } from "@zerodevx/svelte-toast";
+  import View from "../lib/View.svelte";
+  import Overlay from "../lib/Overlay.svelte";
+  import Help from "../lib/Help.svelte";
+  import Search from "../lib/Search.svelte";
+  import Goto from "../lib/Goto.svelte";
+
   import { invoke } from "@tauri-apps/api/tauri";
   import { createEventDispatcher } from "svelte";
   import Select from "svelte-select";
@@ -13,18 +21,19 @@
     escape_html,
     add_code_clipboards,
     no_text_inputs_focused,
-  } from "./util.ts";
+  } from "../lib/util.ts";
   import DOMPurify from "dompurify";
   import SvelteTooltip from "svelte-tooltip";
 
   const dispatch = createEventDispatcher();
-
   export let mode;
   export let mode_args;
+  let overlay = "";
+  let in_page_search_term = "";
 
-  let convo = mode_args.convo;
-  let filename = mode_args.filename;
-  let input = "";
+  export let convo = mode_args.convo;
+  export let filename = mode_args.filename;
+  export let input = "";
 
   let items = [];
   let chosen = null;
@@ -33,31 +42,44 @@
   let output;
   let last_input_tokens = 0;
   let processing_title = false;
+  let help_entries = [{ key: "Esc", text: "Go back" }];
 
   var listener = new window.keypress.Listener();
   listener.reset();
   listener.stop_listening();
 
   listener.simple_combo("esc", () => {
-    if (overlay_mode == "") {
-      dispatch("leave", false);
-    }
+    leave_mode();
   });
 
   listener.simple_combo("shift enter", async () => {
     await query_chat_gtp(input, true);
   });
 
-  listener.simple_combo("s", async (e, count, repeated) => {
-    if (no_text_inputs_focused()) {
-      dispatch("search", {});
-    }
+  listener.register_combo({
+    keys: "s",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+      overlay = "search";
+	  e.preventDefault();
+      }
+    },
   });
 
-  listener.simple_combo("i", async (e, count, repeated) => {
-    if (no_text_inputs_focused()) {
-      dispatch("mail_search", {});
-    }
+
+
+  listener.register_combo({
+    keys: "i",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+      toast.push("todo");
+	  e.preventDefault();
+      }
+    },
   });
 
 
@@ -67,7 +89,7 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
-        dispatch("overlay_change", { overlay: "toggle_help" });
+        overlay = "help";
       }
     },
   });
@@ -78,7 +100,9 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
-        dispatch("in_page_search", true);
+        if (in_page_search_term != "") {
+          window.find(in_page_search_term, false, false, true, false);
+        }
       }
     },
   });
@@ -89,7 +113,9 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
-        dispatch("in_page_search", false);
+        if (in_page_search_term != "") {
+          window.find(in_page_search_term, false, false, true, false);
+        }
       }
     },
   });
@@ -278,11 +304,184 @@
     processing_title = false;
   }
 
+  function handle_overlay_leave() {
+    overlay = "";
+  }
 </script>
 
 <div>
-  <h1>ChatGPT</h1>
-  </div>
+  <View bind:mode bind:mode_args>
+    <div slot="header">
+      <h1>ChatGPT</h1>
+    </div>
+
+    <div slot="content">
+      <table>
+        <tr>
+          <th>Date</th>
+          <td>{@html format_date(convo.date)}</td>
+        </tr>
+        <tr>
+          <th>Title</th>
+          <td>
+            <input
+              type="text"
+              bind:value={convo.title}
+              on:change={handle_title_change}
+              style="width: 70%;"
+            />
+            {#if processing_title}
+              <button><LoadBars color="#303030" size="1em" ; /></button>
+            {:else}
+              <button on:click={handle_title_generate}>Generate</button>
+            {/if}
+          </td>
+        </tr>
+        <tr>
+          <th>Prompt</th>
+          <td>
+            <Select
+              {items}
+              bind:value={chosen}
+              on:change={set_prompt}
+              placeholder=" Replace prompt"
+            />
+            <textarea id="prompt" bind:value={prompt} rows="5" />
+          </td>
+        </tr>
+        {#each convo.messages as message, index}
+          {#if message[0] == "input"}
+            {#if index > convo.messages.length - 1 || convo.messages[index + 1][0] != "output" || convo.messages[index + 1][1].hide !== true}
+              <tr>
+                <th
+                  style="background-color:#eb86bf;color:#EEEEEE;border-radius:.5em;"
+                  class="unselectable">Input</th
+                >
+                <td class="llm_input"> {message[1]} </td>
+              </tr>
+            {:else}{/if}
+          {/if}
+          {#if message[0] == "output"}
+            {@const output = message[1]}
+            {#if output.hide !== true}
+              <tr>
+                <th
+                  style="background-color:#10a37f;color:#EEEEEE;border-radius:.5em;"
+                  class="unselectable"
+                >
+                  Output</th
+                ><td>
+                  <div class="llm_output">
+                    {@html DOMPurify.sanitize(
+                      marked.parse(output.choices[0].message.content)
+                    )}
+                  </div>
+                  <div class="unselectable">
+                    <input
+                      type="checkbox"
+                      class="include_msg_input"
+                      id="include_msg_input_{index}"
+                      data-index={index}
+                      checked
+                    />
+                    <label for="include_msg_input_{index}"
+                      >Include input ({output.usage.prompt_tokens})</label
+                    >
+                    <input
+                      type="checkbox"
+                      class="include_msg_output"
+                      id="include_msg_output_{index}"
+                      data-index={index}
+                      checked
+                    />
+                    <label for="include_msg_output_{index}"
+                      >Include output ({output.usage.completion_tokens})</label
+                    >
+                    <button on:click={toggle_pre} class="small_button"
+                      >Toggle pre</button
+                    >
+                    <button
+                      class="small_button"
+                      on:click={() => {
+                        hide(index);
+                      }}>Hide</button
+                    >
+                  </div>
+                </td>
+              </tr>
+              <tr
+                ><td colspan="2"><hr style="border: 1px dashed black" /></td
+                ></tr
+              >
+            {:else}
+              <tr
+                ><td colspan="2">
+                  <SvelteTooltip color="#DFDFDF;border:1px dashed grey;">
+                    <div slot="custom-tip" class="hover">
+                      {convo.messages[index - 1][1]}<br />
+                      {output.choices[0].message.content}
+                    </div>
+                    <button
+                      class="small_button"
+                      on:click={() => {
+                        unhide(index);
+                      }}>Unhide</button
+                    >
+                  </SvelteTooltip>
+                </td></tr
+              >
+              <tr
+                ><td colspan="2"><hr style="border: 1px dashed black" /></td
+                ></tr
+              >
+            {/if}
+          {/if}
+          {#if message[0] == "error"}
+            <tr>
+              <th> Error</th><td>
+                <div class="llm_error">{message[1]}</div>
+              </td>
+            </tr>
+          {/if}
+        {/each}
+        {#if processing}
+          <tr>
+            <td colspan="2"><LoadBars color="#303030" /> </td>
+          </tr>
+        {/if}
+
+        <tr>
+          <th>New input</th>
+          <td>
+            <a on:click={disable_all}>Disable previous</a>
+            <textarea id="input" bind:value={input} rows="10" autofocus />
+            <button> Submit</button>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div slot="footer">
+      <Overlay {listener} on:overlay_leave={handle_overlay_leave} bind:overlay>
+        {#if overlay == "help"}
+          <Help bind:entries={help_entries} />
+        {:else if overlay == "search"}
+          <Search bind:mode bind:overlay bind:in_page_search_term />
+        {:else if overlay == "goto"}
+          Goto node:
+          <Goto on:action={handle_goto_action} />
+        {:else if overlay == "new_below"}
+          Create new node below
+          <Goto on:action={handle_new_node_below} />
+        {:else if overlay == ""}
+          Press <span class="hotkey">h</span> for help.
+        {:else}
+          Unknown overlay: {overlay}
+        {/if}
+      </Overlay>
+    </div>
+  </View>
+</div>
 
 <style>
   table {

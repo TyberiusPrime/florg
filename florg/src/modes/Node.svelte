@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { onMount, onDestroy } from "svelte";
+  import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
   import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
 
@@ -120,6 +121,7 @@
     prevent_repeat: true,
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
+      console.log("listener h");
       if (!repeated) {
         overlay = "help";
       }
@@ -226,7 +228,17 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-	enter_mode("palette", {}, true);
+      enter_mode("palette", {}, true);
+    },
+  });
+
+  listener.register_combo({
+    keys: "o",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      enter_mode("chatgpt_picker", { start_text: content_text }, true);
     },
   });
 
@@ -288,6 +300,7 @@
   });
 
   function handle_overlay_leave() {
+    //toast.push("overlay:leave in node");
     overlay = "";
   }
 
@@ -337,11 +350,11 @@
       {@html content_rendered}
     </div>
     <div slot="footer">
-      <Overlay {listener} on:overlay_leave={handle_overlay_leave} bind:overlay>
+      <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
         {#if overlay == "help"}
           <Help bind:entries={help_entries} />
         {:else if overlay == "search"}
-          <Search bind:mode bind:overlay bind:in_page_search_term />
+          <Search bind:mode bind:overlay bind:in_page_search_term on:leave />
         {:else if overlay == "goto"}
           Goto node:
           <Goto on:action={handle_goto_action} />

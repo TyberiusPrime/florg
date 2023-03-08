@@ -39,7 +39,9 @@
     on_keyup: (e, count, repeated) => {
       console.log("entr");
       if (downstream_elements.length > 0) {
-        dispatch("action", { cmd: downstream_elements[focused].dataset.cmd });
+        dispatch("action", {
+          cmd: downstream_elements[focused].dataset.cmd,
+        });
       }
     },
   });
@@ -131,13 +133,16 @@
   }
 
   onMount(async () => {
-    elements = [];
-    for (let el of document.querySelector("#pick_table").children) {
-      elements.push(el);
-    }
-    downstream_elements = elements;
-    update_chosen();
-    listener.listen();
+    window.setTimeout(() => {
+      elements = [];
+      for (let el of document.querySelector("#pick_table").children) {
+        elements.push(el);
+      }
+      console.log(elements);
+      downstream_elements = elements;
+      update_chosen();
+      listener.listen();
+    }, 100);
   });
 
   onDestroy(async () => {
@@ -161,12 +166,11 @@
           <slot name="entries" />
         </table>
       </div>
-	  </div>
-      <div slot="footer">
-        Press <span class="hotkey">Esc</span> to abourt.
-      </div>
-    </View
-  >
+    </div>
+    <div slot="footer">
+      Press <span class="hotkey">Esc</span> to abort.
+    </div>
+  </View>
 </div>
 
 <style>

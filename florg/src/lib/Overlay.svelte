@@ -2,23 +2,37 @@
   import { onMount, onDestroy } from "svelte";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
+  import { no_text_inputs_focused } from "../lib/util.ts";
+  import { overlay_handles_escape } from "../lib/mode_stack.ts";
 
   export let overlay = false;
   export let listener;
 
+  let handle_esc = true;
+
+  overlay_handles_escape.subscribe((value) => {
+	  console.log(`overlay_handles_escape set to ${value}`);
+    handle_esc = value;
+  });
+
   var listener_overlay = new window.keypress.Listener();
   listener_overlay.simple_combo("esc", () => {
-    dispatch("overlay_leave", {});
+    if (handle_esc) {
+      dispatch("leave", {});
+    }
   });
   listener_overlay.register_combo({
     keys: "h",
     is_unordered: true,
     prevent_repeat: true,
-    prevent_default: true,
     on_keyup: (e, count, repeated) => {
-	   console.log(overlay);
-      if (overlay == "help") {
-        dispatch("overlay_leave", {});
+      console.log("overaly h");
+
+      if (no_text_inputs_focused) {
+        if (overlay == "help") {
+          dispatch("overlay_leave", {});
+          e.preventDefault();
+        }
       }
     },
   });
@@ -35,7 +49,7 @@
   function stop_listening() {
     listener.listen();
     listener_overlay.stop_listening();
-	return "";
+    return "";
   }
 
   onDestroy(async () => {});

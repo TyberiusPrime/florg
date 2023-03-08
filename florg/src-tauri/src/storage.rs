@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+use crate::openai;
 use anyhow::{Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
-use crate::openai;
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -33,7 +33,7 @@ pub(crate) struct Storage {
     nodes: Vec<Node>,
     pub settings: toml_edit::Document,
 
-    pub (crate) chatgpt: Option<openai::ChatGPT>
+    pub(crate) chatgpt: Option<openai::ChatGPT>,
 }
 
 pub const FLORG_FILENAME: &'static str = "node.adoc";
@@ -44,15 +44,15 @@ impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
             Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
-        let chatgpt = settings["chatgpt"]["api_key"].as_str().map(|s| {
-            openai::ChatGPT::new(s.to_string(), data_path.clone())
-        });
+        let chatgpt = settings["chatgpt"]["api_key"]
+            .as_str()
+            .map(|s| openai::ChatGPT::new(s.to_string(), data_path.clone()));
         let mut s = Storage {
             data_path,
             nodes: Vec::new(),
             git_binary,
             settings,
-            chatgpt
+            chatgpt,
         };
         s.reload();
         s
@@ -256,15 +256,32 @@ impl Storage {
             Node::dirname_from_path(&self.data_path, path).join(FLORG_CACHE_FILENAME),
         )
         .ok()?;
-        dbg!("Read cache");
+        //dbg!("Read cache");
         let (stored_hash, content) = input.split_once("\n")?;
         if stored_hash == hash {
-        dbg!("hash match");
+            dbg!("hash match");
             Some(content.to_string())
         } else {
-        dbg!("hash mismatch", &hash, &stored_hash);
+            //dbg!("hash mismatch", &hash, &stored_hash);
             None
         }
+    }
+
+    pub(crate) fn history_get(&self, name: &str) -> Result<Vec<String>> {
+        let dir = self.data_path.join("history");
+        std::fs::create_dir_all(&dir)?;
+        let filename = dir.join(format!("{name}.json"));
+        let raw = std::fs::read_to_string(&filename)?;
+        Ok(serde_json::from_str(&raw)?)
+    }
+
+    pub(crate) fn history_store(&self, name: &str, entries: &Vec<String>) -> Result<()> {
+        let dir = self.data_path.join("history");
+        std::fs::create_dir_all(&dir)?;
+        let filename = dir.join(format!("{name}.json"));
+        let raw = serde_json::to_string(&entries)?;
+        std::fs::write(&filename, raw)?;
+        Ok(())
     }
 }
 

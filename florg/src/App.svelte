@@ -1,5 +1,6 @@
 <script lang="ts">
   import View from "./lib/View.svelte";
+  import { SvelteToast } from "@zerodevx/svelte-toast";
   import {
     enter_mode,
     assign_last_mode,
@@ -42,6 +43,10 @@
   import ModeNode from "./modes/Node.svelte";
   import NavMode from "./modes/Nav.svelte";
   import PaletteMode from "./modes/Palette.svelte";
+  import NodeSearchMode from "./modes/NodeSearch.svelte";
+  import ChatGPTMode from "./modes/ChatGPT.svelte";
+  import ChatGPTPickerMode from "./modes/ChatGPTPicker.svelte";
+  import InputWithWhistory from "./lib/InputWithHistory.svelte";
 
   let mode;
   let mode_args;
@@ -58,6 +63,14 @@
   });
 
   assign_last_mode();
+
+  let options = {
+    // toast options
+	pausable: true,
+	duration:10000,
+  };
+
+  let history = ['hello','world'];
 </script>
 
 <div>
@@ -67,7 +80,19 @@
     <NavMode {mode} {mode_args} />
   {:else if mode == "palette"}
     <PaletteMode {mode} {mode_args} />
+  {:else if mode == "node_search"}
+    <NodeSearchMode {mode} {mode_args} />
+{:else if mode == "chatgpt_picker"}
+    <ChatGPTPickerMode {mode} {mode_args} />
+
+  {:else if mode == "chatgpt"}
+    <ChatGPTMode {mode} {mode_args} />
   {:else}
     unknown mode {JSON.stringify(mode)}
   {/if}
+  <SvelteToast {options} />
+ 
+
+
+  />
 </div>

@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.6",
     "@tauri-apps/api": "^1.2.0",
     "asciidoctor": "3.0.0-alpha.4",
     "buffer": "^6.0.3",

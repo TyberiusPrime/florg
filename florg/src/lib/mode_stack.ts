@@ -5,6 +5,7 @@ let mode_stack = [{ mode: "node", args: { path: "" }, transient: false }];
 export let mode = writable(null);
 export let mode_args = writable(null);
 export let mode_transient = writable(null);
+export let overlay_handles_escape = writable(true);
 
 export function enter_mode(mode: string, args: any, transient: boolean) {
   if (mode_stack.slice(-1)[0].transient) {

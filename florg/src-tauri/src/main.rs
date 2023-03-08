@@ -442,9 +442,10 @@ struct RipgrepResult {
 }
 
 #[tauri::command]
-fn ripgrep_below_node(path: &str, search_term: &str) -> Option<Vec<RipgrepResult>> {
+fn ripgrep_below_node(query_path: &str, search_term: &str) -> Option<Vec<RipgrepResult>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
-    let search_path = Node::dirname_from_path(&ss.data_path, path);
+    let search_path = Node::dirname_from_path(&ss.data_path, query_path);
+    //println!("searching in {search_path:?}");
     let ok = &std::process::Command::new("rg")
         .arg("--type-add")
         .arg("adoc:*.adoc")
@@ -470,6 +471,7 @@ fn ripgrep_below_node(path: &str, search_term: &str) -> Option<Vec<RipgrepResult
                     }
                     None => continue,
                 };
+                let path = format!("{query_path}{path}");
                 let title = ss
                     .get_node(&path)
                     .map(|x| x.header.title.clone())
@@ -630,6 +632,21 @@ fn chatgpt_get_api_key() -> Option<String> {
     }
 }
 
+#[tauri::command]
+fn history_get(name: &str) -> Vec<String> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    let res = ss.history_get(name);
+    dbg!(&res);
+    res.unwrap_or_default()
+}
+#[tauri::command]
+fn history_store(name: &str, entries: Vec<String>) -> bool {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    let res = ss.history_store(name, &entries);
+    dbg!(&res);
+
+    res.is_ok()
+}
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     Some(
@@ -884,6 +901,8 @@ fn main() -> Result<()> {
             chatgpt_new_conversation,
             chatgpt_save_conversation,
             chatgpt_get_api_key,
+            history_get,
+            history_store
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

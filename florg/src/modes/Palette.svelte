@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
-  import { enter_mode, leave_mode, get_last_path } from "../lib/mode_stack.ts";
+  import { get_last_path } from "../lib/mode_stack.ts";
   import { exit } from "@tauri-apps/api/process";
   import Picker from "../lib/Picker.svelte";
   import { toast } from "@zerodevx/svelte-toast";
@@ -22,7 +22,8 @@
     } else {
       console.log("unhandled command", cmd);
     }
-    leave_mode();
+	window.history.back();
+
   }
 
   async function edit_settings() {

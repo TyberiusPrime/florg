@@ -1,7 +1,6 @@
 <script lang="ts">
   import { get_node, no_text_inputs_focused } from "../lib/util.ts";
   import { onMount, onDestroy } from "svelte";
-  import { mode_args_store } from "../lib/mode_stack.ts";
 
   import View from "../lib/View.svelte";
   import Overlay from "../lib/Overlay.svelte";

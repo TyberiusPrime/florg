@@ -3,7 +3,6 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
   import QuickPick from "../lib/QuickPick.svelte";
-  import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
   import { onMount, onDestroy } from "svelte";

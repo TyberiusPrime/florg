@@ -141,23 +141,12 @@
         id: mail_id,
       });
       if (msg != null) {
-                push_mode("/mail_message/" + mail_id);
-        /*enter_mode(
-          "mail_message",
-          {
-            message: email,
-            message_id: mail_id,
-            message_tags: tags,
-            message_filename: msg.filename,
-          },
-          false
-        );
-		*/
+        push_mode("/mail_message/" + mail_id);
       } else {
         toast.push('<span class="error">Error: Could not load email</span>');
       }
     } else {
-	console.log("target", target);
+      console.log("target", target);
       push_mode("/mail_query/" + target);
     }
   }

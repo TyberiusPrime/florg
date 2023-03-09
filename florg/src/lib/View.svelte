@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { mode_store } from "../lib/mode_stack.ts";
 
-  let mode = $mode_store;
 </script>
 
 <div class="wrapper">
@@ -18,7 +16,6 @@
   <div class="footer" id="footer">
 	<hr />
     <slot name="footer" />
-    {mode}
   </div>
 </div>
 

@@ -7,15 +7,82 @@
     mode_args_store,
   } from "../lib/mode_stack.ts";
   import Picker from "../lib/Picker.svelte";
-  import { format_date, removeItemOnce } from "../lib/util.ts";
+  import { format_date, removeItemOnce, error_toast } from "../lib/util.ts";
   import { toast } from "@zerodevx/svelte-toast";
   import { find_color } from "../lib/colors.ts";
   import PostalMime from "postal-mime";
+  import { onMount, onDestroy } from "svelte";
 
   let mode_args;
   mode_args_store.subscribe((value) => {
     mode_args = value;
   });
+  let focused;
+  let view_mode = "loading";
+  let mail = [];
+  let more_mail = false;
+
+  var listener = new window.keypress.Listener();
+  listener.reset();
+  listener.stop_listening();
+
+  onMount(async () => {
+    listener.reset();
+    let te = await invoke("mail_get_tags", {});
+    if (te != null) {
+      for (let key in te) {
+        console.log("registering meta " + key);
+        listener.register_combo({
+          keys: "meta " + key,
+          prevent_default: true,
+          prevent_repeat: true,
+          on_keyup: async (e, count, repeated) => {
+            console.log("key", key);
+            await toggle_tag(te[key]);
+          },
+        });
+      }
+    }
+    let x = await get_mail(mode_args.query);
+    view_mode = x[0];
+    mail = x[1];
+    more_mail = x[2];
+
+    listener.listen();
+  });
+
+  onDestroy(() => {
+    listener.stop_listening();
+  });
+
+  function find_mail(id) {
+    for (let m of mail) {
+      if (id.startsWith(m.id)) return m; //todo: do better
+    }
+	return null;
+  }
+  async function toggle_tag(tag) {
+    console.log(focused);
+    let el = document.querySelectorAll(".msg_entry").item(focused);
+    let target = el.dataset.cmd;
+    if (target.startsWith("message:")) {
+      let mail_id = target.slice(8);
+      let mail = find_mail(mail_id);
+	  if (mail === null) {
+		error_toast("could not find message");
+		return;
+	  }
+	  console.log(mail);
+      if (await invoke("mail_message_toggle_tag", { id: mail_id, tag: tag })) {
+        toast.push("Toggled");
+      } else {
+        error_toast("Could not toggle tag");
+      }
+    } else {
+      error_toast("Can only toggle tags on messages");
+    }
+    mail = mail;
+  }
 
   function count_unread(entry) {
     let counter = 0;
@@ -67,8 +134,6 @@
     return msg.tags.indexOf("unread") > -1;
   }
 
-
-
   async function handle_action(ev) {
     let target = ev.detail.cmd;
     if (target.startsWith("message:")) {
@@ -117,8 +182,10 @@
 </script>
 
 <div>
-  {#await get_mail(mode_args.query) then [view_mode, mail, more_mail]}
-    <Picker on:action={handle_action}>
+  {#if view_mode == "Loading"}
+    Loading...
+  {:else}
+    <Picker on:action={handle_action} bind:focused>
       <div slot="message">
         <h1>Mail result</h1>
         Query: {mode_args.query}
@@ -129,7 +196,7 @@
       <svelte:fragment slot="entries">
         {#each mail as el, index}
           {#if view_mode == "threads"}
-            <tr data-cmd={link(el)}>
+            <tr data-cmd={link(el)} class="msg_entry">
               <td class="index">{index}</td>
               <td class="unread_count">
                 {#if count_unread(el) > 0}
@@ -156,8 +223,7 @@
               </td>
             </tr>
           {:else if view_mode == "messages"}
-            <tr data-cmd={"message:" + el.id}
-              >
+            <tr data-cmd={"message:" + el.id} class="msg_entry">
               <td class="date">{@html format_date(Date.parse(el.date))}</td>
               <td>
                 <div class="fromsubject">
@@ -177,7 +243,7 @@
         {/each}
       </svelte:fragment>
     </Picker>
-  {/await}
+  {/if}
 </div>
 
 <style>

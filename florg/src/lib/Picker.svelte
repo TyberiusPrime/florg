@@ -25,7 +25,7 @@
     imported_input_text = value["input_text"];
   });
 
-  let focused = 0;
+  export let focused = 0;
   let input_text = "";
   let last_text = "";
   let downstream_elements = [];

@@ -817,6 +817,7 @@ dependencies = [
  "expanduser",
  "glob",
  "inotify",
+ "itertools",
  "mail-parser",
  "notmuch",
  "once_cell",

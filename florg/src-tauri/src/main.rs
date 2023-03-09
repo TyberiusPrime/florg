@@ -539,7 +539,6 @@ fn mail_get_tags() -> Option<HashMap<String, String>> {
     get_from_settings_str_map("mail_tags")
 }
 
-
 #[tauri::command]
 fn get_mail_message(id: &str) -> Option<mail::SingleMessage> {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -555,11 +554,18 @@ fn mail_message_add_tags(id: &str, tags: Vec<String>) -> bool {
     let res = lock.notmuch_db.add_tags(id, &tags);
     res.is_ok()
 }
+
 #[tauri::command]
 fn mail_message_remove_tags(id: &str, tags: Vec<String>) -> bool {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.remove_tags(id, &tags);
     dbg!("removed tags", &id, &tags, &res);
+    res.is_ok()
+}
+#[tauri::command]
+fn mail_message_toggle_tag(id: &str, tag: String) -> bool {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.toggle_tag(id, &tag);
     res.is_ok()
 }
 
@@ -925,6 +931,7 @@ fn main() -> Result<()> {
             get_mail_message,
             mail_message_add_tags,
             mail_message_remove_tags,
+            mail_message_toggle_tag,
             mail_message_store_attachments,
             mail_get_tags,
             chatgpt_get_prompts,

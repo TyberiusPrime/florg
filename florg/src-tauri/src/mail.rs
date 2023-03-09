@@ -145,6 +145,21 @@ impl MailStore {
         Ok(())
     }
 
+    pub fn toggle_tag(&self, msg_id: &str, tag: &String) -> anyhow::Result<()> {
+        use itertools::Itertools;
+        let database = self.open_db();
+
+        let message = database.find_message(msg_id)?.context("not found")?;
+        message.freeze()?;
+        if message.tags().contains(tag) {
+            message.remove_tag(tag)?;
+        } else {
+            message.add_tag(tag)?;
+        }
+        message.thaw()?;
+        Ok(())
+    }
+
     pub fn store_attachments(&self, msg_id: &str, path: &PathBuf) -> anyhow::Result<()> {
         use mail_parser::MimeHeaders;
         let database = self.open_db();

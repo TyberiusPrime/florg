@@ -30,6 +30,7 @@ notmuch = "0.8.0"
 dirs = "4.0.0"
 glob = "0.3.1"
 expanduser = "1.2.2"
+itertools = "0.10.5"
 
 [dependencies.toml_edit]
 version = "0.13.0"

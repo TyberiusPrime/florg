@@ -57,29 +57,34 @@
 
   function find_mail(id) {
     for (let m of mail) {
-      if (id.startsWith(m.id)) return m; //todo: do better
-    }
-	return null;
-  }
-  async function toggle_tag(tag) {
-    console.log(focused);
-    let el = document.querySelectorAll(".msg_entry").item(focused);
-    let target = el.dataset.cmd;
-    if (target.startsWith("message:")) {
-      let mail_id = target.slice(8);
-      let mail = find_mail(mail_id);
-	  if (mail === null) {
-		error_toast("could not find message");
-		return;
-	  }
-	  console.log(mail);
-      if (await invoke("mail_message_toggle_tag", { id: mail_id, tag: tag })) {
-        toast.push("Toggled");
-      } else {
-        error_toast("Could not toggle tag");
+      if (m.id == id) {
+        return m;
       }
-    } else {
-      error_toast("Can only toggle tags on messages");
+    }
+    return null;
+  }
+
+  async function toggle_tag(tag) {
+    if (view_mode == "messages") {
+      error_toast("todo");
+    } else if (view_mode == "threads") {
+      console.log(focused);
+      let el = document.querySelectorAll(".msg_entry").item(focused);
+      let target = el.dataset.thread;
+      let thread = find_mail(target);
+      if (thread.tags.indexOf(tag) > -1) {
+        for (let msg of thread.messages) {
+          await invoke("mail_message_remove_tags", { id: msg.id, tags: [tag] });
+        }
+        removeItemOnce(thread.tags, tag);
+      } else {
+        for (let msg of thread.messages) {
+          await invoke("mail_message_add_tags", { id: msg.id, tags: [tag] });
+        }
+        thread.tags.push(tag);
+      }
+      console.log(target);
+      console.log(thread);
     }
     mail = mail;
   }
@@ -196,7 +201,7 @@
       <svelte:fragment slot="entries">
         {#each mail as el, index}
           {#if view_mode == "threads"}
-            <tr data-cmd={link(el)} class="msg_entry">
+			<tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
               <td class="index">{index}</td>
               <td class="unread_count">
                 {#if count_unread(el) > 0}

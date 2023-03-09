@@ -1,14 +1,15 @@
 <script lang="ts">
+  import { push as push_mode, replace as replace_mode, } from "svelte-spa-router";
   import { createEventDispatcher } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import QuickPick from "../lib/QuickPick.svelte";
   import InputWithHistory from "../lib/InputWithHistory.svelte";
-  import { enter_mode, leave_mode, get_last_path } from "../lib/mode_stack.ts";
+  import { get_last_path } from "../lib/mode_stack.ts";
   import { invoke } from "@tauri-apps/api/tauri";
   import Select from "svelte-select";
   const dispatch = createEventDispatcher();
 
-  export let mode;
+  export let path = "";
   export let overlay;
   export let in_page_search_term = "";
   let search_term;
@@ -33,8 +34,11 @@
   }
 
   async function do_search() {
+    if (search_term == "") {
+      return;
+    }
     let history = await invoke("history_get", { name: "search" + search_mode });
-	history = history.filter((e) => e != search_term);
+    history = history.filter((e) => e != search_term);
     history.push(search_term);
     //limit history to last 10 entries
     history = history.slice(-10);
@@ -57,7 +61,9 @@
         path = get_last_path();
       }
       console.log("path", path);
-      enter_mode("node_search", { path: path, search_term: search_term });
+      push_mode("/node_search/" + search_term + "/" + path);
+    } else if (search_mode == "mail") {
+      push_mode("/mail_query/" + search_term);
     } else {
       toast.push("Unknonw search_mode: " + search_mode);
     }

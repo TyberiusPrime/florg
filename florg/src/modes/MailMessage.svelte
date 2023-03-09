@@ -1,16 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
-  import {
-    enter_mode,
-    leave_mode,
-    get_last_path,
-    mode_args_store,
-  } from "../lib/mode_stack.ts";
+  import { get_last_path } from "../lib/mode_stack.ts";
   import { escape_html, error_toast, removeItemOnce } from "../lib/util.ts";
   import { createEventDispatcher } from "svelte";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
-
+  import PostalMime from "postal-mime";
   import { onMount, onDestroy } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
@@ -20,17 +15,8 @@
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
 
-  let message = null;
-  let message_id = null;
-  let message_tags = null;
-  let message_filename = null;
-  let mode_args;
-  mode_args_store.subscribe((value) => {
-    message = value.message;
-    message_id = value.message_id;
-    message_tags = value.message_tags;
-    message_filename = value.message_filename;
-  });
+  export let params;
+
   const dispatch = createEventDispatcher();
   let overlay = "";
 
@@ -38,6 +24,7 @@
   let show_images = false;
   let all_headers = false;
   let tag_entries = [];
+  let message = null;
 
   let help_entries = [
     { key: "Esc", text: "Go back" },
@@ -77,7 +64,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      leave_mode();
+      window.history.back();
     },
   });
 
@@ -86,7 +73,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         show_html = !show_html;
       }
     },
@@ -96,7 +83,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         overlay = "help";
       }
     },
@@ -128,7 +115,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         all_headers = !all_headers;
       }
     },
@@ -139,7 +126,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         overlay = "copying";
       }
     },
@@ -150,7 +137,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         overlay = "tags";
       }
     },
@@ -161,7 +148,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      if (message.html != null) {
+      if (message.parsed.html != null) {
         show_images = !show_images;
         show_html = false;
         //we need it to retrigger building the iframe
@@ -175,12 +162,12 @@
   });
 
   function get_header(message, header) {
-    for (let i = 0; i < message.headers.length; i++) {
+    for (let i = 0; i < message.parsed.headers.length; i++) {
       if (
-        message.headers[i].key != null &&
-        message.headers[i].key.toLowerCase()! == header
+        message.parsed.headers[i].key != null &&
+        message.parsed.headers[i].key.toLowerCase()! == header
       ) {
-        return message.headers[i].value;
+        return message.parsed.headers[i].value;
       }
     }
   }
@@ -299,33 +286,35 @@
   function handle_copy(ev) {
     let target = ev.detail;
     if (target == "link") {
-		copy_to_clipboard(`[${message.subject}](mail:${message_id})`);
-	}
-    else if (target == "text") {
-      if (message.text != null) {
-        copy_to_clipboard(extractContent(message.text));
+      copy_to_clipboard(`[${message.parsed.subject}](mail:${message.id})`);
+    } else if (target == "text") {
+      if (message.parsed.text != null) {
+        copy_to_clipboard(extractContent(message.parsed.text));
       } else {
         error_toast("No text part found");
       }
     } else if (target == "html") {
-      if (message.html != null) {
-        copy_to_clipboard(extractContent(message.html));
+      if (message.parsed.html != null) {
+        copy_to_clipboard(extractContent(message.parsed.html));
       }
     } else if (target == "raw_html") {
-      if (message.html != null) {
-        copy_to_clipboard(message.html);
+      if (message.parsed.html != null) {
+        copy_to_clipboard(message.parsed.html);
       } else {
         error_toast("No html part found");
       }
     } else if (target == "headers") {
       let headers = "";
-      for (let i = 0; i < message.headers.length; i++) {
+      for (let i = 0; i < message.parsed.headers.length; i++) {
         headers +=
-          message.headers[i].key + ": " + message.headers[i].value + "\n";
+          message.parsed.headers[i].key +
+          ": " +
+          message.parsed.headers[i].value +
+          "\n";
       }
       copy_to_clipboard(headers);
     } else if (target == "filename") {
-      copy_to_clipboard(message_filename);
+      copy_to_clipboard(message.filename);
     } else {
       error_toast("Unknown copy target: " + target);
     }
@@ -350,119 +339,154 @@
     message_tags = message_tags;
     overlay = "";
   }
+
+  async function get_message(mail_id) {
+    let msg = await invoke("get_mail_message", {
+      id: mail_id,
+    });
+    if (msg == null) {
+      throw new Error("Could not retrieve message");
+    }
+    let raw_message = msg.raw;
+    let tags = msg.tags;
+    console.log(msg);
+    if (tags.indexOf("unread") > -1) {
+      console.log("unread");
+      await invoke("mail_message_remove_tags", {
+        id: mail_id,
+        tags: ["unread"],
+      });
+      removeItemOnce(tags, "unread");
+    }
+    const parser = new PostalMime();
+    const email = await parser.parse(raw_message);
+    let res = {
+      id: mail_id,
+      raw: raw_message,
+      parsed: email,
+      tags: tags,
+      filename: msg.filename,
+    };
+    message = res;
+    return res;
+  }
 </script>
 
-<View>
-  <div slot="header">
-    {#if message == null}
-      Could not retrieve this message.
-    {:else}
-      <table>
-        <tr>
-          <th>From</th>
-          <td>{get_header(message, "from")}</td>
-        </tr>
-        <tr>
-          <th>To</th>
-          <td><Expander text={format_to(get_header(message, "to"))} /></td>
-        </tr>
-        <tr>
-          <th>Subject</th>
-          <td>{get_header(message, "subject")}</td>
-        </tr>
-        <tr>
-          <th>Date</th>
-          <td>
-            <SvelteTooltip
-              tip={get_header(message, "date")}
-              right
-              color="#DFDFDF;border:1px dashed grey;"
-            >
-              {local_date(get_header(message, "date"))}
-            </SvelteTooltip>
-          </td>
-        </tr>
-        {#each optional_headers as opt_header}
-          {#if get_header(message, opt_header) != null}
-            <tr>
-              <th>{opt_header}</th>
-              {#if opt_header.toLowerCase() == "cc"}
-                <td>{format_to(get_header(message, opt_header))}</td>
-              {:else}
-                <td>{get_header(message, opt_header)}</td>
-              {/if}
-            </tr>
-          {/if}
-        {/each}
-        <tr>
-          <th>Tags</th>
-          <td>
-            {#each message_tags as tag}
-              <div class="tags" style="background-color:{find_color(tag)}">
-                {tag}
-              </div>
-            {/each}
-          </td>
-        </tr>
-      </table>
-      {#if all_headers}
-        <hr />
-        <table>
-          {#each message.headers as header}
-            <tr>
-              <th>{header.key}</th>
-              <td>{header.value}</td>
-            </tr>
-          {/each}
-        </table>
-      {/if}
-    {/if}
-  </div>
-
-  <div slot="content">
-    {#if message == null}{:else}
-      {#if show_html}
-        <iframe
-          srcdoc={csp(message.html)}
-          sandbox=""
-          style="width:95%; border: 3px solid purple;height:100vh;"
-          id="mail_content_iframe"
-        />
-      {:else if message.text == null}
-        {#if message.html != null}
-          (extracted from html)
-          <pre>{wrap(extractContent(message.html))}</pre>
-        {:else}
-          (no text, no html)
-        {/if}
+{#await get_message(params.message_id)}
+  Loading...
+{:then message}
+  <View>
+    <div slot="header">
+      {#if message == null}
+        Could not retrieve this message.
       {:else}
-        {#if message.html != null}
-          (html available){/if}
-        <pre>{@html wrap(escape_html(message.text))}</pre>
-      {/if}
-    {/if}
-  </div>
-
-  <div slot="footer">
-    <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
-      {#if overlay == "help"}
-        <Help bind:entries={help_entries} />
-      {:else if overlay == "copying"}
-        Copy to clipboard:
-        <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
-      {:else if overlay == "tags"}
-        {#if tag_entries.length > 0}
-          Toggle Tag:
-          <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
-        {:else}
-          Fill out [mail_tags] in your settings
+        <table>
+          <tr>
+            <th>From</th>
+            <td>{get_header(message, "from")}</td>
+          </tr>
+          <tr>
+            <th>To</th>
+            <td><Expander text={format_to(get_header(message, "to"))} /></td>
+          </tr>
+          <tr>
+            <th>Subject</th>
+            <td>{get_header(message, "subject")}</td>
+          </tr>
+          <tr>
+            <th>Date</th>
+            <td>
+              <SvelteTooltip
+                tip={get_header(message, "date")}
+                right
+                color="#DFDFDF;border:1px dashed grey;"
+              >
+                {local_date(get_header(message, "date"))}
+              </SvelteTooltip>
+            </td>
+          </tr>
+          {#each optional_headers as opt_header}
+            {#if get_header(message, opt_header) != null}
+              <tr>
+                <th>{opt_header}</th>
+                {#if opt_header.toLowerCase() == "cc"}
+                  <td>{format_to(get_header(message, opt_header))}</td>
+                {:else}
+                  <td>{get_header(message, opt_header)}</td>
+                {/if}
+              </tr>
+            {/if}
+          {/each}
+          <tr>
+            <th>Tags</th>
+            <td>
+              {#each message.tags as tag}
+                <div class="tags" style="background-color:{find_color(tag)}">
+                  {tag}
+                </div>
+              {/each}
+            </td>
+          </tr>
+        </table>
+        {#if all_headers}
+          <hr />
+          <table>
+            {#each message.parsed.headers as header}
+              <tr>
+                <th>{header.key}</th>
+                <td>{header.value}</td>
+              </tr>
+            {/each}
+          </table>
         {/if}
-      {:else if overlay == ""}
-        Press <span class="hotkey">h</span> for help.
       {/if}
-    </Overlay>
-  </div>
-</View>
+    </div>
+
+    <div slot="content">
+      {#if message == null}{:else}
+        {#if show_html}
+          <iframe
+            srcdoc={csp(message.parsed.html)}
+            sandbox=""
+            style="width:95%; border: 3px solid purple;height:100vh;"
+            id="mail_content_iframe"
+          />
+        {:else if message.parsed.text == null}
+          {#if message.parsed.html != null}
+            (extracted from html)
+            <pre>{wrap(extractContent(message.parsed.html))}</pre>
+          {:else}
+            (no text, no html)
+          {/if}
+        {:else}
+          {#if message.parsed.html != null}
+            (html available){/if}
+          <pre>{@html wrap(escape_html(message.parsed.text))}</pre>
+        {/if}
+      {/if}
+    </div>
+
+    <div slot="footer">
+      <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+        {#if overlay == "help"}
+          <Help bind:entries={help_entries} />
+        {:else if overlay == "copying"}
+          Copy to clipboard:
+          <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+        {:else if overlay == "tags"}
+          {#if tag_entries.length > 0}
+            Toggle Tag:
+            <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
+          {:else}
+            Fill out [mail_tags] in your settings
+          {/if}
+        {:else if overlay == ""}
+          Press <span class="hotkey">h</span> for help.
+        {/if}
+      </Overlay>
+    </div>
+  </View>
+{/await}
 
 <style>
   th {

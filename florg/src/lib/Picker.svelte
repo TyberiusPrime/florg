@@ -4,30 +4,23 @@
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
   import { Fzf, byLengthAsc } from "fzf";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, afterUpdate } from "svelte";
   import {
-    leave_mode,
-    mode_args_store,
-    register_enter_mode,
-    unregister_enter_mode,
-  } from "../lib/mode_stack.ts";
+    push as push_mode,
+    replace as replace_mode,
+    location,
+  } from "svelte-spa-router";
+  import { set_temp_history, get_temp_history } from "../lib/mode_stack.ts";
+
   import View from "../lib/View.svelte";
   import { isElementInViewport } from "../lib/util.ts";
 
   export let elements = [];
 
-  let imported_focused = null;
-  let imported_input_text = null;
-
-  let mode_args;
-  mode_args_store.subscribe((value) => {
-    imported_focused = value["focused"];
-    imported_input_text = value["input_text"];
-  });
-
   export let focused = 0;
   let input_text = "";
   let last_text = "";
+  let test_text = "shu";
   let downstream_elements = [];
   var listener = new window.keypress.Listener();
   listener.reset();
@@ -39,8 +32,7 @@
     prevent_repeat: true,
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
-      console.log("leave picker");
-      leave_mode();
+      window.history.back();
     },
   });
 
@@ -50,7 +42,6 @@
     prevent_repeat: true,
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
-      console.log("entr");
       if (downstream_elements.length > 0) {
         dispatch("action", {
           cmd: downstream_elements[focused].dataset.cmd,
@@ -139,6 +130,10 @@
       focused = 0;
       update_chosen();
       last_text = input_text;
+      window.history.replaceState(
+        { ...history.state, input_text: input_text },
+        undefined
+      );
     }
   }
 
@@ -163,7 +158,10 @@
         }
       }
     }
-
+    window.history.replaceState(
+      { ...history.state, focused: focused },
+      undefined
+    );
     return "";
   }
 
@@ -192,26 +190,28 @@
     });
   }
 
-  export function store_on_forward_exit() {}
+  let previousState = null;
+
+  function popStateChanged(event) {
+    set_temp_history(event.state);
+  }
+  // This is removed in the destroy() invocation below
+  window.addEventListener("popstate", popStateChanged);
 
   onMount(async () => {
-    register_enter_mode("Picker", (old) => {
-      console.log("stored focused", old);
-      old["focused"] = focused;
-	  old["input_text"] = input_text;
-      return old;
-    });
-
     window.setTimeout(() => {
-      console.log("imported_focused", imported_focused);
-      focused = imported_focused != undefined ? imported_focused : 0;
-      input_text = imported_input_text != undefined ? imported_input_text : "";
       elements = [];
       for (let el of document.querySelector("#pick_table").children) {
         elements.push(el);
       }
-      console.log(elements);
       downstream_elements = elements;
+      let state = get_temp_history();
+      if (state != null && state.input_text != undefined) {
+        input_text = state.input_text;
+        handle_text_change();
+        focused = state.focused;
+      }
+
       update_chosen(false);
       listener.listen();
     }, 100);
@@ -219,11 +219,13 @@
 
   onDestroy(async () => {
     listener.stop_listening();
-    unregister_enter_mode("Picker");
+    window.removeEventListener("popstate", popStateChanged);
   });
 </script>
 
 <div on:keyup={handle_text_change}>
+  {input_text}
+  {focused}
   <View>
     <div slot="header">
       <slot name="message" />
@@ -254,7 +256,7 @@
     font-family: sans-serif;
     min-width: 400px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-	width:99%;
+    width: 99%;
   }
 
   thead tr {

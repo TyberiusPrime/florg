@@ -1,31 +1,22 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
-  import { enter_mode, leave_mode, get_last_path } from "../lib/mode_stack.ts";
+  import { get_last_path } from "../lib/mode_stack.ts";
   import { exit } from "@tauri-apps/api/process";
   import Picker from "../lib/Picker.svelte";
   import { get_node } from "../lib/util.ts";
-  import { mode_args_store } from "../lib/mode_stack.ts";
+  import { push as push_mode, replace as replace_mode, } from "svelte-spa-router";
 
   async function handle_action(ev) {
     let filename = ev.detail.cmd;
-    let convo;
     if (filename == "") {
-      convo = await invoke("chatgpt_new_conversation", {});
       filename = new Date().toISOString() + ".json";
-    } else {
-      convo = await invoke("chatgpt_get_conversation", {
-        filename: filename,
-      });
     }
-    enter_mode("chatgpt", { filename: filename, convo: convo }, false);
+
+	push_mode("/chatgpt/" + filename);
   }
 
-  let start_text;
+  let start_text = get_last_path();
   let mode_args;
-  mode_args_store.subscribe((value) => {
-    mode_args = value;
-    start_text = mode_args.start_text;
-  });
 
   async function get_convos() {
     return await invoke("chatgpt_list_conversations", {});

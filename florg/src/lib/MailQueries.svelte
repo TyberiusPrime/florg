@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { push as push_mode, replace as replace_mode, } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
   import QuickPick from "../lib/QuickPick.svelte";
@@ -33,7 +34,7 @@
 
   function handle_action(event) {
 	console.log("action", event.detail);
-	enter_mode("mail_query", { query: event.detail}, false);
+	push_mode("/mail_query/" + event.detail);
   }
 </script>
 

@@ -6,14 +6,13 @@
   export let levels = [];
   export let title = "";
   export let path = "";
-  export let mode;
 
   function goto_level(level) {
     let path = "";
     for (let i = 0; i <= level; i++) {
       path += levels[i][0];
     }
-    dispatch("goto_node", { path: path, normal_mode: mode != "nav" });
+    dispatch("goto_node", { path: path, normal_mode: true });
     console.log("goto level");
     console.log(path);
   }

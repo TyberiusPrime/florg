@@ -1,18 +1,15 @@
 <script lang="ts">
+  import { push as push_mode, replace as replace_mode, } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
-  import {
-    enter_mode,
-    leave_mode,
-    mode_args_store,
-  } from "../lib/mode_stack.ts";
 
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
   import "../styles/highlight.js/github.css";
   import { add_code_clipboards, get_node, iso_date } from "../lib/util.ts";
+  import { set_last_path } from "../lib/mode_stack.ts";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
 
   import View from "../lib/View.svelte";
@@ -24,10 +21,8 @@
   import Goto from "../lib/Goto.svelte";
   import MailQueries from "../lib/MailQueries.svelte";
 
-  let mode_args;
-  mode_args_store.subscribe((value) => {
-    mode_args = value;
-  });
+  export let params = {};
+  console.log("path", params.path);
 
   let content_text = "";
   let content_rendered = "";
@@ -44,6 +39,7 @@
 
   let help_entries = [
     { key: "Esc", text: "Go back" },
+    { key: "Shift-Esc", text: "Go forward" },
     { key: "Enter", text: "Edit node" },
     { key: "Space", text: "Nav mode" },
     { key: "o", text: "Goto: ChatGPT" },
@@ -121,6 +117,8 @@
     if (edit_afterwards) {
       await edit_current_node();
     }
+	set_last_path(path);
+    return "";
   }
 
   function apply_mods(_ignored) {
@@ -162,7 +160,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
-      await enter_mode("nav", { enter_path: current_path }, true);
+      push_mode("/nav/" + current_path);
     },
   });
 
@@ -173,17 +171,29 @@
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
       if (current_path.length > 0)
-        await enter_mode("node", { path: current_path.slice(0, -1) }, false);
+        push_mode("/node/" + current_path.slice(0, -1));
     },
   });
   listener.register_combo({
     keys: "esc",
     is_unordered: true,
+    exclusive: true,
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
       console.log("from esc in listener");
-      leave_mode();
+      window.history.back();
+    },
+  });
+  listener.register_combo({
+    keys: "shift esc",
+    is_unordered: true,
+    exclusive: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: async (e, count, repeated) => {
+      console.log("from esc in listener");
+      window.history.forward();
     },
   });
 
@@ -246,7 +256,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      enter_mode("palette", {}, true);
+      push_mode("/palette");
     },
   });
 
@@ -256,7 +266,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      enter_mode("chatgpt_picker", { start_text: content_text }, true);
+      push_mode("/chatgpt_picker");
     },
   });
   listener.register_combo({
@@ -359,7 +369,7 @@
 
   async function handle_goto_action(ev) {
     let path = await parse_path(ev.detail);
-    load_node(path);
+    push_mode("/node/" + path);
     overlay = "";
   }
 
@@ -369,9 +379,6 @@
     let new_path = await invoke("find_next_empty_child", { path: path });
     load_node(new_path, true);
     overlay = "";
-  }
-  async function handle_mail_query() {
-    toast.push("mail query");
   }
 
   async function handle_copy(ev) {
@@ -394,49 +401,51 @@
     if (out != null) {
       await copy_to_clipboard(out);
     }
-	overlay = "";
+    overlay = "";
   }
 </script>
 
 <div>
-  <View>
-    <div slot="header">
-      <TopTree
-        bind:levels={content_levels}
-        bind:title={content_title}
-        bind:path={current_path}
-      />
-    </div>
-    <div slot="content">
-      {@html content_rendered}
-    </div>
-    <div slot="footer">
-      <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
-        {#if overlay == "help"}
-          <Help bind:entries={help_entries} />
-        {:else if overlay == "search"}
-          <Search bind:overlay bind:in_page_search_term on:leave />
-        {:else if overlay == "goto"}
-          Goto node:
-          <Goto on:action={handle_goto_action} />
-        {:else if overlay == "new_below"}
-          Create new node below
-          <Goto on:action={handle_new_node_below} />
-        {:else if overlay == "mail_queries"}
-          <MailQueries on:action={handle_mail_query} />
-        {:else if overlay == "copying"}
-          <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
-        {:else if overlay == ""}
-          Press <span class="hotkey">h</span> for help.
-        {:else}
-          Unknown overlay: {overlay}
+  {#await load_node(params.path || "", params.edit_on_load || false)}
+  {:then}
+  {/await}
+    <View>
+      <div slot="header">
+        <TopTree
+          bind:levels={content_levels}
+          bind:title={content_title}
+          bind:path={current_path}
+        />
+      </div>
+      <div slot="content">
+        {@html content_rendered}
+      </div>
+      <div slot="footer">
+        <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+          {#if overlay == "help"}
+            <Help bind:entries={help_entries} />
+          {:else if overlay == "search"}
+            <Search bind:overlay bind:in_page_search_term on:leave bind:current_path />
+          {:else if overlay == "goto"}
+            Goto node:
+            <Goto on:action={handle_goto_action} />
+          {:else if overlay == "new_below"}
+            Create new node below
+            <Goto on:action={handle_new_node_below} />
+          {:else if overlay == "mail_queries"}
+            <MailQueries />
+          {:else if overlay == "copying"}
+            <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+          {:else if overlay == ""}
+            Press <span class="hotkey">h</span> for help.
+          {:else}
+            Unknown overlay: {overlay}
+          {/if}
+        </Overlay>
+        {#if currently_edited}
+          <span style="color:red">Currently edited</span>
         {/if}
-      </Overlay>
-      {#if currently_edited}
-        <span style="color:red">Currently edited</span>
-      {/if}
-    </div>
-  </View>
-  {quiet(load_node(mode_args.path, mode_args.edit === true))}
-  {quiet(apply_mods(content_rendered))}
+      </div>
+    </View>
+    {quiet(apply_mods(content_rendered))}
 </div>

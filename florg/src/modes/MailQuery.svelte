@@ -1,22 +1,17 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/tauri";
   import {
-    enter_mode,
-    leave_mode,
-    get_last_path,
-    mode_args_store,
-  } from "../lib/mode_stack.ts";
+    push as push_mode,
+    replace as replace_mode,
+  } from "svelte-spa-router";
+  import { invoke } from "@tauri-apps/api/tauri";
   import Picker from "../lib/Picker.svelte";
   import { format_date, removeItemOnce, error_toast } from "../lib/util.ts";
   import { toast } from "@zerodevx/svelte-toast";
   import { find_color } from "../lib/colors.ts";
-  import PostalMime from "postal-mime";
   import { onMount, onDestroy } from "svelte";
 
-  let mode_args;
-  mode_args_store.subscribe((value) => {
-    mode_args = value;
-  });
+  export let params;
+
   let focused;
   let view_mode = "loading";
   let mail = [];
@@ -26,8 +21,7 @@
   listener.reset();
   listener.stop_listening();
 
-  onMount(async () => {
-    listener.reset();
+  async function register_tag_keys() {
     let te = await invoke("mail_get_tags", {});
     if (te != null) {
       for (let key in te) {
@@ -43,11 +37,11 @@
         });
       }
     }
-    let x = await get_mail(mode_args.query);
-    view_mode = x[0];
-    mail = x[1];
-    more_mail = x[2];
+    return "";
+  }
 
+  onMount(async () => {
+    listener.reset();
     listener.listen();
   });
 
@@ -147,19 +141,8 @@
         id: mail_id,
       });
       if (msg != null) {
-        let raw_message = msg.raw;
-        let tags = msg.tags;
-        if (tags.indexOf("unread") > -1) {
-          console.log("unread");
-          await invoke("mail_message_remove_tags", {
-            id: mail_id,
-            tags: ["unread"],
-          });
-          removeItemOnce(tags, "unread");
-        }
-        const parser = new PostalMime();
-        const email = await parser.parse(raw_message);
-        enter_mode(
+                push_mode("/mail_message/" + mail_id);
+        /*enter_mode(
           "mail_message",
           {
             message: email,
@@ -169,11 +152,13 @@
           },
           false
         );
+		*/
       } else {
-        toast.push('<span class="error">Error: Could loat email</span>');
+        toast.push('<span class="error">Error: Could not load email</span>');
       }
     } else {
-      enter_mode("mail_query", { query: target }, false);
+	console.log("target", target);
+      push_mode("/mail_query/" + target);
     }
   }
 
@@ -187,13 +172,12 @@
 </script>
 
 <div>
-  {#if view_mode == "Loading"}
-    Loading...
-  {:else}
+  {#await register_tag_keys}{/await}
+  {#await get_mail(params.query) then [view_mode, mail, more_mail]}
     <Picker on:action={handle_action} bind:focused>
       <div slot="message">
         <h1>Mail result</h1>
-        Query: {mode_args.query}
+        Query: {params.query}
         {#if more_mail}
           <br />(More mail available. refine your search)
         {/if}
@@ -201,7 +185,7 @@
       <svelte:fragment slot="entries">
         {#each mail as el, index}
           {#if view_mode == "threads"}
-			<tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
+            <tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
               <td class="index">{index}</td>
               <td class="unread_count">
                 {#if count_unread(el) > 0}
@@ -248,7 +232,7 @@
         {/each}
       </svelte:fragment>
     </Picker>
-  {/if}
+  {/await}
 </div>
 
 <style>

@@ -10,7 +10,8 @@
   } from "./lib/mode_stack.ts";
   //this is global..,
   import * as KeyPress from "./js/keypress-2.1.5.min.js";
-
+  import Router from "svelte-spa-router";
+  import { location, querystring  } from "svelte-spa-router";
   /*
   import Greet from "./lib/Greet.svelte";
   import TopTree from "./lib/TopTree.svelte";
@@ -39,7 +40,7 @@
   //let Asciidoctor = asciidoctor();
   */
 
-  import ModeNode from "./modes/Node.svelte";
+  import NodeMode from "./modes/Node.svelte";
   import NavMode from "./modes/Nav.svelte";
   import PaletteMode from "./modes/Palette.svelte";
   import NodeSearchMode from "./modes/NodeSearch.svelte";
@@ -47,22 +48,7 @@
   import ChatGPTPickerMode from "./modes/ChatGPTPicker.svelte";
   import MailQuery from "./modes/MailQuery.svelte";
   import MailMessage from "./modes/MailMessage.svelte";
-
-  let mode;
-  let mode_args;
-  let mode_transient;
-
-  mode_store.subscribe((value) => {
-    mode = value;
-  });
-  mode_args_store.subscribe((value) => {
-    mode_args = value;
-  });
-  mode_transient_store.subscribe((value) => {
-    mode_transient = value;
-  });
-
-  assign_last_mode();
+  import NotFound from "./modes/NotFound.svelte";
 
   let options = {
     // toast options
@@ -70,29 +56,26 @@
     duration: 10000,
   };
 
-  let history = ["hello", "world"];
+  const routes = {
+    "/": NodeMode,
+    "/node/:path?": NodeMode,
+    "/nav/:path?": NavMode,
+    "/node_search/:search_term/:path?": NodeSearchMode,
+	"/mail_query/:query": MailQuery,
+	"/mail_message/:message_id": MailMessage,
+	"/chatgpt_picker/": ChatGPTPickerMode,
+	"/chatgpt/:filename": ChatGPTMode,
+	"*": NotFound,
+
+  };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  let mode = urlParams.get("mode") || "node";
 </script>
 
 <div>
-  {#if mode == "node"}
-    <ModeNode />
-  {:else if mode == "nav"}
-    <NavMode />
-  {:else if mode == "palette"}
-    <PaletteMode />
-  {:else if mode == "node_search"}
-    <NodeSearchMode />
-  {:else if mode == "chatgpt_picker"}
-    <ChatGPTPickerMode />
-  {:else if mode == "chatgpt"}
-    <ChatGPTMode />
-  {:else if mode == "mail_query"}
-    <MailQuery />
-  {:else if mode == "mail_message"}
-  <MailMessage />
-
-  {:else}
-    unknown mode {JSON.stringify(mode)}
-  {/if}
+  {$location}
+  <br />
   <SvelteToast {options} />
+  <Router {routes} />
 </div>

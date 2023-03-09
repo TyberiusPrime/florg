@@ -7,6 +7,7 @@
 <div class="wrapper">
   <div class="header" id="header">
     <slot name="header" />
+	<hr />
   </div>
   <div class="main_content">
     <div class="sticky-spacer" />
@@ -15,6 +16,7 @@
     </div>
   </div>
   <div class="footer" id="footer">
+	<hr />
     <slot name="footer" />
     {mode}
   </div>

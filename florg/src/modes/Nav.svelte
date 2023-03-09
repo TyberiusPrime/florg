@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
   import { get_node, no_text_inputs_focused } from "../lib/util.ts";
   import { onMount, onDestroy } from "svelte";
   import { mode_args_store } from "../lib/mode_stack.ts";
@@ -8,8 +7,13 @@
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
 
-  let inital_path;
-  let path;
+  import {
+    push as push_mode,
+    replace as replace_mode,
+  } from "svelte-spa-router";
+  export let params = {};
+
+  let path = params.path || "";
 
   let overlay = "";
 
@@ -30,7 +34,7 @@
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
         console.log("listener nav leave");
-        leave_mode();
+        window.history.back();
       }
     },
   });
@@ -54,7 +58,7 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
-        enter_mode("node", { path: path }, false);
+        replace_mode("/node/" + path);
       }
     },
   });
@@ -66,7 +70,7 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
-        enter_mode("node", { path: path, edit: true }, false);
+        replace_mode("/node/", { path: path, edit: true }, false);
       }
     },
   });
@@ -100,11 +104,13 @@
   }
 
   function goto_level(index) {
+    console.log("goto_level", index);
     let new_path = "";
     for (let ii = 0; ii < index + 1; ii++) {
       new_path += current_node.levels[ii][0];
     }
     path = new_path;
+    console.log(new_path);
     handle_input_changed();
   }
 
@@ -114,12 +120,12 @@
   }
 
   function accept_current_node() {
-    enter_mode("node", { path: path }, false);
+    replace_mode("/node/" + path);
   }
 </script>
 
 <div>
-  <View >
+  <View>
     <div slot="header">
       <h1>Navigation mode.</h1>
       Path:<input
@@ -133,25 +139,29 @@
     <div slot="content">
       <div id="the_content">
         {#if current_node != null}
-          Parents:
-          <table>
-            {#each current_node.levels as level, index}
-              {#if index < current_node.levels.length - 1}
-                <tr
-                  ><td
-                    ><a on:click={(ev) => goto_level(index)}
-                      >{level[0]}{@html indent(index)} {level[1]}</a
-                    ></td
-                  ></tr
-                >
-              {:else}
-                <tr><td>{level[0]}{@html indent(index)} {level[1]}</td></tr>
-              {/if}
-            {/each}
-          </table>
           {#if current_node.levels.length == 0}
-            (root)
-          {/if} <br />
+			(at root)<br />
+          {:else}
+            Parents:
+            <table>
+			<tr><td>
+			<a on:click={() => goto_level(-1)}>&nbsp;Root</a>
+			</td></tr>
+              {#each current_node.levels as level, index}
+                {#if index < current_node.levels.length - 1}
+                  <tr
+                    ><td
+                      ><a on:click={(ev) => goto_level(index)}
+                        >{level[0]}{@html indent(index)} {level[1]}</a
+                      ></td
+                    ></tr
+                  >
+                {:else}
+                  <tr><td>{level[0]}{@html indent(index)} {level[1]}</td></tr>
+                {/if}
+              {/each}
+            </table>
+          {/if}
           Current node:
           <a on:click={accept_current_node}>
             {#if current_node.node !== null}

@@ -52,12 +52,13 @@ export function assign_last_mode() {
   mode_transient_store.update((_old) => m.transient);
 }
 
+let last_path = "";
+
+export function set_last_path(value) {
+  last_path = value;
+}
 export function get_last_path() {
-  for (let i = mode_stack.length - 1; i >= 0; i--) {
-    if (mode_stack[i].mode == "node") {
-      return mode_stack[i].args.path;
-    }
-  }
+  return last_path;
 }
 
 export function register_enter_mode(mode: string, callback: any) {
@@ -66,4 +67,12 @@ export function register_enter_mode(mode: string, callback: any) {
 
 export function unregister_enter_mode(mode: string) {
   delete enter_mode_callbacks[mode];
+}
+
+let temp_history_store = null;
+export function set_temp_history(value: any) {
+  temp_history_store = value;
+}
+export function get_temp_history() {
+  return temp_history_store;
 }

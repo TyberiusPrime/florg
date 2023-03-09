@@ -7,6 +7,7 @@
   import { location, querystring  } from "svelte-spa-router";
 
   import NodeMode from "./modes/Node.svelte";
+  import NodeEdit from "./modes/NodeEdit.svelte";
   import NavMode from "./modes/Nav.svelte";
   import PaletteMode from "./modes/Palette.svelte";
   import NodeSearchMode from "./modes/NodeSearch.svelte";
@@ -25,6 +26,7 @@
   const routes = {
     "/": NodeMode,
     "/node/:path?": NodeMode,
+    "/node_edit/:path?": NodeEdit,
     "/nav/:path?": NavMode,
     "/node_search/:search_term/:path?": NodeSearchMode,
 	"/mail_query/:query": MailQuery,
@@ -40,6 +42,7 @@
 </script>
 
 <div>
+  {window.location.hash}
   <SvelteToast {options} />
   <Router {routes} />
 </div>

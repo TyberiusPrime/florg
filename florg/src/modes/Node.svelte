@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { push as push_mode, replace as replace_mode, } from "svelte-spa-router";
+  import {
+    push as push_mode,
+    replace as replace_mode,
+  } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
@@ -63,7 +66,7 @@
     { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
 
-  async function load_node(path, edit_afterwards = false) {
+  async function load_node(path) {
     //console.log("load node", path);
     let node = await get_node(path);
     if (node.node != null) {
@@ -115,10 +118,7 @@
     if (obj != null) {
       obj.scrollTop = 0;
     }
-    if (edit_afterwards) {
-      await edit_current_node();
-    }
-	set_last_path(path);
+    set_last_path(path);
     return "";
   }
 
@@ -288,6 +288,21 @@
       overlay = "copying";
     },
   });
+  listener.register_combo({
+    keys: "a",
+    is_unordered: true,
+    prevent_repeat: true,
+    prevent_default: true,
+    on_keyup: async (e, count, repeated) => {
+      console.log("listener h");
+      if (!repeated) {
+        let next_empty = await invoke("find_next_empty_child", {
+          path: current_path,
+        });
+		push_mode("/node_edit/" + next_empty);
+      }
+    },
+  });
 
   async function edit_current_node() {
     currently_edited = true;
@@ -407,46 +422,49 @@
 </script>
 
 <div>
-  {#await load_node(params.path || "", params.edit_on_load || false)}
-  {:then}
-  {/await}
-    <View>
-      <div slot="header">
-        <TopTree
-          bind:levels={content_levels}
-          bind:title={content_title}
-          bind:path={current_path}
-        />
-      </div>
-      <div slot="content">
-        {@html content_rendered}
-      </div>
-      <div slot="footer">
-        <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
-          {#if overlay == "help"}
-            <Help bind:entries={help_entries} />
-          {:else if overlay == "search"}
-            <Search bind:overlay bind:in_page_search_term on:leave bind:current_path />
-          {:else if overlay == "goto"}
-            Goto node:
-            <Goto on:action={handle_goto_action} />
-          {:else if overlay == "new_below"}
-            Create new node below
-            <Goto on:action={handle_new_node_below} />
-          {:else if overlay == "mail_queries"}
-            <MailQueries />
-          {:else if overlay == "copying"}
-            <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
-          {:else if overlay == ""}
-            Press <span class="hotkey">h</span> for help.
-          {:else}
-            Unknown overlay: {overlay}
-          {/if}
-        </Overlay>
-        {#if currently_edited}
-          <span style="color:red">Currently edited</span>
+  {#await load_node(params.path || "", params.edit_on_load || false)}{/await}
+  <View>
+    <div slot="header">
+      <TopTree
+        bind:levels={content_levels}
+        bind:title={content_title}
+        bind:path={current_path}
+      />
+    </div>
+    <div slot="content">
+      {@html content_rendered}
+    </div>
+    <div slot="footer">
+      <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+        {#if overlay == "help"}
+          <Help bind:entries={help_entries} />
+        {:else if overlay == "search"}
+          <Search
+            bind:overlay
+            bind:in_page_search_term
+            on:leave
+            bind:current_path
+          />
+        {:else if overlay == "goto"}
+          Goto node:
+          <Goto on:action={handle_goto_action} />
+        {:else if overlay == "new_below"}
+          Create new node below
+          <Goto on:action={handle_new_node_below} />
+        {:else if overlay == "mail_queries"}
+          <MailQueries />
+        {:else if overlay == "copying"}
+          <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+        {:else if overlay == ""}
+          Press <span class="hotkey">h</span> for help.
+        {:else}
+          Unknown overlay: {overlay}
         {/if}
-      </div>
-    </View>
-    {quiet(apply_mods(content_rendered))}
+      </Overlay>
+      {#if currently_edited}
+        <span style="color:red">Currently edited</span>
+      {/if}
+    </div>
+  </View>
+  {quiet(apply_mods(content_rendered))}
 </div>

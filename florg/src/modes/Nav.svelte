@@ -69,7 +69,7 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
-        replace_mode("/node/", { path: path, edit: true }, false);
+        replace_mode("/node_edit/" + path);
       }
     },
   });

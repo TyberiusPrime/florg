@@ -288,7 +288,8 @@
   }
 
   let copy_entries = [
-    { key: "c", target_path: "text", text: "Copy text" },
+    { key: "c", target_path: "link", text: "Copy link" },
+    { key: "y", target_path: "text", text: "Copy text" },
     { key: "m", target_path: "html", text: "Copy extract text from html" },
     { key: "M", target_path: "raw_html", text: "Copy raw html" },
     { key: "h", target_path: "headers", text: "Copy headers" },
@@ -297,7 +298,10 @@
 
   function handle_copy(ev) {
     let target = ev.detail;
-    if (target == "text") {
+    if (target == "link") {
+		copy_to_clipboard(`[${message.subject}](mail:${message_id})`);
+	}
+    else if (target == "text") {
       if (message.text != null) {
         copy_to_clipboard(extractContent(message.text));
       } else {

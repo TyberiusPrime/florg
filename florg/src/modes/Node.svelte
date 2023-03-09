@@ -3,14 +3,20 @@
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
-  import { enter_mode, leave_mode, mode_args_store } from "../lib/mode_stack.ts";
+  import {
+    enter_mode,
+    leave_mode,
+    mode_args_store,
+  } from "../lib/mode_stack.ts";
 
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
   import "../styles/highlight.js/github.css";
   import { add_code_clipboards, get_node, iso_date } from "../lib/util.ts";
+  import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
 
   import View from "../lib/View.svelte";
+  import QuickPick from "../lib/QuickPick.svelte";
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
   import TopTree from "../lib/TopTree.svelte";
@@ -50,6 +56,14 @@
     { key: "m", text: "move node to node below" },
     { key: "p", text: "command palette" },
     { key: "c", text: "copy menu" },
+  ];
+
+  let copy_entries = [
+    { key: "c", text: "link", target_path: "link" },
+    { key: "y", text: "content", target_path: "content" },
+    { key: "t", text: "title", target_path: "title" },
+    { key: "p", text: "node folder path", target_path: "path" },
+    { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
 
   async function load_node(path, edit_afterwards = false) {
@@ -255,6 +269,15 @@
     },
   });
 
+  listener.register_combo({
+    keys: "c",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      overlay = "copying";
+    },
+  });
+
   async function edit_current_node() {
     currently_edited = true;
     return await invoke("edit_node", { path: current_path });
@@ -350,6 +373,29 @@
   async function handle_mail_query() {
     toast.push("mail query");
   }
+
+  async function handle_copy(ev) {
+    let mode = ev.detail;
+    console.log("copy_to_clipboard", mode);
+    let out = null;
+    if (mode == "link") {
+      out = `[${content_title}](${current_path})`;
+    } else if (mode == "content") {
+      out = content_text;
+    } else if (mode == "rendered_content") {
+      out = document.getElementById("the_content").innerHTML;
+    } else if (mode == "title") {
+      out = content_title;
+    } else if (mode == "path") {
+      out = await invoke("get_node_folder_path", { path: current_path });
+    } else {
+      console.log("unknown copy_to_clipboard mode", mode);
+    }
+    if (out != null) {
+      await copy_to_clipboard(out);
+    }
+	overlay = "";
+  }
 </script>
 
 <div>
@@ -378,6 +424,8 @@
           <Goto on:action={handle_new_node_below} />
         {:else if overlay == "mail_queries"}
           <MailQueries on:action={handle_mail_query} />
+        {:else if overlay == "copying"}
+          <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
         {:else if overlay == ""}
           Press <span class="hotkey">h</span> for help.
         {:else}

@@ -69,7 +69,9 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
+      if (!check_and_reset_mode_ignore_enter()) {
         replace_mode("/node_edit/" + path);
+		}
       }
     },
   });

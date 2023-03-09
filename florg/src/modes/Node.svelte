@@ -12,7 +12,10 @@
   import hljs from "highlight.js";
   import "../styles/highlight.js/github.css";
   import { add_code_clipboards, get_node, iso_date } from "../lib/util.ts";
-  import { set_last_path } from "../lib/mode_stack.ts";
+  import {
+    set_last_path,
+    check_and_reset_mode_ignore_enter,
+  } from "../lib/mode_stack.ts";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
 
   import View from "../lib/View.svelte";
@@ -227,7 +230,9 @@
     prevent_repeat: true,
     prevent_default: true,
     on_keyup: async (ev) => {
-      edit_current_node();
+      if (!check_and_reset_mode_ignore_enter()) {
+        edit_current_node();
+      }
     },
   });
 
@@ -299,7 +304,7 @@
         let next_empty = await invoke("find_next_empty_child", {
           path: current_path,
         });
-		push_mode("/node_edit/" + next_empty);
+        push_mode("/node_edit/" + next_empty);
       }
     },
   });

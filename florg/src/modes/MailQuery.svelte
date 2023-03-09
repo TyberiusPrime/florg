@@ -39,6 +39,7 @@
           messages.push(msg);
         }
       }
+      messages.reverse();
       res.push(messages);
       res.push(t[1]);
     } else {
@@ -78,21 +79,20 @@
     let target = ev.detail.cmd;
     if (target.startsWith("message:")) {
       let mail_id = target.slice(8);
-      let tup = await invoke("get_mail_message", {
+      let msg = await invoke("get_mail_message", {
         id: mail_id,
       });
-      let raw_message = tup[0];
-      let tags = tup[1];
-      if (tags.indexOf("unread") > -1) {
-        console.log("unread");
-        /*await invoke("mail_message_remove_tags", {
-          id: mail_id,
-          tags: ["unread"],
-        });
-		*/
-        removeItemOnce(tags, "unread");
-      }
-      if (raw_message != null) {
+      if (msg != null) {
+        let raw_message = msg.raw;
+        let tags = msg.tags;
+        if (tags.indexOf("unread") > -1) {
+          console.log("unread");
+          await invoke("mail_message_remove_tags", {
+            id: mail_id,
+            tags: ["unread"],
+          });
+          removeItemOnce(tags, "unread");
+        }
         const parser = new PostalMime();
         const email = await parser.parse(raw_message);
         enter_mode(
@@ -101,6 +101,7 @@
             message: email,
             message_id: mail_id,
             message_tags: tags,
+            message_filename: msg.filename,
           },
           false
         );
@@ -161,7 +162,8 @@
               </td>
             </tr>
           {:else if view_mode == "messages"}
-            <tr>
+            <tr data-cmd={"message:" + el.id}
+              >
               <td class="date">{@html format_date(Date.parse(el.date))}</td>
               <td>
                 <div class="fromsubject">

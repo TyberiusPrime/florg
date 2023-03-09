@@ -126,6 +126,19 @@ code {
   border-radius: 5px;
 }
 
+pre .line {
+  color: red;
+  margin: 0;
+  padding: 0;
+}
+pre .line:first-line {
+  color: #000; /* Default color   */
+}
+
+pre {
+  white-space: pre-wrap;
+}
+
 li {
   margin-bottom: 0px;
   margin-top: 0px;
@@ -147,13 +160,11 @@ li {
 }
 
 .hover {
-	background:#DFDFDF;
-	border:1px dashed grey;
-
+  background: #dfdfdf;
+  border: 1px dashed grey;
 }
 
-input:focus, button:focus {
-	border: 1px solid green;
-		
+input:focus,
+button:focus {
+  border: 1px solid green;
 }
-

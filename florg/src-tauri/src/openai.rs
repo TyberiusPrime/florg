@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 use toml_edit;
-use walkdir::WalkDir;
 
 #[derive(Debug)]
 pub struct ChatGPT {

@@ -1,36 +1,58 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
-  import { enter_mode, leave_mode, get_last_path, mode_args_store } from "../lib/mode_stack.ts";
+  import {
+    enter_mode,
+    leave_mode,
+    get_last_path,
+    mode_args_store,
+  } from "../lib/mode_stack.ts";
+  import { escape_html, error_toast } from "../lib/util.ts";
   import { createEventDispatcher } from "svelte";
+  import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
 
   import { onMount, onDestroy } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
   import Expander from "../lib/Expander.svelte";
+  import View from "../lib/View.svelte";
+  import QuickPick from "../lib/QuickPick.svelte";
+  import Overlay from "../lib/Overlay.svelte";
+  import Help from "../lib/Help.svelte";
 
   let message = null;
   let message_id = null;
   let message_tags = null;
+  let message_filename = null;
   let mode_args;
   mode_args_store.subscribe((value) => {
-    mode_args = value;
     message = value.message;
     message_id = value.message_id;
     message_tags = value.message_tags;
+    message_filename = value.message_filename;
   });
   const dispatch = createEventDispatcher();
+  let overlay = "";
 
   let show_html = false;
   let show_images = false;
   let all_headers = false;
+
+  let help_entries = [
+    { key: "Esc", text: "Go back" },
+    { key: "m", text: "toggle html" },
+    { key: "i", text: "toggle images" },
+    { key: "c", text: "copy menu" },
+  ];
 
   var listener = new window.keypress.Listener();
   listener.reset();
   listener.stop_listening();
 
   onMount(async () => {
+    overlay = "";
     listener.listen();
+    window.scroll(0, 0);
   });
 
   onDestroy(() => {
@@ -42,12 +64,12 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-	leave_mode();
+      leave_mode();
     },
   });
 
   listener.register_combo({
-    keys: "h",
+    keys: "m",
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
@@ -56,6 +78,38 @@
       }
     },
   });
+  listener.register_combo({
+    keys: "h",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (message.html != null) {
+        overlay = "help";
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "p",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: async (e, count, repeated) => {
+      if (message_tags.indexOf("attachment") != -1) {
+        if (
+          await invoke("mail_message_store_attachments", {
+            id: message_id,
+          })
+        ) {
+          toast.push("Attachments saved");
+        } else {
+          error_toast("Error saving attachments");
+        }
+      } else {
+        toast("No attachments");
+      }
+    },
+  });
+
   listener.register_combo({
     keys: "shift h",
     prevent_default: true,
@@ -66,7 +120,16 @@
       }
     },
   });
-
+  listener.register_combo({
+    keys: "c",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (message.html != null) {
+        overlay = "copying";
+      }
+    },
+  });
   listener.register_combo({
     keys: "i",
     prevent_default: true,
@@ -164,104 +227,188 @@
   }
 
   function format_to(to) {
-    return to
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "")
-      .split(",")
-      .map((x) => {
-        return x.trim();
-      })
-      .sort()
-      .join("<br />");
+    return (
+      to
+        //.replaceAll("<", "&lt;")
+        //.replaceAll(">", "&gt;")
+        .replaceAll('"', "")
+        .split(",")
+        .map((x) => {
+          return x.trim();
+        })
+        .sort()
+        .join("<br />")
+    );
+  }
+
+  function wrap_at_80_chars(text) {
+    return text.replace(/(?![^\n]{1,80}$)([^\n]{1,80})\s/g, "$1\n&#x2937;");
+  }
+
+  function wrap(text) {
+    return text;
+    //not sure if I like this
+    text = wrap_at_80_chars(text.replaceAll("\n", "--dan--\n")).replaceAll(
+      "--dan--\n&#x2937;",
+      "\n"
+    );
+    let lines = text.split("\n");
+    lines = lines.map((line) => "<div class=line>" + line + "</div>");
+    return lines.join("");
+  }
+
+  function handle_overlay_leave() {
+    overlay = "";
+  }
+
+  let copy_entries = [
+    { key: "c", target_path: "text", text: "Copy text" },
+    { key: "m", target_path: "html", text: "Copy extract text from html" },
+    { key: "M", target_path: "raw_html", text: "Copy raw html" },
+    { key: "h", target_path: "headers", text: "Copy headers" },
+    { key: "f", target_path: "filename", text: "Copy filename" },
+  ];
+
+  function handle_copy(ev) {
+    let target = ev.detail;
+    if (target == "text") {
+      if (message.text != null) {
+        copy_to_clipboard(extractContent(message.text));
+      } else {
+        error_toast("No text part found");
+      }
+    } else if (target == "html") {
+      if (message.html != null) {
+        copy_to_clipboard(extractContent(message.html));
+      }
+    } else if (target == "raw_html") {
+      if (message.html != null) {
+        copy_to_clipboard(message.html);
+      } else {
+        error_toast("No html part found");
+      }
+    } else if (target == "headers") {
+      let headers = "";
+      for (let i = 0; i < message.headers.length; i++) {
+        headers +=
+          message.headers[i].key + ": " + message.headers[i].value + "\n";
+      }
+      copy_to_clipboard(headers);
+    } else if (target == "filename") {
+      copy_to_clipboard(message_filename);
+    } else {
+      error_toast("Unknown copy target: " + target);
+    }
+
+    overlay = "";
   }
 </script>
 
-<div>
-  {#if message == null}
-    Could not retrieve this message.
-  {:else}
-    <table>
-      <tr>
-        <th>From</th>
-        <td>{get_header(message, "from")}</td>
-      </tr>
-      <tr>
-        <th>To</th>
-        <td><Expander text={format_to(get_header(message, "to"))} /></td>
-      </tr>
-      <tr>
-        <th>Subject</th>
-        <td>{get_header(message, "subject")}</td>
-      </tr>
-      <tr>
-        <th>Date</th>
-        <td>
-          <SvelteTooltip
-            tip={get_header(message, "date")}
-            right
-            color="#DFDFDF;border:1px dashed grey;"
-          >
-            {local_date(get_header(message, "date"))}
-          </SvelteTooltip>
-        </td>
-      </tr>
-      {#each optional_headers as opt_header}
-        {#if get_header(message, opt_header) != null}
-          <tr>
-            <th>{opt_header}</th>
-            {#if opt_header == "cc"}
-              <td>{fomat_to(get_header(message, opt_header))}</td>
-            {:else}
-              <td>{get_header(message, opt_header)}</td>
-            {/if}
-          </tr>
-        {/if}
-      {/each}
-      <tr>
-        <th>Tags</th>
-        <td>
-          {#each message_tags as tag}
-            <div class="tags" style="background-color:{find_color(tag)}">
-              {tag}
-            </div>
-          {/each}
-        </td>
-      </tr>
-    </table>
-    {#if all_headers}
-      <hr />
-      <table>
-        {#each message.headers as header}
-          <tr>
-            <th>{header.key}</th>
-            <td>{header.value}</td>
-          </tr>
-        {/each}
-      </table>
-    {/if}
-    <hr />
-
-    {#if show_html}
-      <iframe
-        srcdoc={csp(message.html)}
-        sandbox=""
-        style="width:95%; border: 3px solid purple;height:100vh;"
-        id="mail_content_iframe"
-      />
-    {:else if message.text == null}
-      {#if message.html != null}
-        (extracted from html)
-        <pre>{extractContent(message.html)}</pre>
-      {:else}
-        (no text, no html)
-      {/if}
+<View>
+  <div slot="header">
+    {#if message == null}
+      Could not retrieve this message.
     {:else}
-      {#if message.html != null}
-        (html available){/if}
-      <pre>{message.text}</pre>{/if}
-  {/if}
-</div>
+      <table>
+        <tr>
+          <th>From</th>
+          <td>{get_header(message, "from")}</td>
+        </tr>
+        <tr>
+          <th>To</th>
+          <td><Expander text={format_to(get_header(message, "to"))} /></td>
+        </tr>
+        <tr>
+          <th>Subject</th>
+          <td>{get_header(message, "subject")}</td>
+        </tr>
+        <tr>
+          <th>Date</th>
+          <td>
+            <SvelteTooltip
+              tip={get_header(message, "date")}
+              right
+              color="#DFDFDF;border:1px dashed grey;"
+            >
+              {local_date(get_header(message, "date"))}
+            </SvelteTooltip>
+          </td>
+        </tr>
+        {#each optional_headers as opt_header}
+          {#if get_header(message, opt_header) != null}
+            <tr>
+              <th>{opt_header}</th>
+              {#if opt_header.toLowerCase() == "cc"}
+                <td>{format_to(get_header(message, opt_header))}</td>
+              {:else}
+                <td>{get_header(message, opt_header)}</td>
+              {/if}
+            </tr>
+          {/if}
+        {/each}
+        <tr>
+          <th>Tags</th>
+          <td>
+            {#each message_tags as tag}
+              <div class="tags" style="background-color:{find_color(tag)}">
+                {tag}
+              </div>
+            {/each}
+          </td>
+        </tr>
+      </table>
+      {#if all_headers}
+        <hr />
+        <table>
+          {#each message.headers as header}
+            <tr>
+              <th>{header.key}</th>
+              <td>{header.value}</td>
+            </tr>
+          {/each}
+        </table>
+      {/if}
+    {/if}
+  </div>
+
+  <div slot="content">
+    {#if message == null}{:else}
+      {#if show_html}
+        <iframe
+          srcdoc={csp(message.html)}
+          sandbox=""
+          style="width:95%; border: 3px solid purple;height:100vh;"
+          id="mail_content_iframe"
+        />
+      {:else if message.text == null}
+        {#if message.html != null}
+          (extracted from html)
+          <pre>{wrap(extractContent(message.html))}</pre>
+        {:else}
+          (no text, no html)
+        {/if}
+      {:else}
+        {#if message.html != null}
+          (html available){/if}
+        <pre>{@html wrap(escape_html(message.text))}</pre>
+      {/if}
+    {/if}
+  </div>
+
+  <div slot="footer">
+    <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+      {#if overlay == "help"}
+        <Help bind:entries={help_entries} />
+      {:else if overlay == "copying"}
+        <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+
+        copying...
+      {:else if overlay == ""}
+        Press <span class="hotkey">h</span> for help.
+      {/if}
+    </Overlay>
+  </div>
+</View>
 
 <style>
   th {

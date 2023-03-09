@@ -34,6 +34,14 @@ pub struct MailStore {
     config_path: PathBuf,
 }
 
+#[derive(Serialize, Debug)]
+pub struct SingleMessage {
+    id: String,
+    raw: String,
+    tags: Vec<String>,
+    filename: String,
+}
+
 impl MailStore {
     pub fn new(path: impl AsRef<Path>, config_path: impl AsRef<Path>) -> MailStore {
         MailStore {
@@ -101,13 +109,17 @@ impl MailStore {
         .expect("failed to open notmuch database")
     }
 
-    pub fn get_message(&self, msg_id: &str) -> anyhow::Result<(String, Vec<String>)> {
+    pub fn get_message(&self, msg_id: &str) -> anyhow::Result<SingleMessage> {
         let database = self.open_db();
         let message = database.find_message(msg_id)?.context("not found")?;
         let raw = std::fs::read_to_string(message.filename())?;
-        Ok((raw, message.tags().collect()))
-        //        let parsed_message = mail_parser::Message::parse(&raw).context("failed to parse")?;
-        //       Ok(serde_json::to_string_pretty(&parsed_message)?)
+
+        Ok(SingleMessage {
+            id: msg_id.to_string(),
+            raw,
+            tags: message.tags().collect(),
+            filename: message.filename().to_string_lossy().to_string(),
+        })
     }
 
     pub fn add_tags(&self, msg_id: &str, tags: &Vec<String>) -> anyhow::Result<()> {
@@ -130,6 +142,39 @@ impl MailStore {
             message.remove_tag(tag)?;
         }
         message.thaw()?;
+        Ok(())
+    }
+
+    pub fn store_attachments(&self, msg_id: &str, path: &PathBuf) -> anyhow::Result<()> {
+        use mail_parser::MimeHeaders;
+        let database = self.open_db();
+        let message = database.find_message(msg_id)?.context("not found")?;
+        let raw = std::fs::read(message.filename())?;
+        let message = mail_parser::Message::parse(&raw[..]).unwrap();
+        for (ii, attachment) in message.attachments().enumerate() {
+            let name = attachment
+                .attachment_name()
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| {
+                    format!(
+                        "attachment-{}.{}",
+                        ii,
+                        if attachment.is_text() {
+                            "txt"
+                        } else if attachment.is_text_html() {
+                            "html"
+                        } else {
+                            "bin"
+                        }
+                    )
+                });
+            if name.contains("/") {
+                println!("skipping attachment {}, contained /", name);
+            }
+            let save_name = path.join(name);
+            std::fs::write(save_name, attachment.contents())?;
+        }
+
         Ok(())
     }
 }

@@ -49,6 +49,7 @@
     { key: "z", text: "new node below" },
     { key: "m", text: "move node to node below" },
     { key: "p", text: "command palette" },
+    { key: "c", text: "copy menu" },
   ];
 
   async function load_node(path, edit_afterwards = false) {

@@ -7,7 +7,7 @@ mod mail;
 mod openai;
 mod storage;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::Datelike;
 use inotify::{EventMask, Inotify, WatchMask};
 use once_cell::sync::OnceCell;
@@ -535,7 +535,7 @@ fn query_mail(query: &str) -> (Vec<mail::Thread>, bool) {
 }
 
 #[tauri::command]
-fn get_mail_message(id: &str) -> Option<(String, Vec<String>)> {
+fn get_mail_message(id: &str) -> Option<mail::SingleMessage> {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.get_message(id);
     if !res.is_ok() {
@@ -554,6 +554,34 @@ fn mail_message_remove_tags(id: &str, tags: Vec<String>) -> bool {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.remove_tags(id, &tags);
     dbg!("removed tags", &id, &tags, &res);
+    res.is_ok()
+}
+
+#[tauri::command]
+fn mail_message_store_attachments(id: &str) -> bool {
+    fn inner(id: &str) -> anyhow::Result<()> {
+        let ss = STORAGE.get().unwrap().lock().unwrap();
+
+        let attachment_dir = ss
+            .settings
+            .get("mail.attachment_dir")
+            .map(|x| x.to_string())
+            .unwrap_or("~/attachments".to_string());
+        let attachment_dir = expanduser::expanduser(attachment_dir)?;
+        let attachment_dir = PathBuf::from(&attachment_dir);
+        if attachment_dir.exists() {
+            std::fs::remove_dir_all(&attachment_dir)?;
+        }
+        std::fs::create_dir_all(&attachment_dir)?;
+
+        let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+        lock.notmuch_db.store_attachments(id, &attachment_dir)?;
+        Ok(())
+    }
+    let res = inner(id);
+    if (!res.is_ok()) {
+        dbg!(&res);
+    }
     res.is_ok()
 }
 
@@ -891,6 +919,7 @@ fn main() -> Result<()> {
             get_mail_message,
             mail_message_add_tags,
             mail_message_remove_tags,
+            mail_message_store_attachments,
             chatgpt_get_prompts,
             chatgpt_update_prompts,
             chatgpt_list_conversations,

@@ -50,7 +50,7 @@ export function add_code_clipboards() {
   }
 }
 
-export function escape_html(html: String) {
+export function escape_html(html: string) {
   return document.createElement("div").appendChild(
     document.createTextNode(html),
   ).parentNode.innerHTML;

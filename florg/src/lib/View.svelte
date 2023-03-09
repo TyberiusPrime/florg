@@ -10,7 +10,7 @@
   </div>
   <div class="main_content">
     <div class="sticky-spacer" />
-    <div class="sticky-content">
+    <div class="sticky-content" id="sticky-content">
       <slot name="content" />
     </div>
   </div>

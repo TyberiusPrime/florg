@@ -1,5 +1,6 @@
 import { readText, writeText } from "@tauri-apps/api/clipboard";
 import { invoke } from "@tauri-apps/api/tauri";
+import { toast } from "@zerodevx/svelte-toast";
 
 export function format_date(date: any, br = false) {
   //todo :centralize / dry
@@ -8,6 +9,9 @@ export function format_date(date: any, br = false) {
   if (typeof date === "string") {
     pdate = new Date();
     pdate.setTime(Date.parse(date));
+  } else if (typeof date == "number") {
+    pdate = new Date();
+    pdate.setTime(date);
   } else {
     pdate = date;
   }
@@ -16,7 +20,7 @@ export function format_date(date: any, br = false) {
   let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
   let hh = new Intl.DateTimeFormat("de", { hour: "numeric" }).format(date);
   let mm = new Intl.DateTimeFormat("en", { minute: "2-digit" }).format(date); */
-  let ye = pdate.getFullYear();
+  let ye = pdate.getYear();
   let mo = String(pdate.getMonth() + 1).padStart(2, "0");
   let da = String(pdate.getDay()).padStart(2, "0");
   let hh = String(pdate.getHours()).padStart(2, "0");
@@ -67,3 +71,30 @@ export function no_text_inputs_focused(): Boolean {
 export async function get_node(path: string) {
   return await invoke("get_node", { path });
 }
+
+export function isElementInViewport(el): boolean {
+  // Special bonus for those using jQuery
+  if (typeof jQuery === "function" && el instanceof jQuery) {
+    el = el[0];
+  }
+
+  var rect = el.getBoundingClientRect();
+  let header_height = document.getElementById("header").offsetHeight;
+  let footer_height = document.getElementById("footer").offsetHeight;
+
+  return (
+    rect.top >= header_height &&
+    rect.left >= 0 &&
+    rect.bottom <=
+      (window.innerHeight || document.documentElement.clientHeight) -
+        footer_height &&
+    rect.right <=
+      (window.innerWidth ||
+        document.documentElement.clientWidth) /* or $(window).width() */
+  );
+}
+
+export function error_toast(msg) {
+	toast.push(`<span class="error">${msg}</span>`);
+}
+

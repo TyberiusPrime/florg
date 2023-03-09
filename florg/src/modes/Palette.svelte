@@ -3,6 +3,7 @@
   import { enter_mode, leave_mode, get_last_path } from "../lib/mode_stack.ts";
   import { exit } from "@tauri-apps/api/process";
   import Picker from "../lib/Picker.svelte";
+  import { toast } from "@zerodevx/svelte-toast";
   import { get_node } from "../lib/util.ts";
 
   async function handle_action(ev) {
@@ -32,8 +33,8 @@
     let node = await get_node(last_path);
 	console.log(node);
     if (node.children.length > 0) {
-      footer_msg =
-        "<span class='error'>Can not create date nodes on an node that already has children</span>";
+	toast.push(
+        "<span class='error'>Can not create date nodes on an node that already has children</span>");
     } else {
       let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(
         new Date()
@@ -47,7 +48,7 @@
         let year_parsed = parseInt(year);
         console.log(year_parsed);
         if (!isNaN(year_parsed)) {
-          footer_msg = "Created calendar";
+          toast.push("Created calendar");
           await invoke("create_calendar", {
             parentPath: current_path,
             year: year_parsed,
@@ -86,9 +87,9 @@
           });
         }
       );
-      footer_msg = "Downloaded awesome chatgpt prompt & stored in prompts.toml";
+      toast.push("Downloaded awesome chatgpt prompt & stored in prompts.toml");
     } else {
-      footer_msg = `<span class='error'>error downloading prompts. ${response.status}</span>`;
+      toast.push(`<span class='error'>error downloading prompts. ${response.status}</span>`);
     }
   }
 </script>

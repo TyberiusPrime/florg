@@ -4,6 +4,7 @@
   import { exit } from "@tauri-apps/api/process";
   import Picker from "../lib/Picker.svelte";
   import { get_node } from "../lib/util.ts";
+  import { mode_args_store } from "../lib/mode_stack.ts";
 
   async function handle_action(ev) {
     let filename = ev.detail.cmd;
@@ -19,10 +20,12 @@
     enter_mode("chatgpt", { filename: filename, convo: convo }, false);
   }
 
-  export let mode;
-  export let mode_args;
-
-  let start_text = mode_args.start_text;
+  let start_text;
+  let mode_args;
+  mode_args_store.subscribe((value) => {
+    mode_args = value;
+    start_text = mode_args.start_text;
+  });
 
   async function get_convos() {
     return await invoke("chatgpt_list_conversations", {});

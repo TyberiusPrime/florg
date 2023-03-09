@@ -1,16 +1,26 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
+  import { toast } from "@zerodevx/svelte-toast";
+  import { enter_mode, leave_mode, get_last_path, mode_args_store } from "../lib/mode_stack.ts";
   import { createEventDispatcher } from "svelte";
+
   import { onMount, onDestroy } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
-  import Expander from "./Expander.svelte";
+  import Expander from "../lib/Expander.svelte";
 
+  let message = null;
+  let message_id = null;
+  let message_tags = null;
+  let mode_args;
+  mode_args_store.subscribe((value) => {
+    mode_args = value;
+    message = value.message;
+    message_id = value.message_id;
+    message_tags = value.message_tags;
+  });
   const dispatch = createEventDispatcher();
 
-  export let message = null;
-  export let message_id = null;
-  export let message_tags = null;
   let show_html = false;
   let show_images = false;
   let all_headers = false;
@@ -32,7 +42,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      dispatch("leave", null);
+	leave_mode();
     },
   });
 
@@ -114,7 +124,6 @@
   }
 
   function resize_iframe() {
-    console.log("resize_iframe");
     document.getElementById("mail_content_iframe").style.height = "200px"; //document.getElementById("mail_content_iframe").contentWindow.document.body.scrollHeight + 'px';
   }
 

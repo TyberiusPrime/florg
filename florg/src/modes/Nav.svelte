@@ -2,16 +2,15 @@
   import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
   import { get_node, no_text_inputs_focused } from "../lib/util.ts";
   import { onMount, onDestroy } from "svelte";
+  import { mode_args_store } from "../lib/mode_stack.ts";
 
   import View from "../lib/View.svelte";
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
 
-  export let mode;
-  export let mode_args;
+  let inital_path;
+  let path;
 
-  let inital_path = mode_args.enter_path;
-  let path = inital_path;
   let overlay = "";
 
   let help_entries = [
@@ -120,7 +119,7 @@
 </script>
 
 <div>
-  <View bind:mode bind:mode_args>
+  <View >
     <div slot="header">
       <h1>Navigation mode.</h1>
       Path:<input
@@ -192,7 +191,6 @@
       </Overlay>
     </div>
   </View>
-
 </div>
 
 <style>

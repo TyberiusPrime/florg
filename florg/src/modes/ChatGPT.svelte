@@ -26,13 +26,20 @@
   import SvelteTooltip from "svelte-tooltip";
 
   const dispatch = createEventDispatcher();
-  export let mode;
-  export let mode_args;
+
+  let convo;
+  let filename;
+
+  let mode_args;
+  mode_args_store.subscribe((value) => {
+    mode_args = value;
+    convo = mode_args.convo;
+    filename = mode_args.filename;
+  });
+
   let overlay = "";
   let in_page_search_term = "";
 
-  export let convo = mode_args.convo;
-  export let filename = mode_args.filename;
   export let input = "";
 
   let items = [];
@@ -62,13 +69,11 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
-      overlay = "search";
-	  e.preventDefault();
+        overlay = "search";
+        e.preventDefault();
       }
     },
   });
-
-
 
   listener.register_combo({
     keys: "i",
@@ -76,12 +81,11 @@
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
-      toast.push("todo");
-	  e.preventDefault();
+        toast.push("todo");
+        e.preventDefault();
       }
     },
   });
-
 
   listener.register_combo({
     keys: "h",
@@ -310,7 +314,7 @@
 </script>
 
 <div>
-  <View bind:mode bind:mode_args>
+  <View>
     <div slot="header">
       <h1>ChatGPT</h1>
     </div>
@@ -466,7 +470,7 @@
         {#if overlay == "help"}
           <Help bind:entries={help_entries} />
         {:else if overlay == "search"}
-          <Search bind:mode bind:overlay bind:in_page_search_term />
+          <Search bind:overlay bind:in_page_search_term />
         {:else if overlay == "goto"}
           Goto node:
           <Goto on:action={handle_goto_action} />

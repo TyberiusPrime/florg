@@ -3,7 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
-  import { enter_mode, leave_mode } from "../lib/mode_stack.ts";
+  import { enter_mode, leave_mode, mode_args_store } from "../lib/mode_stack.ts";
 
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
@@ -16,9 +16,12 @@
   import TopTree from "../lib/TopTree.svelte";
   import Search from "../lib/Search.svelte";
   import Goto from "../lib/Goto.svelte";
+  import MailQueries from "../lib/MailQueries.svelte";
 
-  export let mode;
-  export let mode_args;
+  let mode_args;
+  mode_args_store.subscribe((value) => {
+    mode_args = value;
+  });
 
   let content_text = "";
   let content_rendered = "";
@@ -241,6 +244,15 @@
       enter_mode("chatgpt_picker", { start_text: content_text }, true);
     },
   });
+  listener.register_combo({
+    keys: "i",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: async (e, count, repeated) => {
+      overlay = "mail_queries";
+    },
+  });
 
   async function edit_current_node() {
     currently_edited = true;
@@ -334,16 +346,18 @@
     load_node(new_path, true);
     overlay = "";
   }
+  async function handle_mail_query() {
+    toast.push("mail query");
+  }
 </script>
 
 <div>
-  <View bind:mode bind:mode_args>
+  <View>
     <div slot="header">
       <TopTree
         bind:levels={content_levels}
         bind:title={content_title}
         bind:path={current_path}
-        bind:mode
       />
     </div>
     <div slot="content">
@@ -354,13 +368,15 @@
         {#if overlay == "help"}
           <Help bind:entries={help_entries} />
         {:else if overlay == "search"}
-          <Search bind:mode bind:overlay bind:in_page_search_term on:leave />
+          <Search bind:overlay bind:in_page_search_term on:leave />
         {:else if overlay == "goto"}
           Goto node:
           <Goto on:action={handle_goto_action} />
         {:else if overlay == "new_below"}
           Create new node below
           <Goto on:action={handle_new_node_below} />
+        {:else if overlay == "mail_queries"}
+          <MailQueries on:action={handle_mail_query} />
         {:else if overlay == ""}
           Press <span class="hotkey">h</span> for help.
         {:else}

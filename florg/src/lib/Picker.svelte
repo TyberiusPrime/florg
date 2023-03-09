@@ -5,12 +5,25 @@
   const dispatch = createEventDispatcher();
   import { Fzf, byLengthAsc } from "fzf";
   import { onMount, onDestroy } from "svelte";
-  import { leave_mode } from "../lib/mode_stack.ts";
+  import {
+    leave_mode,
+    mode_args_store,
+    register_enter_mode,
+    unregister_enter_mode,
+  } from "../lib/mode_stack.ts";
   import View from "../lib/View.svelte";
+  import { isElementInViewport } from "../lib/util.ts";
 
   export let elements = [];
-  export let mode;
-  export let mode_args;
+
+  let imported_focused = null;
+  let imported_input_text = null;
+
+  let mode_args;
+  mode_args_store.subscribe((value) => {
+    imported_focused = value["focused"];
+    imported_input_text = value["input_text"];
+  });
 
   let focused = 0;
   let input_text = "";
@@ -68,10 +81,50 @@
       }
     },
   });
+  listener.register_combo({
+    keys: "home",
+    is_unordered: true,
+    prevent_default: true,
+    on_keydown: (e, count, repeated) => {
+      focused = 0;
+      update_chosen();
+    },
+  });
+  listener.register_combo({
+    keys: "end",
+    is_unordered: true,
+    prevent_default: true,
+    on_keydown: (e, count, repeated) => {
+      focused = downstream_elements.length - 1;
+      update_chosen();
+    },
+  });
+
+  listener.register_combo({
+    keys: "pagedown",
+    is_unordered: true,
+    prevent_default: true,
+    on_keydown: (e, count, repeated) => {
+      focused = Math.min(downstream_elements.length - 1, focused + 10);
+      update_chosen();
+    },
+  });
+
+  listener.register_combo({
+    keys: "pageup",
+    is_unordered: true,
+    prevent_default: true,
+    on_keydown: (e, count, repeated) => {
+      focused = Math.max(0, focused - 10);
+      update_chosen();
+    },
+  });
+
   function handle_text_change(ev) {
     const fzf = new Fzf(elements, {
       selector: (item) => item.innerText,
       tiebreakers: [byLengthAsc],
+      fuzzy: "v2",
     });
     if (input_text != last_text) {
       const entries = fzf.find(input_text);
@@ -96,6 +149,12 @@
         if (focused == ii) {
           for (let yy = 0; yy < table.children[ii].children.length; yy++) {
             table.children[ii].children[yy].classList.add("chosen");
+            if (!isElementInViewport(table.children[ii].children[yy])) {
+              table.children[ii].children[yy].scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
           }
         } else {
           for (let yy = 0; yy < table.children[ii].children.length; yy++) {
@@ -104,6 +163,7 @@
         }
       }
     }
+
     return "";
   }
 
@@ -132,26 +192,39 @@
     });
   }
 
+  export function store_on_forward_exit() {}
+
   onMount(async () => {
+    register_enter_mode("Picker", (old) => {
+      console.log("stored focused", old);
+      old["focused"] = focused;
+	  old["input_text"] = input_text;
+      return old;
+    });
+
     window.setTimeout(() => {
+      console.log("imported_focused", imported_focused);
+      focused = imported_focused != undefined ? imported_focused : 0;
+      input_text = imported_input_text != undefined ? imported_input_text : "";
       elements = [];
       for (let el of document.querySelector("#pick_table").children) {
         elements.push(el);
       }
       console.log(elements);
       downstream_elements = elements;
-      update_chosen();
+      update_chosen(false);
       listener.listen();
     }, 100);
   });
 
   onDestroy(async () => {
     listener.stop_listening();
+    unregister_enter_mode("Picker");
   });
 </script>
 
 <div on:keyup={handle_text_change}>
-  <View bind:mode bind:mode_args>
+  <View>
     <div slot="header">
       <slot name="message" />
       filter: <input id="typebox" autofocus bind:value={input_text} />

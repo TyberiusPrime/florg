@@ -636,15 +636,12 @@ fn chatgpt_get_api_key() -> Option<String> {
 fn history_get(name: &str) -> Vec<String> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     let res = ss.history_get(name);
-    dbg!(&res);
     res.unwrap_or_default()
 }
 #[tauri::command]
 fn history_store(name: &str, entries: Vec<String>) -> bool {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     let res = ss.history_store(name, &entries);
-    dbg!(&res);
-
     res.is_ok()
 }
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {

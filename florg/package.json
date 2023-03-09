@@ -23,6 +23,7 @@
     "flatpickr": "^4.6.13",
     "flowbite-svelte": "^0.30.5",
     "fzf": "^0.5.1",
+    "fzy.js": "^0.4.1",
     "highlight.js": "^11.7.0",
     "html2plaintext": "^2.1.4",
     "marked": "^4.2.12",

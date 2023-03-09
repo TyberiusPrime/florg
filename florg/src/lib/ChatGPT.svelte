@@ -282,7 +282,7 @@
 
 <div>
   <h1>ChatGPT</h1>
-  </div>
+ </div>
 
 <style>
   table {

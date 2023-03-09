@@ -4,9 +4,9 @@
   import {
     enter_mode,
     assign_last_mode,
-    mode as mode_store,
-    mode_args as mode_args_store,
-    mode_transient as mode_transient_store,
+    mode_store,
+    mode_args_store,
+    mode_transient_store,
   } from "./lib/mode_stack.ts";
   //this is global..,
   import * as KeyPress from "./js/keypress-2.1.5.min.js";
@@ -33,7 +33,6 @@
   import { onMount, onDestroy } from "svelte";
   import { readText, writeText } from "@tauri-apps/api/clipboard";
   import asciidoctor from "asciidoctor";
-  import PostalMime from "postal-mime";
   import { fetch } from "@tauri-apps/api/http";
   import { parse as csv_parse } from "csv-parse/browser/esm";
   import { format_date, iso_date } from "./lib/util.ts";
@@ -46,7 +45,8 @@
   import NodeSearchMode from "./modes/NodeSearch.svelte";
   import ChatGPTMode from "./modes/ChatGPT.svelte";
   import ChatGPTPickerMode from "./modes/ChatGPTPicker.svelte";
-  import InputWithWhistory from "./lib/InputWithHistory.svelte";
+  import MailQuery from "./modes/MailQuery.svelte";
+  import MailMessage from "./modes/MailMessage.svelte";
 
   let mode;
   let mode_args;
@@ -66,33 +66,33 @@
 
   let options = {
     // toast options
-	pausable: true,
-	duration:10000,
+    pausable: true,
+    duration: 10000,
   };
 
-  let history = ['hello','world'];
+  let history = ["hello", "world"];
 </script>
 
 <div>
   {#if mode == "node"}
-    <ModeNode {mode} {mode_args} />
+    <ModeNode />
   {:else if mode == "nav"}
-    <NavMode {mode} {mode_args} />
+    <NavMode />
   {:else if mode == "palette"}
-    <PaletteMode {mode} {mode_args} />
+    <PaletteMode />
   {:else if mode == "node_search"}
-    <NodeSearchMode {mode} {mode_args} />
-{:else if mode == "chatgpt_picker"}
-    <ChatGPTPickerMode {mode} {mode_args} />
-
+    <NodeSearchMode />
+  {:else if mode == "chatgpt_picker"}
+    <ChatGPTPickerMode />
   {:else if mode == "chatgpt"}
-    <ChatGPTMode {mode} {mode_args} />
+    <ChatGPTMode />
+  {:else if mode == "mail_query"}
+    <MailQuery />
+  {:else if mode == "mail_message"}
+  <MailMessage />
+
   {:else}
     unknown mode {JSON.stringify(mode)}
   {/if}
   <SvelteToast {options} />
- 
-
-
-  />
 </div>

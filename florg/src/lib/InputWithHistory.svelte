@@ -78,7 +78,7 @@
   }
 </script>
 
-<div>
+<svelet:element>
   {#if showHistory && history.length > 0}
     <div id="history_popcorn">
       History:
@@ -99,7 +99,7 @@
     on:keydown={handleInput}
     autofocus
   />
-</div>
+</svelet:element>
 
 <style>
   #history_popcorn {

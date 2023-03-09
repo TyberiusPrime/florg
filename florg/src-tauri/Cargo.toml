@@ -15,7 +15,7 @@ tauri-build = { version = "1.2", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.2", features = ["clipboard-all", "dialog-all", "http-all", "process-all", "shell-open"] }
+tauri = { version = "1.2", features = ["clipboard-all", "dialog-all", "http-all", "process-all", "shell-open", "window-create", "window-set-title"] }
 
 xdg="2.4.1"
 anyhow="1.0.69"

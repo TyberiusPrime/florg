@@ -3,13 +3,22 @@ export let entries;
 </script>
 
 <div>
-  <table>
-  Help<br />
+Help
+<div class="dacols">
   {#each entries as entry }
-	<tr><td><span class="hotkey">{entry.key}</span></td><td>{entry.text}</td></tr>
+  <div><span class="hotkey">{entry.key}</span>&nbsp;{@html entry.text.replaceAll(" ", "&nbsp;")}</div>
   {/each}
-  </table>
+</div>
 </div>
 
 <style>
+.dacols {
+	padding:0.5em;
+	columns: 200px 3;
+}
+.dacols p {
+text-align:left;
+padding:0;
+margin:0;
+}
  </style>

@@ -52,6 +52,7 @@
     { key: "m", text: "move node to node below" },
     { key: "p", text: "command palette" },
     { key: "c", text: "copy menu" },
+    { key: "a", text: "add node below" },
   ];
 
   let copy_entries = [

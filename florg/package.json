@@ -31,6 +31,7 @@
     "svelte-flatpickr": "^3.3.2",
     "svelte-loading-animation": "^0.0.1",
     "svelte-select": "^5.4.0",
+    "svelte-spa-router": "^3.3.0",
     "svelte-tooltip": "^1.2.0"
   },
   "devDependencies": {

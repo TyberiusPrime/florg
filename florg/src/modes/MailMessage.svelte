@@ -7,7 +7,7 @@
     get_last_path,
     mode_args_store,
   } from "../lib/mode_stack.ts";
-  import { escape_html, error_toast } from "../lib/util.ts";
+  import { escape_html, error_toast, removeItemOnce } from "../lib/util.ts";
   import { createEventDispatcher } from "svelte";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
 
@@ -37,6 +37,7 @@
   let show_html = false;
   let show_images = false;
   let all_headers = false;
+  let tag_entries = [];
 
   let help_entries = [
     { key: "Esc", text: "Go back" },
@@ -53,6 +54,18 @@
     overlay = "";
     listener.listen();
     window.scroll(0, 0);
+
+    let te = await invoke("mail_get_tags", {});
+    if (te != null) {
+      for (let key in te) {
+        let el = te[key];
+        tag_entries.push({
+          key: key,
+          target_path: el,
+          text: el,
+        });
+      }
+    }
   });
 
   onDestroy(() => {
@@ -120,6 +133,7 @@
       }
     },
   });
+
   listener.register_combo({
     keys: "c",
     prevent_default: true,
@@ -130,6 +144,18 @@
       }
     },
   });
+
+  listener.register_combo({
+    keys: "t",
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (message.html != null) {
+        overlay = "tags";
+      }
+    },
+  });
+
   listener.register_combo({
     keys: "i",
     prevent_default: true,
@@ -299,7 +325,25 @@
     } else {
       error_toast("Unknown copy target: " + target);
     }
+    overlay = "";
+  }
 
+  async function handle_tag(ev) {
+    let tag = ev.detail;
+    if (message_tags.indexOf(tag) == -1) {
+      await invoke("mail_message_add_tags", {
+        id: message_id,
+        tags: [tag],
+      });
+      message_tags.push(tag);
+    } else {
+      await invoke("mail_message_remove_tags", {
+        id: message_id,
+        tags: [tag],
+      });
+      removeItemOnce(message_tags, tag);
+    }
+    message_tags = message_tags;
     overlay = "";
   }
 </script>
@@ -400,9 +444,15 @@
       {#if overlay == "help"}
         <Help bind:entries={help_entries} />
       {:else if overlay == "copying"}
+        Copy to clipboard:
         <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
-
-        copying...
+      {:else if overlay == "tags"}
+        {#if tag_entries.length > 0}
+          Toggle Tag:
+          <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
+        {:else}
+          Fill out [mail_tags] in your settings
+        {/if}
       {:else if overlay == ""}
         Press <span class="hotkey">h</span> for help.
       {/if}

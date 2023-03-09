@@ -7,7 +7,7 @@
     mode_args_store,
   } from "../lib/mode_stack.ts";
   import Picker from "../lib/Picker.svelte";
-  import { format_date } from "../lib/util.ts";
+  import { format_date, removeItemOnce } from "../lib/util.ts";
   import { toast } from "@zerodevx/svelte-toast";
   import { find_color } from "../lib/colors.ts";
   import PostalMime from "postal-mime";
@@ -67,13 +67,7 @@
     return msg.tags.indexOf("unread") > -1;
   }
 
-  function removeItemOnce(arr, value) {
-    var index = arr.indexOf(value);
-    if (index > -1) {
-      arr.splice(index, 1);
-    }
-    return arr;
-  }
+
 
   async function handle_action(ev) {
     let target = ev.detail.cmd;

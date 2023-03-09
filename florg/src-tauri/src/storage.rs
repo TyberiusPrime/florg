@@ -47,6 +47,7 @@ impl Storage {
         let chatgpt = settings["chatgpt"]["api_key"]
             .as_str()
             .map(|s| openai::ChatGPT::new(s.to_string(), data_path.clone()));
+
         let mut s = Storage {
             data_path,
             nodes: Vec::new(),
@@ -61,6 +62,13 @@ impl Storage {
     pub fn reload(&mut self) {
         let nodes = Self::parse_path(&self.data_path);
         self.nodes = nodes;
+        let settings =
+            Self::load_settings(&self.data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
+        let chatgpt = settings["chatgpt"]["api_key"]
+            .as_str()
+            .map(|s| openai::ChatGPT::new(s.to_string(), self.data_path.clone()));
+        self.settings = settings;
+        self.chatgpt = chatgpt;
     }
 
     pub fn settings_filename(data_path: &PathBuf) -> PathBuf {

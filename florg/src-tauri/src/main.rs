@@ -535,6 +535,12 @@ fn query_mail(query: &str) -> (Vec<mail::Thread>, bool) {
 }
 
 #[tauri::command]
+fn mail_get_tags() -> Option<HashMap<String, String>> {
+    get_from_settings_str_map("mail_tags")
+}
+
+
+#[tauri::command]
 fn get_mail_message(id: &str) -> Option<mail::SingleMessage> {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     let res = lock.notmuch_db.get_message(id);
@@ -579,7 +585,7 @@ fn mail_message_store_attachments(id: &str) -> bool {
         Ok(())
     }
     let res = inner(id);
-    if (!res.is_ok()) {
+    if !res.is_ok() {
         dbg!(&res);
     }
     res.is_ok()
@@ -920,6 +926,7 @@ fn main() -> Result<()> {
             mail_message_add_tags,
             mail_message_remove_tags,
             mail_message_store_attachments,
+            mail_get_tags,
             chatgpt_get_prompts,
             chatgpt_update_prompts,
             chatgpt_list_conversations,

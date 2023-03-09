@@ -95,6 +95,13 @@ export function isElementInViewport(el): boolean {
 }
 
 export function error_toast(msg) {
-	toast.push(`<span class="error">${msg}</span>`);
+  toast.push(`<span class="error">${msg}</span>`);
 }
 
+export function removeItemOnce(arr, value) {
+  var index = arr.indexOf(value);
+  if (index > -1) {
+    arr.splice(index, 1);
+  }
+  return arr;
+}

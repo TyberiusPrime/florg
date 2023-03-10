@@ -295,6 +295,11 @@
   dependencies:
     "@types/node" "*"
 
+"@zerodevx/svelte-toast@^0.9.2":
+  version "0.9.2"
+  resolved "https://registry.yarnpkg.com/@zerodevx/svelte-toast/-/svelte-toast-0.9.2.tgz#704e35734296260efc4c04dfb1d805cec6591f87"
+  integrity sha512-9Ope024toXZpc9uk/WNMQMm9o15xeLnQwkWk1L8ZAaThFJJksiEWvGo1qXwO6ISfhA0GtafF9rR83TsEcpRLTg==
+
 ansi-regex@^5.0.1:
   version "5.0.1"
   resolved "https://registry.yarnpkg.com/ansi-regex/-/ansi-regex-5.0.1.tgz#082cb2c89c9fe8659a311a53bd6a4dc5301db304"

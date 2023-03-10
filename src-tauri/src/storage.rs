@@ -44,6 +44,7 @@ impl Storage {
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
             Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
+        //todo: make this robust
         let chatgpt = settings["chatgpt"]["api_key"]
             .as_str()
             .map(|s| openai::ChatGPT::new(s.to_string(), data_path.clone()));

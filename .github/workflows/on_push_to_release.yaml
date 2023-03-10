@@ -14,6 +14,9 @@ jobs:
         platform: [macos-latest, ubuntu-20.04, windows-latest]
 
     runs-on: ${{ matrix.platform }}
+    with:
+        projectPath: ./florg
+        configPath: ./florg/src-tauri/tauri.conf.json
     steps:
       - uses: actions/checkout@v3
       - name: setup node

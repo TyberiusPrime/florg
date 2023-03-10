@@ -20,7 +20,7 @@
 
           src = pkgs.fetchurl {
             url = "https://github.com/TyberiusPrime/florg/releases/download/app-v0.0.0/florg_0.0.0_amd64.deb";
-            sha256 = "sha256-9Lr0seU6pAaZpbw7xK3NwOUQu+/DnEQVEFmo1j60BB4=";
+            sha256 = "sha256-00foHJey+sRWIXPBth2ASNSIC4nKsnS8BSrN232OBS8=";
           };
 
           buildInputs = [pkgs.dpkg pkgs.tree];

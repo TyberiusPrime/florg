@@ -4,12 +4,14 @@
   import { WebviewWindow as www } from "@tauri-apps/api/window";
   //this is global..,
   //#import * as KeyPress from "./js/keypress-2.1.5.min.js";
-  import {keypress} from "keypress.js";
+  import { keypress } from "keypress.js";
   import Router from "svelte-spa-router";
   import { location, querystring } from "svelte-spa-router";
   import { set_mode_ignore_enter } from "./lib/mode_stack.ts";
+  import { toast } from "@zerodevx/svelte-toast";
   import { error_toast } from "./lib/util.ts";
   import { onMount, onDestroy } from "svelte";
+  import { emit, listen } from "@tauri-apps/api/event";
 
   import NodeMode from "./modes/Node.svelte";
   import NodeEdit from "./modes/NodeEdit.svelte";
@@ -40,7 +42,7 @@
       window.location.reload();
     },
   });
-  let window_count = (new Date()).getMilliseconds();
+  let window_count = new Date().getMilliseconds();
   listener.register_combo({
     keys: "ctrl enter",
     is_unordered: false,
@@ -56,7 +58,7 @@
           title: "florg" + window_count,
         });
         webview.once("tauri://error", function (e) {
-		console.log(e);
+          console.log(e);
           error_toast("Error during window creation" + JSON.stringify(e));
         });
         window_count += 1;
@@ -78,14 +80,38 @@
   };
 
   onDestroy(() => {
-	listener.reset();
+    listener.reset();
   });
 
   const urlParams = new URLSearchParams(window.location.search);
   let mode = urlParams.get("mode") || "node";
+
+
+  const unlisten_mouse_button_pressed = listen(
+    "mouse-button-pressed",
+    async (event) => {
+      if (has_focus) {
+        if (event.payload == 8) {
+          window.history.back();
+        } else if (event.payload == 9) {
+          window.history.forward();
+        }
+      }
+    }
+  );
+
+  let has_focus = false;
+  function enter_focus() {
+    has_focus = true;
+  }
+  function leave_focus() {
+    has_focus = false;
+  }
 </script>
 
-<div>
+<svelte:body on:mouseenter={enter_focus} on:mouseleave={leave_focus} />
+
+<div >
   <SvelteToast {options} />
   <Router {routes} />
 </div>

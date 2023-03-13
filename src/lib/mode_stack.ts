@@ -32,5 +32,5 @@ export function check_and_reset_mode_ignore_enter() {
 }
 
 export function set_mode_ignore_enter() {
-	mode_ignore_enter = true;
+  mode_ignore_enter = true;
 }

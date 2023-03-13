@@ -2,6 +2,10 @@
   import { invoke } from "@tauri-apps/api/tauri";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
+import {
+    push as push_mode,
+    replace as replace_mode,
+  } from "svelte-spa-router";
 
   export let levels = [];
   export let title = "";
@@ -12,9 +16,7 @@
     for (let i = 0; i <= level; i++) {
       path += levels[i][0];
     }
-    dispatch("goto_node", { path: path, normal_mode: true });
-    console.log("goto level");
-    console.log(path);
+	push_mode("/node/" + path);
   }
 
   function indent(depth) {

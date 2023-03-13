@@ -144,10 +144,14 @@
     on_keyup: (e, count, repeated) => {
       console.log("listener h");
       if (!repeated) {
-        overlay = "help";
+		  show_help();
       }
     },
   });
+
+  function show_help() {
+        overlay = "help";
+  }
 
   listener.register_combo({
     keys: "s",
@@ -368,7 +372,7 @@
   });
 
   function handle_overlay_leave() {
-    //toast.push("overlay:leave in node");
+    // toast.push("overlay:leave in node");
     overlay = "";
   }
 
@@ -439,6 +443,18 @@
     </div>
     <div slot="content">
       {@html content_rendered}
+	  {#if content_children != null}
+	  {#if content_children.length > 0}
+	  <h2 class="children">Children</h2>
+	  <table class="table_children">
+	  {#each content_children as child}
+		<tr><td><a href="#/node/{current_path}{child.key}">{current_path.toLowerCase()}{child.key}</a></td><td>{child.text}</td></tr>
+	  {/each}
+	  </table>
+	  {:else}
+	  <h2 class="children">No children</h2>
+	  {/if}
+	  {/if}
     </div>
     <div slot="footer">
       <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
@@ -462,7 +478,9 @@
         {:else if overlay == "copying"}
           <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
         {:else if overlay == ""}
+		  <div on:click={show_help}>
           Press <span class="hotkey">h</span> for help.
+		  </div>
         {:else}
           Unknown overlay: {overlay}
         {/if}
@@ -474,3 +492,20 @@
   </View>
   {quiet(apply_mods(content_rendered))}
 </div>
+
+<style>
+.children {
+font-size:1em;
+padding-bottom:0;
+margin-bottom:0;
+
+}
+.table_children {
+margin:0;
+border-collapse:collapse;
+}
+.table_children td {
+border:1px solid grey;
+padding:0.5em;
+}
+</style>

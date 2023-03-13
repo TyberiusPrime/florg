@@ -1,8 +1,12 @@
 <script lang="ts">
+  import { toast } from "@zerodevx/svelte-toast";
   import { get_node, no_text_inputs_focused } from "../lib/util.ts";
   import {keypress} from "keypress.js";
   import { onMount, onDestroy } from "svelte";
-
+  import {
+    check_and_reset_mode_ignore_enter,
+  } from "../lib/mode_stack.ts";
+ 
   import View from "../lib/View.svelte";
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
@@ -70,7 +74,9 @@
     prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
+	  toast.push("edit");
       if (!check_and_reset_mode_ignore_enter()) {
+	  toast.push("edit2");
         replace_mode("/node_edit/" + path);
 		}
       }

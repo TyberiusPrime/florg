@@ -22,7 +22,6 @@
     "csv-parser": "^3.0.0",
     "dompurify": "^3.0.1",
     "flatpickr": "^4.6.13",
-    "flowbite-svelte": "^0.30.5",
     "fzf": "^0.5.1",
     "fzy.js": "^0.4.1",
     "highlight.js": "^11.7.0",

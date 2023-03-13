@@ -31,7 +31,8 @@
 
       if (no_text_inputs_focused) {
         if (overlay == "help") {
-          dispatch("overlay_leave", {});
+		console.log("hide help");
+          dispatch("leave", {});
           e.preventDefault();
         }
       }

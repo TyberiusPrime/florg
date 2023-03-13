@@ -684,6 +684,15 @@ fn history_store(name: &str, entries: Vec<String>) -> bool {
     let res = ss.history_store(name, &entries);
     res.is_ok()
 }
+#[tauri::command]
+fn start_terminal(folder: String) -> bool {
+    let process = std::process::Command::new("kitty")
+        .current_dir(folder)
+        .spawn();
+    //    .expect("Failed to spawn kitty");
+    process.is_ok()
+}
+
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     Some(
@@ -870,6 +879,7 @@ fn main() -> Result<()> {
             }
         }
     });
+
     fn get_mail_setting(key: &str) -> Option<String> {
         let ss = STORAGE.get().unwrap().lock().unwrap();
         Some(
@@ -902,6 +912,21 @@ fn main() -> Result<()> {
     });
 
     let mail_store = mail::MailStore::new(&mail_path, &config_path);
+
+    {
+        use rdev::{listen, Event};
+        thread::spawn(|| {
+            listen(|event: Event| {
+                match event.event_type {
+                    rdev::EventType::ButtonRelease(rdev::Button::Unknown(no)) => {
+                        let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                        lock.app_handle.emit_all("mouse-button-pressed", no).ok();
+                    }
+                    _ => {}
+                };
+            }).ok();
+        });
+    }
 
     tauri::Builder::default()
         .setup(|app| {
@@ -942,7 +967,8 @@ fn main() -> Result<()> {
             chatgpt_save_conversation,
             chatgpt_get_api_key,
             history_get,
-            history_store
+            history_store,
+            start_terminal,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

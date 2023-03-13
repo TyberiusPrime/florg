@@ -46,6 +46,7 @@
         gst_all_1.gst-plugins-base
         gst_all_1.gst-plugins-good
         notmuch
+        xorg.libXtst # for rdev
       ];
 
       da_packages = with pkgs; [
@@ -59,6 +60,7 @@
         libsoup
         webkitgtk
         notmuch
+        xorg.libXtst # for rdev
       ];
     in rec {
       # `nix build`
@@ -91,7 +93,7 @@
         ];
         shellHook = ''
           export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH
-          export PATH=$PATH:$(pwd)/florg/node_modules/.bin/
+          export PATH=$PATH:$(pwd)/node_modules/.bin/
         '';
       };
     });

@@ -17,6 +17,8 @@
       await create_date_nodes();
     } else if (cmd == "settings") {
       await edit_settings();
+    } else if (cmd == "terminal") {
+	  await invoke("start_terminal", {folder: await invoke("get_node_folder_path", {path: get_last_path()})});
     } else if (cmd == "download_awesome_chatpgt_prompts") {
       await download_awesome_chatpgt_prompts();
     } else {
@@ -99,6 +101,7 @@
   <Picker on:action={handle_action}>
     <div slot="message"><h1>Pick a command</h1></div>
     <svelte:fragment slot="entries">
+	  <tr data-cmd="terminal"><td>Open terminal here</td></tr>
       <tr data-cmd="settings"><td>Edit settings</td></tr>
       <tr data-cmd="create_date_nodes"><td>Create date nodes</td></tr>
       <tr data-cmd="exit"><td>Exit the app</td></tr>

@@ -47,6 +47,7 @@
   let currently_edited = false;
   let overlay;
   let date_nav_target = "";
+  let search_mode;
 
   let Asciidoctor = asciidoctor();
 
@@ -199,15 +200,15 @@
     },
   });
 
- listener.register_combo({
+  listener.register_combo({
     keys: "#",
     is_unordered: true,
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
-	toast.push("hello");
-	overlay = "datenav";
-	date_nav_target = current_path;
+      toast.push("hello");
+      overlay = "datenav";
+      date_nav_target = current_path;
     },
   });
   listener.register_combo({
@@ -251,6 +252,9 @@
     on_keyup: (e, count, repeated) => {
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
       }
     },
   });
@@ -263,6 +267,9 @@
     on_keyup: (e, count, repeated) => {
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
       }
     },
   });
@@ -428,7 +435,7 @@
       date_nav_target = path.slice(1);
     } else {
       push_mode("/node/" + path);
-    overlay = "";
+      overlay = "";
     }
   }
 
@@ -488,9 +495,9 @@
         bind:path={current_path}
       />
     </div>
-    <div slot="content">
+    <div slot="content" id="content">
       {@html content_rendered}
-      {#if content_children != null}
+      {#if content_children != null && current_path != null}
         {#if content_children.length > 0}
           <h2 class="children">Children</h2>
           <table class="table_children">
@@ -517,8 +524,8 @@
           <Search
             bind:overlay
             bind:in_page_search_term
+			bind:search_mode
             on:leave
-            bind:current_path
           />
         {:else if overlay == "goto"}
           Goto node:

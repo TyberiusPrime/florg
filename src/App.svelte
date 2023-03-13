@@ -12,6 +12,8 @@
   import { error_toast } from "./lib/util.ts";
   import { onMount, onDestroy } from "svelte";
   import { emit, listen } from "@tauri-apps/api/event";
+  import { no_text_inputs_focused } from "./lib/util.ts";
+  import "./styles/tufte.css";
 
   import NodeMode from "./modes/Node.svelte";
   import NodeEdit from "./modes/NodeEdit.svelte";
@@ -47,7 +49,6 @@
     keys: "ctrl enter",
     is_unordered: false,
     prevent_repeat: true,
-    prevent_default: true,
     is_exclusive: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated) {
@@ -65,6 +66,7 @@
       }
     },
   });
+
   const routes = {
     "/": NodeMode,
     "/node/:path?": NodeMode,
@@ -110,7 +112,7 @@
 
 <svelte:body on:mouseenter={enter_focus} on:mouseleave={leave_focus} />
 
-<div >
+<div>
   <SvelteToast {options} />
   <Router {routes} />
 </div>

@@ -47,10 +47,10 @@
     keys: "h",
     is_unordered: true,
     prevent_repeat: true,
-    prevent_default: true,
     on_keyup: (e, count, repeated) => {
       if (!repeated && no_text_inputs_focused()) {
         overlay = "help";
+		e.preventDefault();
       }
     },
   });

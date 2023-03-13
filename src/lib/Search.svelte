@@ -21,7 +21,7 @@
     { key: "p", target_path: "in_page", text: "in page" },
   ];
 
-  let search_mode = "pick";
+  export let search_mode = "pick";
 
   function handle_search_action(event) {
     console.log("search action", event.detail);

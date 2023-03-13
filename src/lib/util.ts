@@ -20,7 +20,7 @@ export function format_date(date: any, br = false) {
   let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
   let hh = new Intl.DateTimeFormat("de", { hour: "numeric" }).format(date);
   let mm = new Intl.DateTimeFormat("en", { minute: "2-digit" }).format(date); */
-  let ye = pdate.getYear();
+  let ye = pdate.getFullYear();
   let mo = String(pdate.getMonth() + 1).padStart(2, "0");
   let da = String(pdate.getDay()).padStart(2, "0");
   let hh = String(pdate.getHours()).padStart(2, "0");
@@ -73,10 +73,6 @@ export async function get_node(path: string) {
 }
 
 export function isElementInViewport(el): boolean {
-  // Special bonus for those using jQuery
-  if (typeof jQuery === "function" && el instanceof jQuery) {
-    el = el[0];
-  }
 
   var rect = el.getBoundingClientRect();
   let header_height = document.getElementById("header").offsetHeight;
@@ -118,3 +114,8 @@ export const replaceAsync = async (
   const data = await Promise.all(promises);
   return str.replace(regex, () => data.shift());
 };
+
+
+export function trim_eol(multi_lines: string) {
+  return multi_lines.replace(/[ \t]+$/gm, "");
+}

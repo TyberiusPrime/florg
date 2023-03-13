@@ -1,7 +1,7 @@
 <script lang="ts">
   import { get_last_path } from "../lib/mode_stack.ts";
   import { toast } from "@zerodevx/svelte-toast";
-  import {keypress} from "keypress.js";
+  import { keypress } from "keypress.js";
   import View from "../lib/View.svelte";
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
@@ -13,6 +13,7 @@
   import Select from "svelte-select";
   import { LoadBars } from "svelte-loading-animation";
   import { onMount, onDestroy } from "svelte";
+  import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
   import { fetch, Body } from "@tauri-apps/api/http";
   import { marked } from "marked";
   import hljs from "highlight.js";
@@ -23,9 +24,11 @@
     add_code_clipboards,
     get_node,
     no_text_inputs_focused,
+	trim_eol,
   } from "../lib/util.ts";
   import DOMPurify from "dompurify";
   import SvelteTooltip from "svelte-tooltip";
+  import QuickPick from "../lib/QuickPick.svelte";
 
   const dispatch = createEventDispatcher();
   export let params;
@@ -36,6 +39,7 @@
 
   let overlay = "";
   let in_page_search_term = "";
+  let search_mode;
 
   export let input = "";
 
@@ -46,7 +50,17 @@
   let output;
   let last_input_tokens = 0;
   let processing_title = false;
-  let help_entries = [{ key: "Esc", text: "Go back" }];
+  let help_entries = [
+    { key: "Esc", text: "Go back" },
+    { key: "s", text: "Search" },
+    { key: "n/N", text: "Search forward/rev in page" },
+    { key: "c", text: "copy" },
+  ];
+  let copy_entries = [
+    { key: "c", text: "link", target_path: "link" },
+    { key: "y", text: "content", target_path: "content" },
+    { key: "t", text: "title", target_path: "title" },
+  ];
 
   var listener = new keypress.Listener();
   listener.reset();
@@ -56,8 +70,25 @@
     window.history.back();
   });
 
-  listener.simple_combo("shift enter", async () => {
-    await query_chat_gtp(input, true);
+  listener.register_combo({
+    keys: "enter",
+    prevent_repeat: true,
+	prevent_default: false,
+    is_exclusive: true,
+    on_keyup: async (e, count, repeated) => {
+	console.log("etner")
+    },
+  });
+
+
+  listener.register_combo({
+    keys: "shift enter",
+    prevent_repeat: true,
+	prevent_default: false,
+    is_exclusive: true,
+    on_keyup: async (e, count, repeated) => {
+      await query_chat_gtp(input, true);
+    },
   });
 
   listener.register_combo({
@@ -103,6 +134,9 @@
       if (no_text_inputs_focused()) {
         if (in_page_search_term != "") {
           window.find(in_page_search_term, false, false, true, false);
+        } else {
+          overlay = "search";
+          search_mode = "in_page";
         }
       }
     },
@@ -116,7 +150,22 @@
       if (no_text_inputs_focused()) {
         if (in_page_search_term != "") {
           window.find(in_page_search_term, false, false, true, false);
+        } else {
+          overlay = "search";
+          search_mode = "in_page";
         }
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "c",
+    prevent_repeat: true,
+	is_exclusive: true,
+    on_keyup: (e, count, repeated) => {
+      if (no_text_inputs_focused() && !e.ctrlKey && !e.metaKey) {
+        overlay = "copying";
+        e.preventDefault();
       }
     },
   });
@@ -239,7 +288,7 @@
         }
       }
     }
-    listener.listen();
+    //listener.listen();
     highlight_code();
   });
 
@@ -322,6 +371,40 @@
       input = node.node.raw;
     }
     console.log(convo);
+  }
+
+  async function handle_copy(ev) {
+    let mode = ev.detail;
+    console.log("copy_to_clipboard", mode);
+    let out = null;
+    if (mode == "link") {
+      out = `<<<chatgpt:${filename}>>>`;
+    } else if (mode == "content") {
+      out = "";
+      for (let i = 0; i < convo.messages.length; i++) {
+        let m = convo.messages[i];
+        if (m[0] == "input") {
+          out += "Input:\n\t" + trim_eol(m[1].replaceAll("\n", "\n\t")) + "\n\n";
+        } else if (m[0] == "output") {
+          out +=
+            "Output:\n\t" +
+            trim_eol(m[1].choices[0].message.content.replaceAll("\n", "\n\t")) +
+            "\n\n";
+        }
+      }
+    } else if (mode == "title") {
+      out = convo.title;
+    } else {
+      console.log("unknown copy_to_clipboard mode", mode);
+    }
+    if (out != null) {
+      await copy_to_clipboard(out);
+    }
+    overlay = "";
+  }
+
+  async function submit(ev) {
+      await query_chat_gtp(input, true);
   }
 </script>
 
@@ -476,28 +559,26 @@
             <td>
               <a on:click={disable_all}>Disable previous</a>
               <textarea id="input" bind:value={input} rows="10" autofocus />
-              <button> Submit</button>
+			  <button on:click={submit}> Submit</button>
             </td>
           </tr>
         </table>
       </div>
 
       <div slot="footer">
-        <Overlay
-          {listener}
-          on:overlay_leave={handle_overlay_leave}
-          bind:overlay
-        >
+        <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
           {#if overlay == "help"}
             <Help bind:entries={help_entries} />
           {:else if overlay == "search"}
-            <Search bind:overlay bind:in_page_search_term />
+            <Search bind:overlay bind:in_page_search_term bind:search_mode />
           {:else if overlay == "goto"}
             Goto node:
             <Goto on:action={handle_goto_action} />
           {:else if overlay == "new_below"}
             Create new node below
             <Goto on:action={handle_new_node_below} />
+          {:else if overlay == "copying"}
+            <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
           {:else if overlay == ""}
             Press <span class="hotkey">h</span> for help.
           {:else}

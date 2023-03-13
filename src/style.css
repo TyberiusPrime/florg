@@ -1,5 +1,4 @@
 body {
-            font-size: 1.3em;
             font-family: monospace;
            height:100%;
           }
@@ -90,8 +89,9 @@ body {
      }
 
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  /*font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
+  */
   line-height: 24px;
   font-weight: 400;
 
@@ -148,8 +148,25 @@ h1 {
   text-decoration-style: double;
   text-decoration-color: darkgrey;
   margin-top: 0px;
+  font-size:1.5em;
+  padding-left:0px;
+  margin-left:0px;
 }
-
+h2, h3 {
+  line-height: 1em;
+  text-align: left;
+  margin-left: 1em;
+  text-decoration: underline;
+  text-decoration-style: double;
+  text-decoration-color: darkgrey;
+  margin-top: 0px;
+  font-size:1.3em;
+  padding-left:0px;
+  margin-left:0px;
+}
+h3 {
+  font-size:1.0em;
+}
 input,
 button {
   border-radius: 8px;
@@ -212,9 +229,15 @@ button {
 pre,
 code {
   overflow: scroll;
-  background: #fefefe;
+  background: #eeeeee;
   padding: 5px;
+  border: 1px solid #cccccc;
   border-radius: 5px;
+}
+
+pre {
+
+	padding-left:1em;
 }
 
 pre .line {
@@ -234,6 +257,10 @@ li {
   margin-bottom: 0px;
   margin-top: 0px;
   padding-top: 0;
+}
+li p{
+	padding-left:0;
+
 }
 li p:first-child{
 	margin-top:0;
@@ -265,4 +292,23 @@ li p:first-child{
 input:focus,
 button:focus {
   border: 1px solid green;
+}
+
+
+h1  {
+}
+
+p {
+	padding-left:1em;
+}
+
+
+#content .paragraph:first-child  {
+	margin-top:0px;
+}
+
+#content .paragraph:first-child  p{
+	padding-top:0px;
+	margin-top:0px;
+
 }

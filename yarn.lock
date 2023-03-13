@@ -844,6 +844,11 @@ is-number@^7.0.0:
   resolved "https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz#7535345b896734d5f80c4d06c50955527a14f12b"
   integrity sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==
 
+keypress.js@^2.1.5:
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/keypress.js/-/keypress.js-2.1.5.tgz#38f96d1ded85f56115a0cafd9908e727bcd1b348"
+  integrity sha512-PQpeWxG6vNuTT0Gq20LyAzqSpeBWtQ6DTYIJB7JMJEetgF730Om9e6y82GdEv06o1iaJiH1hh2JpSOXK3zIAdA==
+
 kleur@^3.0.0:
   version "3.0.3"
   resolved "https://registry.yarnpkg.com/kleur/-/kleur-3.0.3.tgz#a79c9ecc86ee1ce3fa6206d1216c501f147fc07e"

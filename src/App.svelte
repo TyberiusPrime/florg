@@ -3,7 +3,8 @@
   import { SvelteToast } from "@zerodevx/svelte-toast";
   import { WebviewWindow as www } from "@tauri-apps/api/window";
   //this is global..,
-  import * as KeyPress from "./js/keypress-2.1.5.min.js";
+  //#import * as KeyPress from "./js/keypress-2.1.5.min.js";
+  import {keypress} from "keypress.js";
   import Router from "svelte-spa-router";
   import { location, querystring } from "svelte-spa-router";
   import { set_mode_ignore_enter } from "./lib/mode_stack.ts";
@@ -26,8 +27,9 @@
     pausable: true,
     duration: 10000,
   };
+  console.log(keypress);
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
 
   listener.register_combo({
     keys: "f5",

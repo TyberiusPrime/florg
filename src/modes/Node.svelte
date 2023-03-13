@@ -4,6 +4,7 @@
     replace as replace_mode,
   } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
+  import {keypress} from "keypress.js";
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -133,7 +134,7 @@
     return "";
   }
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
 
   listener.register_combo({
     keys: "h",

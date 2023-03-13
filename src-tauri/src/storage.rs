@@ -41,12 +41,14 @@ pub const FLORG_CACHE_FILENAME: &'static str = "node.cache";
 pub const FLORG_SUFFIX: &'static str = ".adoc";
 
 impl Storage {
+    fn get_chatgtp_key(settings: &toml_edit::Document) -> Option<String> {
+        settings.get("chatgpt")?.get("api_key")?.as_str().map(|x| x.to_string())
+    }
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
             Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
         //todo: make this robust
-        let chatgpt = settings["chatgpt"]["api_key"]
-            .as_str()
+        let chatgpt =  Storage::get_chatgtp_key(&settings)
             .map(|s| openai::ChatGPT::new(s.to_string(), data_path.clone()));
 
         let mut s = Storage {
@@ -65,8 +67,8 @@ impl Storage {
         self.nodes = nodes;
         let settings =
             Self::load_settings(&self.data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
-        let chatgpt = settings["chatgpt"]["api_key"]
-            .as_str()
+
+        let chatgpt =  Storage::get_chatgtp_key(&settings)
             .map(|s| openai::ChatGPT::new(s.to_string(), self.data_path.clone()));
         self.settings = settings;
         self.chatgpt = chatgpt;

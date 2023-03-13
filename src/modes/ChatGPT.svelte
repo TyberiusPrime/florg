@@ -1,6 +1,7 @@
 <script lang="ts">
   import { get_last_path } from "../lib/mode_stack.ts";
   import { toast } from "@zerodevx/svelte-toast";
+  import {keypress} from "keypress.js";
   import View from "../lib/View.svelte";
   import Overlay from "../lib/Overlay.svelte";
   import Help from "../lib/Help.svelte";
@@ -47,7 +48,7 @@
   let processing_title = false;
   let help_entries = [{ key: "Esc", text: "Go back" }];
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

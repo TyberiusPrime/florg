@@ -1,0 +1,7 @@
+[Desktop Entry]
+Categories=Development;
+Exec=florg
+Icon=florg
+Name=florg
+Terminal=false
+Type=Application

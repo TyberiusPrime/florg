@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { createEventDispatcher } from "svelte";
+  import {keypress} from "keypress.js";
   const dispatch = createEventDispatcher();
   import { no_text_inputs_focused } from "../lib/util.ts";
   import { overlay_handles_escape } from "../lib/mode_stack.ts";
@@ -15,7 +16,7 @@
     handle_esc = value;
   });
 
-  var listener_overlay = new window.keypress.Listener();
+  var listener_overlay = new keypress.Listener();
   listener_overlay.simple_combo("esc", () => {
     if (handle_esc) {
       dispatch("leave", {});

@@ -4,8 +4,8 @@
   import Flatpickr from "svelte-flatpickr";
   import "flatpickr/dist/flatpickr.css";
   import { createEventDispatcher } from "svelte";
+  import {keypress} from "keypress.js";
   const dispatch = createEventDispatcher();
-  import * as KeyPress from "../js/keypress-2.1.5.min.js";
 
   export let message = "";
   export let action = "";
@@ -13,7 +13,7 @@
   let natural_date_input = "";
   let output_date = "";
   let date_input;
-var listener_date = new window.keypress.Listener();
+var listener_date = new keypress.Listener();
   listener_date.reset();
   listener_date.stop_listening();
 

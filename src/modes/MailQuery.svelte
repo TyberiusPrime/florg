@@ -4,6 +4,7 @@
     replace as replace_mode,
   } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
+  import {keypress} from "keypress.js";
   import Picker from "../lib/Picker.svelte";
   import { format_date, removeItemOnce, error_toast } from "../lib/util.ts";
   import { toast } from "@zerodevx/svelte-toast";
@@ -17,7 +18,7 @@
   let mail = [];
   let more_mail = false;
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

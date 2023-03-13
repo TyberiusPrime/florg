@@ -1,4 +1,5 @@
 <script lang="ts">
+  import {keypress} from "keypress.js";
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
   import { get_last_path } from "../lib/mode_stack.ts";
@@ -33,7 +34,7 @@
     { key: "c", text: "copy menu" },
   ];
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

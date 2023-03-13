@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { createEventDispatcher } from "svelte";
+  import {keypress} from "keypress.js";
   import { onMount, onDestroy } from "svelte";
   const dispatch = createEventDispatcher();
 
@@ -8,7 +9,7 @@
   export let text = "";
   export let entries = "";
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { get_node, no_text_inputs_focused } from "../lib/util.ts";
+  import {keypress} from "keypress.js";
   import { onMount, onDestroy } from "svelte";
 
   import View from "../lib/View.svelte";
@@ -21,7 +22,7 @@
     { key: "Space", text: "Open current node" },
     { key: "Enter", text: "Open&Edit current node" },
   ];
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

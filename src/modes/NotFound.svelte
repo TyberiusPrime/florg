@@ -1,7 +1,9 @@
 <script lang="ts">
+
+  import {keypress} from "keypress.js";
   export let params;
 
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.register_combo({
     keys: "esc",
     is_unordered: true,

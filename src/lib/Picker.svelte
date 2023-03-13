@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
+  import {keypress} from "keypress.js";
   import * as chrono from "chrono-node";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
@@ -22,7 +23,7 @@
   let last_text = "";
   let test_text = "shu";
   let downstream_elements = [];
-  var listener = new window.keypress.Listener();
+  var listener = new keypress.Listener();
   listener.reset();
   listener.stop_listening();
 

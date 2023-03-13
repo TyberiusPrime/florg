@@ -86,6 +86,8 @@
           pkgs.cargo-tauri
           pkgs.yarn
           pkgs.nodejs-19_x
+          pkgs.dpkg
+          pkgs.tree
         ];
         shellHook = ''
           export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH

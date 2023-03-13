@@ -86,7 +86,6 @@
   const urlParams = new URLSearchParams(window.location.search);
   let mode = urlParams.get("mode") || "node";
 
-
   const unlisten_mouse_button_pressed = listen(
     "mouse-button-pressed",
     async (event) => {

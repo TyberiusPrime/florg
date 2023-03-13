@@ -5,7 +5,7 @@
   import "flatpickr/dist/flatpickr.css";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
-  import * as KeyPress from "../js/keypress-2.1.5.min.js";
+  import { keypress } from "keypress.js";
 
   export let message = "";
   export let action = "";
@@ -63,9 +63,13 @@
         natural_date_input = "tomorrow";
         parse_text_do_date();
       }
-    } else if (ev.key == "Enter" && natural_date_input == "") {
-      natural_date_input = "today";
-      parse_text_do_date();
+    } else if (ev.key == "Enter") {
+      if (natural_date_input == "") {
+        natural_date_input = "today";
+        parse_text_do_date();
+      } else {
+        handleSubmit(null);
+      }
     } else if (ev.key == "Escape") {
       cancel_date_select();
     } else {
@@ -74,7 +78,7 @@
   }
 
   function cancel_date_select() {
-    dispatch("date_chosen", { action: null });
+    dispatch("cancel", { action: null });
   }
 
   function handleSubmit(ev) {

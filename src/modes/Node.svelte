@@ -8,6 +8,7 @@
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
+  import { querystring } from "svelte-spa-router";
 
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
@@ -32,6 +33,7 @@
   import Search from "../lib/Search.svelte";
   import Goto from "../lib/Goto.svelte";
   import MailQueries from "../lib/MailQueries.svelte";
+  import DatePicker from "../lib/DatePicker.svelte";
 
   export let params = {};
   console.log("path", params.path);
@@ -44,6 +46,7 @@
   let current_path = "";
   let currently_edited = false;
   let overlay;
+  let date_nav_target = "";
 
   let Asciidoctor = asciidoctor();
 
@@ -113,7 +116,7 @@
     if (rendered_cached == null) {
       let start_time = performance.now();
 
-	  content_rendered = await render_text(content_text);
+      content_rendered = await render_text(content_text);
 
       let end_time = performance.now();
       if (end_time - start_time > 100) {
@@ -196,6 +199,17 @@
     },
   });
 
+ listener.register_combo({
+    keys: "#",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: async (e, count, repeated) => {
+	toast.push("hello");
+	overlay = "datenav";
+	date_nav_target = current_path;
+    },
+  });
   listener.register_combo({
     keys: "backspace",
     is_unordered: true,
@@ -344,7 +358,6 @@
 
   onMount(async () => {
     listener.listen();
-    overlay = "";
   });
 
   //this is an event from rust
@@ -404,15 +417,19 @@
       });
       path = prefix + date_suffix;
     } else if (path.startsWith("#")) {
-      //TODO
     }
     return path;
   }
 
   async function handle_goto_action(ev) {
     let path = await parse_path(ev.detail);
-    push_mode("/node/" + path);
+    if (path.startsWith("#")) {
+      overlay = "datenav";
+      date_nav_target = path.slice(1);
+    } else {
+      push_mode("/node/" + path);
     overlay = "";
+    }
   }
 
   async function handle_new_node_below(ev) {
@@ -443,6 +460,20 @@
     if (out != null) {
       await copy_to_clipboard(out);
     }
+    overlay = "";
+  }
+
+  async function handle_date_nav_chosen(ev) {
+    let date_suffix = await invoke("date_to_path", {
+      dateStr: ev.detail.date,
+    });
+    let path = date_nav_target + date_suffix;
+    if (date_nav_target == current_path) {
+      push_mode("/node/" + path);
+    } else {
+      replace_mode("/node/" + path);
+    }
+
     overlay = "";
   }
 </script>
@@ -499,6 +530,9 @@
           <MailQueries />
         {:else if overlay == "copying"}
           <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+        {:else if overlay == "datenav"}
+          Datenav:
+          <DatePicker on:date_chosen={handle_date_nav_chosen} />
         {:else if overlay == ""}
           <div on:click={show_help}>
             Press <span class="hotkey">h</span> for help.

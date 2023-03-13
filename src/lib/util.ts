@@ -34,20 +34,22 @@ export function format_date(date: any, br = false) {
 }
 
 export function add_code_clipboards() {
+	window.setTimeout( () => {
   for (let tag of ["code", "pre", "p"]) {
     const codeBlocks = document.getElementsByTagName(tag);
 
-    for (let i = 0; i < codeBlocks.length; i++) {
+	for (let block of codeBlocks) {
       const copyButton = document.createElement("button");
       copyButton.classList.add("copy-button");
       copyButton.innerText = "📋";
       copyButton.onclick = async () => {
-        await writeText(codeBlocks[i].innerText);
+        await writeText(block.innerText);
       };
-      codeBlocks[i].parentElement.style.position = "relative";
-      codeBlocks[i].parentElement.appendChild(copyButton);
+      block.parentElement.style.position = "relative";
+      block.parentElement.appendChild(copyButton);
     }
   }
+	}, 10);
 }
 
 export function escape_html(html: string) {

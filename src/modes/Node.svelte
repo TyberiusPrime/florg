@@ -483,6 +483,8 @@
 
     overlay = "";
   }
+
+
 </script>
 
 <div>
@@ -524,7 +526,7 @@
           <Search
             bind:overlay
             bind:in_page_search_term
-			bind:search_mode
+            bind:search_mode
             on:leave
           />
         {:else if overlay == "goto"}

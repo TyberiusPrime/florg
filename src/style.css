@@ -230,13 +230,11 @@ pre,
 code {
   overflow: scroll;
   background: #eeeeee;
-  padding: 5px;
   border: 1px solid #cccccc;
   border-radius: 5px;
 }
 
 pre {
-
 	padding-left:1em;
 }
 
@@ -311,4 +309,40 @@ p {
 	padding-top:0px;
 	margin-top:0px;
 
+}
+
+pre 
+{
+	border: 1px solid blue !important;
+	margin-left:1em !important;
+	padding-top:.25em;
+	padding-bottom:.25em;
+}
+
+pre .hljs {
+	padding-top:0;
+	padding-bottom:0;
+	padding:0 !important;
+	background-color:#eeeeee;
+	margin:0;
+	border:0px;
+}
+
+.focused::before {
+	content: ">";
+	float:left;
+    background-color: #f8f8f8;
+	margin-top:.28em;
+  }
+
+
+.copy-button {
+	display:none;
+}
+.copy-button:hover {
+	display:block;
+}
+
+p:hover + .copy-button, pre:hover + .copy-button  {
+	display:block;
 }

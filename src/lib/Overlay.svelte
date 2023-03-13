@@ -12,7 +12,6 @@
   let handle_esc = true;
 
   overlay_handles_escape.subscribe((value) => {
-	  console.log(`overlay_handles_escape set to ${value}`);
     handle_esc = value;
   });
 

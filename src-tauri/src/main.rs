@@ -117,6 +117,12 @@ fn get_node(path: &str) -> NodeForJS {
     }
 }
 #[tauri::command]
+fn get_node_title(path: &str) -> Option<String> {
+    let s = STORAGE.get().unwrap().lock().unwrap();
+    s.get_node(path).map(|x| x.header.title.clone())
+}
+
+#[tauri::command]
 fn change_node_text(path: &str, text: &str) {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
@@ -227,8 +233,10 @@ fn edit_node(path: &str) -> bool {
                                 }
                             }
                         }
-                        dbg!(event);
-                        dbg!(&tf_name_for_thread);
+                        //dbg!(event);
+                        //http://localhost:1420/#/node/T
+                        //http://localhost:1420/#T
+                        //dbg!(&tf_name_for_thread);
                         // Handle event
                     }
                 }
@@ -924,7 +932,8 @@ fn main() -> Result<()> {
                     }
                     _ => {}
                 };
-            }).ok();
+            })
+            .ok();
         });
     }
 
@@ -939,6 +948,7 @@ fn main() -> Result<()> {
             edit_node,
             change_node_text,
             get_node,
+            get_node_title,
             get_node_folder_path,
             list_open_paths,
             date_to_path,

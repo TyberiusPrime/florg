@@ -105,3 +105,16 @@ export function removeItemOnce(arr, value) {
   }
   return arr;
 }
+export const replaceAsync = async (
+  str: string,
+  regex: RegExp,
+  asyncFn: (match: any, ...args: any) => Promise<any>,
+) => {
+  const promises: Promise<any>[] = [];
+  str.replace(regex, (match, ...args) => {
+    promises.push(asyncFn(match, args));
+    return match;
+  });
+  const data = await Promise.all(promises);
+  return str.replace(regex, () => data.shift());
+};

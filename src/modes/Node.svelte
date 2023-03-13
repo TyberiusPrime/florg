@@ -4,7 +4,7 @@
     replace as replace_mode,
   } from "svelte-spa-router";
   import { invoke } from "@tauri-apps/api/tauri";
-  import {keypress} from "keypress.js";
+  import { keypress } from "keypress.js";
   import { onMount, onDestroy } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -12,7 +12,12 @@
   import asciidoctor from "asciidoctor";
   import hljs from "highlight.js";
   import "../styles/highlight.js/github.css";
-  import { add_code_clipboards, get_node, iso_date } from "../lib/util.ts";
+  import {
+    add_code_clipboards,
+    get_node,
+    iso_date,
+    replaceAsync,
+  } from "../lib/util.ts";
   import {
     set_last_path,
     check_and_reset_mode_ignore_enter,
@@ -70,6 +75,29 @@
     { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
 
+  async function render_text(text) {
+    let rendered = Asciidoctor.convert(text, {
+      attributes: {
+        doctype: "article",
+        showtitle: true,
+        "source-highlighter": "highlight.js",
+        "highlightjs-languages": "rust, swift",
+      },
+    });
+    rendered = rendered.replace(/<a/g, '<a target="_blank"');
+    rendered = await replaceAsync(
+      rendered,
+      /<a target="_blank" href="#([A-Z]+)">[[A-Z]+]/g,
+      async (match, args) => {
+        let path = args[0];
+        let title = await invoke("get_node_title", { path });
+        return `<a href="#/node/${path}">${path}:${title}`;
+      }
+    );
+
+    return rendered;
+  }
+
   async function load_node(path) {
     //console.log("load node", path);
     let node = await get_node(path);
@@ -84,14 +112,9 @@
     let rendered_cached = await invoke("get_cached_node", { path });
     if (rendered_cached == null) {
       let start_time = performance.now();
-      content_rendered = Asciidoctor.convert(content_text, {
-        attributes: {
-          doctype: "article",
-          showtitle: true,
-          "source-highlighter": "highlight.js",
-          "highlightjs-languages": "rust, swift",
-        },
-      });
+
+	  content_rendered = await render_text(content_text);
+
       let end_time = performance.now();
       if (end_time - start_time > 100) {
         // probably just as fast to not cache...
@@ -144,13 +167,13 @@
     on_keyup: (e, count, repeated) => {
       console.log("listener h");
       if (!repeated) {
-		  show_help();
+        show_help();
       }
     },
   });
 
   function show_help() {
-        overlay = "help";
+    overlay = "help";
   }
 
   listener.register_combo({
@@ -347,14 +370,7 @@
       console.log("node temp-changed", event.payload[0]);
       if (event.payload[0] == current_path) {
         content_text = event.payload[1];
-        content_rendered = Asciidoctor.convert(content_text, {
-          attributes: {
-            doctype: "article",
-            showtitle: true,
-            "source-highlighter": "highlight.js",
-            "highlightjs-languages": "rust, swift",
-          },
-        });
+        content_rendered = await render_text(content_text);
       }
     }
   );
@@ -443,18 +459,24 @@
     </div>
     <div slot="content">
       {@html content_rendered}
-	  {#if content_children != null}
-	  {#if content_children.length > 0}
-	  <h2 class="children">Children</h2>
-	  <table class="table_children">
-	  {#each content_children as child}
-		<tr><td><a href="#/node/{current_path}{child.key}">{current_path.toLowerCase()}{child.key}</a></td><td>{child.text}</td></tr>
-	  {/each}
-	  </table>
-	  {:else}
-	  <h2 class="children">No children</h2>
-	  {/if}
-	  {/if}
+      {#if content_children != null}
+        {#if content_children.length > 0}
+          <h2 class="children">Children</h2>
+          <table class="table_children">
+            {#each content_children as child}
+              <tr
+                ><td
+                  ><a href="#/node/{current_path}{child.key}"
+                    >{current_path.toLowerCase()}{child.key}</a
+                  ></td
+                ><td>{child.text}</td></tr
+              >
+            {/each}
+          </table>
+        {:else}
+          <h2 class="children">No children</h2>
+        {/if}
+      {/if}
     </div>
     <div slot="footer">
       <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
@@ -478,9 +500,9 @@
         {:else if overlay == "copying"}
           <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
         {:else if overlay == ""}
-		  <div on:click={show_help}>
-          Press <span class="hotkey">h</span> for help.
-		  </div>
+          <div on:click={show_help}>
+            Press <span class="hotkey">h</span> for help.
+          </div>
         {:else}
           Unknown overlay: {overlay}
         {/if}
@@ -494,18 +516,17 @@
 </div>
 
 <style>
-.children {
-font-size:1em;
-padding-bottom:0;
-margin-bottom:0;
-
-}
-.table_children {
-margin:0;
-border-collapse:collapse;
-}
-.table_children td {
-border:1px solid grey;
-padding:0.5em;
-}
+  .children {
+    font-size: 1em;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  .table_children {
+    margin: 0;
+    border-collapse: collapse;
+  }
+  .table_children td {
+    border: 1px solid grey;
+    padding: 0.5em;
+  }
 </style>

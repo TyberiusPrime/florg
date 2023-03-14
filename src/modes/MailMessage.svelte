@@ -95,7 +95,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: async (e, count, repeated) => {
-      if (message_tags.indexOf("attachment") != -1) {
+      if (message.tags.indexOf("attachment") != -1) {
         if (
           await invoke("mail_message_store_attachments", {
             id: message_id,
@@ -324,20 +324,21 @@
 
   async function handle_tag(ev) {
     let tag = ev.detail;
-    if (message_tags.indexOf(tag) == -1) {
+    if (message.tags.indexOf(tag) == -1) {
       await invoke("mail_message_add_tags", {
-        id: message_id,
+        id: message.id,
         tags: [tag],
       });
-      message_tags.push(tag);
+      message.tags.push(tag);
     } else {
       await invoke("mail_message_remove_tags", {
-        id: message_id,
+        id: message.id,
         tags: [tag],
       });
-      removeItemOnce(message_tags, tag);
+      removeItemOnce(message.tags, tag);
     }
-    message_tags = message_tags;
+	message = message;
+	params.message_id = params.message_id;
     overlay = "";
   }
 

@@ -24,6 +24,7 @@
 
   async function register_tag_keys() {
     let te = await invoke("mail_get_tags", {});
+	console.log(te);
     if (te != null) {
       for (let key in te) {
         console.log("registering meta " + key);
@@ -34,6 +35,7 @@
           on_keyup: async (e, count, repeated) => {
             console.log("key", key);
             await toggle_tag(te[key]);
+			console.log("toggled");
           },
         });
       }
@@ -80,7 +82,9 @@
       }
       console.log(target);
       console.log(thread);
-    }
+	} else {
+	error_toast("what");
+	}
     mail = mail;
   }
 
@@ -159,11 +163,12 @@
       return "thread:" + entry.id;
     }
   }
+  register_tag_keys();
 </script>
 
 <div>
-  {#await register_tag_keys}{/await}
-  {#await get_mail(params.query) then [view_mode, mail, more_mail]}
+  {#await get_mail(params.query) then [vm, mail, more_mail]}
+  {view_mode = vm}
     <Picker on:action={handle_action} bind:focused>
       <div slot="message">
         <h1>Mail result</h1>

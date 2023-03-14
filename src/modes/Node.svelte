@@ -36,7 +36,6 @@
   import DatePicker from "../lib/DatePicker.svelte";
 
   export let params = {};
-  console.log("path", params.path);
 
   let content_text = "";
   let content_rendered = "";

@@ -31,7 +31,6 @@
     pausable: true,
     duration: 10000,
   };
-  console.log(keypress);
 
   var listener = new keypress.Listener();
 

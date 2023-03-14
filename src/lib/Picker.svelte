@@ -226,7 +226,6 @@
 
 <div on:keyup={handle_text_change}>
   {input_text}
-  {focused}
   <View>
     <div slot="header">
       <slot name="message" />

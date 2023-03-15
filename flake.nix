@@ -90,6 +90,7 @@
           pkgs.nodejs-19_x
           pkgs.dpkg
           pkgs.tree
+          pkgs.nodePackages.typescript-language-server
         ];
         shellHook = ''
           export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH

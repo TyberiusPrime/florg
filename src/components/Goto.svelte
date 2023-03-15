@@ -8,6 +8,7 @@
   const dispatch = createEventDispatcher();
 
   export let action = null;
+  export let overlay;
 
   async function get_entries() {
     let entries = [];
@@ -45,7 +46,9 @@
     if (action != null) {
       action(path);
     } else {
+	  overlay = "";
       goto_node(path);
+
     }
   }
 </script>

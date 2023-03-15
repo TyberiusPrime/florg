@@ -38,9 +38,11 @@
 		"chrono-node": "^2.6.1",
 		"csv-parse": "^5.3.6",
 		"fzf": "^0.5.1",
+		"highlight.js": "^11.7.0",
 		"html2plaintext": "^2.1.4",
 		"keypress.js": "^2.1.5",
 		"postal-mime": "^1.0.15",
+		"svelte-select": "^5.5.2",
 		"svelte-tooltip": "^1.2.0"
 	}
 }

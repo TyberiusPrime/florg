@@ -347,17 +347,6 @@
     return path;
   }
 
-  async function handle_goto_action(ev) {
-    let path = await parse_path(ev.detail);
-    if (path.startsWith("#")) {
-      overlay = "datenav";
-      date_nav_target = path.slice(1);
-    } else {
-      goto("/node/" + path);
-      overlay = "";
-    }
-  }
-
   let handle_new_node_below = async (path) => {
     let ppath = await parse_path(path);
     console.log(ppath);
@@ -402,6 +391,8 @@
 
     overlay = "";
   }
+  beforeUpdate( () => {
+  });
 
   afterUpdate(() => {
     apply_mods();
@@ -447,7 +438,7 @@
             on:leave
           />
         {:else if overlay == "goto"}
-          <Goto on:action={handle_goto_action} />
+		  <Goto bind:overlay={overlay} />
         {:else if overlay == "new_below"}
           Create new node below
           <Goto bind:action={handle_new_node_below} />

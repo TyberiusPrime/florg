@@ -5,6 +5,7 @@
   import QuickPick from "$lib/../components/QuickPick.svelte";
   import { onMount, onDestroy } from "svelte";
   import { goto_node } from "$lib/../components/Goto.ts";
+  import { toast } from "@zerodevx/svelte-toast";
   const dispatch = createEventDispatcher();
 
   export let action = null;
@@ -13,19 +14,26 @@
   async function get_entries() {
     let entries = [];
     let nav = await invoke("get_nav", {});
+	if (nav == null) {
+		toast.push("Could not read [nav] from settings. Please check your settings.toml");
+		overlay = "";
+		return;
+	}
     for (let key in nav) {
       let target_path = nav[key];
       let query_path = target_path;
       if (query_path.startsWith("#") || query_path.startsWith("!")) {
         query_path = query_path.slice(1);
       }
-      let node = await get_node(query_path);
-      let text = target_path + " ";
-      if (node.node != null) {
-        text += node.node.header.title;
-      } else {
-        text += " (empty node)";
-      }
+	  let text = target_path ;
+	  if (!query_path.startsWith("mail")) {
+		  let node = await get_node(query_path);
+		  if (node.node != null) {
+			text += " " + node.node.header.title;
+		  } else {
+			text += " (empty node)";
+		  }
+	  }
       entries.push({
         key: key,
         target_path: target_path,

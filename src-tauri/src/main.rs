@@ -139,6 +139,14 @@ fn get_node_folder_path(path: &str) -> String {
 }
 
 #[tauri::command]
+fn delete_node(path: &str) -> Result<(), String> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    s.delete_node(path)?;
+    Ok(())
+    }
+
+
+#[tauri::command]
 fn edit_node(path: &str) -> bool {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -950,6 +958,7 @@ fn main() -> Result<()> {
             get_node,
             get_node_title,
             get_node_folder_path,
+            delete_node,
             list_open_paths,
             date_to_path,
             create_calendar,

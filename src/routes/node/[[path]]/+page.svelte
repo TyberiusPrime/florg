@@ -6,6 +6,7 @@
   import { emit, listen } from "@tauri-apps/api/event";
   import { add_code_clipboards } from "$lib/util.ts";
   import { goto, invalidateAll } from "$app/navigation";
+  import { toast } from "@zerodevx/svelte-toast";
   import {
     set_last_path,
     check_and_reset_mode_ignore_enter,
@@ -54,6 +55,9 @@
     { key: "p", text: "node folder path", target_path: "path" },
     { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
+
+  let delete_entries = [{ key: "d", text: "delete node & children" }];
+
   function apply_mods() {
     document.querySelectorAll("pre code").forEach((el) => {
       hljs.highlightElement(el);
@@ -206,25 +210,6 @@
   });
 
   listener.register_combo({
-    keys: "p",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      goto("/palette");
-    },
-  });
-
-  listener.register_combo({
-    keys: "o",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      goto("/chatgpt_picker");
-    },
-  });
-  listener.register_combo({
     keys: "i",
     is_unordered: true,
     prevent_default: true,
@@ -255,6 +240,15 @@
         });
         goto("/node/" + next_empty + "?edit=true");
       }
+    },
+  });
+
+  listener.register_combo({
+    keys: "d",
+    prevent_default: true,
+    prevent_repeat: false,
+    on_release: (e, count, repeated) => {
+      overlay = "delete";
     },
   });
 
@@ -391,13 +385,24 @@
 
     overlay = "";
   }
-  beforeUpdate( () => {
-  });
+  beforeUpdate(() => {});
 
   afterUpdate(() => {
     apply_mods();
     set_last_path(data.path);
   });
+
+  function handle_delete(ev) {
+    invoke("delete_node", { path: data.path })
+      .then(() => {
+        toast.push("node deleted");
+        goto("/node/" + data.path.slice(0,-1));
+      })
+      .catch((e) => {
+        toast.push(`Error ${e}`);
+      });
+    overlay = "";
+  }
 </script>
 
 <div>
@@ -405,7 +410,11 @@
     <div slot="header">
       <TopTree bind:data />
     </div>
-    <div slot="content" id="content">
+    <div
+      slot="content"
+      id="content"
+      class={data.currently_edited ? "edited" : ""}
+    >
       {@html data.rendered}
       {#if data.children != null && data.path != null}
         {#if data.children.length > 0}
@@ -438,17 +447,17 @@
             on:leave
           />
         {:else if overlay == "goto"}
-		  <Goto bind:overlay={overlay} />
+          <Goto bind:overlay />
         {:else if overlay == "new_below"}
           Create new node below
           <Goto bind:action={handle_new_node_below} />
-        {:else if overlay == "mail_queries"}
-          <MailQueries />
         {:else if overlay == "copying"}
           <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
         {:else if overlay == "datenav"}
           Datenav:
           <DatePicker on:date_chosen={handle_date_nav_chosen} />
+        {:else if overlay == "delete"}
+          <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
         {:else if overlay == ""}
           <div on:click={show_help}>
             Press <span class="hotkey">h</span> for help.
@@ -477,5 +486,9 @@
   .table_children td {
     border: 1px solid grey;
     padding: 0.5em;
+  }
+
+  .edited {
+    background-color: #ffafa8;
   }
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SvelteToast } from "@zerodevx/svelte-toast";
+  import { SvelteToast, toast } from "@zerodevx/svelte-toast";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
   import { emit, listen } from "@tauri-apps/api/event";
   import { goto } from "$app/navigation";
@@ -18,6 +18,10 @@
       }
     }
   );
+  const unlisten_message = listen("message", async (event) => {
+    toast.push(event.payload);
+  });
+
   let has_focus = false;
   function enter_focus() {
     has_focus = true;
@@ -70,21 +74,35 @@
     prevent_default: false,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-	if (no_text_inputs_focused()) {
-      goto("/chatgpt");
-	  ev.preventDefault();
-	  }
+      if (no_text_inputs_focused()) {
+        goto("/chatgpt");
+        e.preventDefault();
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "p",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      goto("/palette");
     },
   });
 
   listener.listen();
 
-  onDestroy(() => {
-	listener.stop_listening();
-	unlisten_mouse_button_pressed();
+  onDestroy(async () => {
+    listener.stop_listening();
+    (await unlisten_mouse_button_pressed)();
+    (await unlisten_message)();
   });
 </script>
 
 <svelte:body on:mouseenter={enter_focus} on:mouseleave={leave_focus} />
 <SvelteToast bind:options={toast_options} />
 <slot />
+<div>
+  {window.location.href}
+</div>

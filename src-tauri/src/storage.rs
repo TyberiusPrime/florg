@@ -131,6 +131,15 @@ impl Storage {
         self.nodes.iter().filter(|n| n.path == path).next()
     }
 
+    pub (crate) fn delete_node(&mut self, path: &str) -> Result<(), String> {
+        let node = self.get_node(path).ok_or("node not found")?;
+        let file_path = node.dirname(&self.data_path);
+        std::fs::remove_dir_all(file_path).map_err(|e| e.to_string())?;
+        self.add_and_commit(&format!("Deleted node {path} and children"));
+        self.nodes.retain(|n| !n.path.starts_with(path));
+        Ok(())
+    }
+
     pub(crate) fn levels(&self, path: &str) -> Vec<(String, String)> {
         let mut res = Vec::new();
         let mut p = path.to_owned();

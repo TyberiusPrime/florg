@@ -3,6 +3,7 @@
   import QuickPick from "$lib/../components/QuickPick.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
   import Help from "$lib/../components/Help.svelte";
+  import Search from "$lib/../components/Search.svelte";
   import Goto from "$lib/../components/Goto.svelte";
   import {
     format_date,
@@ -20,12 +21,16 @@
   let query = data.query;
   let focused = 0;
   let overlay = "";
+  let search_mode;
+  let in_page_search_term;
 
   let help_entries = [
     { key: "Esc", text: "Go back" },
     { key: "t", text: "toggle tag" },
     { key: "m", text: "mark read" },
     { key: "c", text: "copy" },
+    { key: "s", text: "search" },
+    { key: "n/N", text: "in page search" },
   ];
   let copy_entries = [{ key: "c", text: "link", target_path: "link" }];
   let tag_entries = Object.keys(data.tags).map((key) => {
@@ -53,6 +58,45 @@
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
         overlay = "tags";
+      }
+    },
+  });
+  listener.register_combo({
+    keys: "s",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      overlay = "search";
+    },
+  });
+
+  listener.register_combo({
+    keys: "n",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "shift n",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
       }
     },
   });
@@ -120,8 +164,8 @@
         id: mail_id,
       });
       if (msg != null) {
-	  console.log(mail_id);
-	  console.log(encodeURIComponent(mail_id));
+        console.log(mail_id);
+        console.log(encodeURIComponent(mail_id));
         goto("/mail/message/" + encodeURIComponent(mail_id));
       } else {
         toast.push('<span class="error">Error: Could not load email</span>');
@@ -220,7 +264,11 @@
     {#each data.messages as el, index}
       {#if data.mode == "threads"}
         <tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
-          <td class="index">{index}</td>
+          <td class="index">{index}
+		  {#if el.tags.indexOf("flagged") > -1}
+		  <b class="flagged">★</b>
+		  {/if}
+		  </td>
           <td class="unread_count">
             {#if count_unread(el) > 0}
               <span class="new">{count_unread(el)}/{el.messages.length}</span>
@@ -237,7 +285,7 @@
               <div class="from">{el.authors}</div>
             </div>
             {#each el.tags as tag}
-			  <div class="tags {tag_class(tag)}">
+              <div class="tags {tag_class(tag)}">
                 {tag}
               </div>
             {/each}
@@ -254,7 +302,7 @@
               <div class="from">{el.from}</div>
             </div>
             {#each el.tags as tag}
-			  <div class="tags {tag_class(tag)}">
+              <div class="tags {tag_class(tag)}">
                 {tag}
               </div>
             {/each}
@@ -272,7 +320,14 @@
       {:else if overlay == "copying"}
         <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
       {:else if overlay == "goto"}
-        <Goto />
+        <Goto bind:overlay/>
+      {:else if overlay == "search"}
+        <Search
+          bind:overlay
+          bind:in_page_search_term
+          bind:search_mode
+          on:leave
+        />
       {:else if overlay == ""}
         Press <span class="hotkey">h</span> for help.
       {:else}
@@ -344,5 +399,10 @@
 
   tr:nth-child(odd) {
     background-color: #feffee;
+  }
+
+  .flagged {
+  color:red;
+  font-size:1.5em;
   }
 </style>

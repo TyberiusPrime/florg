@@ -5,7 +5,11 @@
   import View from "$lib/../components/View.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
   import Help from "$lib/../components/Help.svelte";
-  import { format_date, add_code_clipboards, no_text_inputs_focused	 } from "../../../lib/util.ts";
+  import {
+    format_date,
+    add_code_clipboards,
+    no_text_inputs_focused,
+  } from "../../../lib/util.ts";
   import Select from "svelte-select";
   import { LoadBars } from "svelte-loading-animation";
   import { keypress } from "keypress.js";
@@ -204,6 +208,7 @@
     //return
     if (record_in_convo) {
       data.messages.push(["input", input]);
+      data = data;
     }
 
     let args = {
@@ -227,6 +232,9 @@
       response = await fetch(url, args);
     } catch (err) {
       data.messages.push(["error", "Error: " + err]);
+      console.log(err);
+      processing = false;
+      return;
     }
     if (!response.ok) {
       data.messages.push([
@@ -254,7 +262,8 @@
 
   onMount(async () => {
     let p = await invoke("chatgpt_get_prompts", {});
-    /*items.length = 0;
+    items.length = 0;
+    //prompt items
     for (let outer_key in p) {
       for (let inner_key in p[outer_key]) {
         items.push({
@@ -267,13 +276,12 @@
         }
       }
     }
-	*/
     //listener.listen();
     highlight_code();
-	document.getElementById("input").scrollIntoView({
-		behavior: "smooth",
-		block: "end",
-	});
+    document.getElementById("input").scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
   });
 
   function highlight_code() {
@@ -417,7 +425,7 @@
             on:change={set_prompt}
             placeholder=" Replace prompt"
           />
-          <textarea id="prompt" bind:value={prompt} rows="5"  />
+          <textarea id="prompt" bind:value={prompt} rows="5" />
         </td>
       </tr>
       {#each data.messages as message, index}
@@ -484,7 +492,7 @@
             >
           {:else}
             <tr
-			  ><td></td><td>
+              ><td /><td>
                 <SvelteTooltip color="#DFDFDF;border:1px dashed grey;">
                   <div slot="custom-tip" class="hover">
                     {data.messages[index - 1][1]}<br />
@@ -521,7 +529,14 @@
         <th>New input</th>
         <td>
           <a on:click={disable_all}>Disable previous</a>
-          <textarea id="input" bind:value={input} rows="5" autofocus autocorrect="on" spellcheck="on"/>
+          <textarea
+            id="input"
+            bind:value={input}
+            rows="5"
+            autofocus
+            autocorrect="on"
+            spellcheck="on"
+          />
           <button on:click={submit}> Submit</button>
         </td>
       </tr>
@@ -571,7 +586,7 @@
     font-size: 1em;
     width: 95%;
     padding: 0.25em;
-	resize: vertical;
+    resize: vertical;
   }
 
   .llm_input {

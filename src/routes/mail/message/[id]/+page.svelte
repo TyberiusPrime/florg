@@ -15,6 +15,7 @@
   import Expander from "$lib/../components/Expander.svelte";
   import View from "$lib/../components/View.svelte";
   import QuickPick from "$lib/../components/QuickPick.svelte";
+  import Search from "$lib/../components/Search.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
   import Help from "$lib/../components/Help.svelte";
   import Goto from "$lib/../components/Goto.svelte";
@@ -31,6 +32,8 @@
   const dispatch = createEventDispatcher();
 
   let overlay = "";
+  let search_mode;
+  let in_page_search_term;
 
   let show_html = false;
   let show_images = false;
@@ -42,6 +45,8 @@
     { key: "i", text: "toggle images" },
     { key: "c", text: "copy menu" },
     { key: "H", text: "Show all headers" },
+    { key: "s", text: "search" },
+    { key: "n/N", text: "in page search" },
   ];
 
   var listener = new keypress.Listener();
@@ -150,7 +155,7 @@
     prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-        overlay = "copying";
+      overlay = "copying";
     },
   });
 
@@ -177,6 +182,45 @@
         window.setTimeout(() => {
           show_html = true;
         }, 10);
+      }
+    },
+  });
+  listener.register_combo({
+    keys: "s",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      overlay = "search";
+    },
+  });
+
+  listener.register_combo({
+    keys: "n",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
+      }
+    },
+  });
+
+  listener.register_combo({
+    keys: "shift n",
+    is_unordered: true,
+    prevent_default: true,
+    prevent_repeat: true,
+    on_keyup: (e, count, repeated) => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
       }
     },
   });
@@ -237,9 +281,9 @@
     return html2plaintext(html);
   }
   function format_to(to) {
-	 if (to == null) {
-		  return "";
-		}
+    if (to == null) {
+      return "";
+    }
     return (
       to
         //.replaceAll("<", "&lt;")
@@ -384,17 +428,17 @@
         <th>Tags</th>
         <td>
           {#each data.tags as tag}
-			<div class="tags {tag_class(tag)}">
+            <div class="tags {tag_class(tag)}">
               {tag}
             </div>
           {/each}
         </td>
       </tr>
     </table>
-      </div>
+  </div>
 
   <div slot="content">
-{#if all_headers}
+    {#if all_headers}
       <table>
         {#each data.parsed.headers as header}
           <tr>
@@ -442,6 +486,13 @@
         {:else}
           Fill out [mail_tags] in your settings
         {/if}
+      {:else if overlay == "search"}
+        <Search
+          bind:overlay
+          bind:in_page_search_term
+          bind:search_mode
+          on:leave
+        />
       {:else if overlay == "goto"}
         <Goto />
       {:else if overlay == ""}

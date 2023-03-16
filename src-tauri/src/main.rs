@@ -17,7 +17,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     path::PathBuf,
-    sync::Mutex,
+    sync::{Mutex, MutexGuard},
     thread::{self},
 };
 use storage::{Node, Storage};
@@ -30,6 +30,7 @@ pub struct OpenEditor {
     temp_file: PathBuf,
     org_content: String,
     process: std::process::Child,
+    window_title: String,
 }
 
 #[derive(Debug)]
@@ -143,11 +144,10 @@ fn delete_node(path: &str) -> Result<(), String> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
     s.delete_node(path)?;
     Ok(())
-    }
-
+}
 
 #[tauri::command]
-fn edit_node(path: &str) -> bool {
+fn edit_node(path: &str, window_title: &str) -> bool {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
     if runtime_state
@@ -254,6 +254,7 @@ fn edit_node(path: &str) -> bool {
                 temp_file: tf,
                 org_content: content,
                 process,
+                window_title: window_title.to_string(),
             });
         }
 
@@ -263,14 +264,37 @@ fn edit_node(path: &str) -> bool {
     }
 }
 
+fn get_settings_temp_filename(ss: &MutexGuard<Storage>) -> PathBuf {
+    let tf_folder = ss.data_path.join("temp");
+    std::fs::create_dir_all(&tf_folder).unwrap();
+    let tf = tf_folder.join("settings.toml");
+    tf
+}
+
+fn spawn_settings_editor(tf: PathBuf, content: String, lock: &mut MutexGuard<RuntimeState>) {
+    let tf_name = tf.to_str().expect("temp file was not unicode name?");
+    let process = std::process::Command::new("kitty")
+        .arg("--")
+        .arg("nvim")
+        .arg(format!("+{}", 0))
+        .arg(tf_name)
+        .spawn()
+        .expect("Failed to spawn kitty&neovim");
+    lock.open_editors.push(OpenEditor {
+        path: "settings.toml".to_string(),
+        temp_file: tf,
+        org_content: content,
+        process,
+        window_title: "Settings".to_string(),
+    });
+}
+
 #[tauri::command]
 fn edit_settings() -> bool {
     let path = "settings.toml";
-    if RUNTIME_STATE
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
+    let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+
+    if lock
         .open_editors
         .iter()
         .filter(|entry| entry.path == path)
@@ -279,36 +303,13 @@ fn edit_settings() -> bool {
     {
         {
             let ss = STORAGE.get().unwrap().lock().unwrap();
-            let tf_folder = ss.data_path.join("temp");
-            std::fs::create_dir_all(&tf_folder).unwrap();
-            let tf = tf_folder.join("settings.toml");
-
+            let tf = get_settings_temp_filename(&ss);
             dbg!(&ss.settings);
             let content = ss.settings.to_string();
-            let skip_lines = 0;
 
-            let tf_name = tf.to_str().expect("temp file was not unicode name?");
-            std::fs::write(&tf_name, &content).expect("temp file write failure");
+            std::fs::write(&tf, &content).expect("temp file write failure");
 
-            let process = std::process::Command::new("kitty")
-                .arg("--")
-                .arg("nvim")
-                .arg(format!("+{}", skip_lines))
-                .arg(tf_name)
-                .spawn()
-                .expect("Failed to spawn kitty&neovim");
-            RUNTIME_STATE
-                .get()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .open_editors
-                .push(OpenEditor {
-                    path: path.to_string(),
-                    temp_file: tf,
-                    org_content: content,
-                    process,
-                });
+            spawn_settings_editor(tf, content, &mut lock);
         }
 
         true
@@ -805,10 +806,18 @@ fn editor_ended() {
         }
     }
     for (ii, path, result) in remove {
+        let window_title = {
+            let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+            std::fs::remove_file(&lock.open_editors[ii].temp_file).ok();
+            let window_title = lock.open_editors[ii].window_title.clone();
+            lock.open_editors.remove(ii);
+            window_title
+        };
+
         match result {
             Some(raw) => {
                 println!("Received {path}. nvim exit was success, content was there");
-                update_from_edited_file(&path, raw);
+                update_from_edited_file(&path, raw, &window_title)
             }
             None => {
                 let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -817,15 +826,12 @@ fn editor_ended() {
                 lock.app_handle.emit_all("node-unchanged", &path).ok();
             }
         }
-        let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-        std::fs::remove_file(&lock.open_editors[ii].temp_file).ok();
-        lock.open_editors.remove(ii);
     }
 }
 
-fn update_from_edited_file(path: &str, raw_contents: String) {
+fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str) {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
 
     if path == "settings.toml" {
         println!("received settings");
@@ -834,11 +840,21 @@ fn update_from_edited_file(path: &str, raw_contents: String) {
         match settings {
             Ok(new_settings) => {
                 ss.settings = new_settings;
+                println!("Updated settings {:?}", &ss.settings);
                 ss.store_settings();
                 lock.app_handle.emit_all("message", "Settings updated").ok();
             }
             Err(_) => {
-                lock.app_handle.emit_all("message", "<span class='error'>Settings could not be parsed, changes thrown away. Try again</span>").ok();
+                lock.app_handle
+                    .emit_all(
+                        "message",
+                        "<span class='error'>Settings could not be parsed. Try again</span>",
+                    )
+                    .ok();
+                let tf = get_settings_temp_filename(&ss);
+                println!("Writing contents - len {}", raw_contents.len());
+                std::fs::write(&tf, &raw_contents).expect("failed to write settings temp file");
+                spawn_settings_editor(tf, raw_contents, &mut lock);
             }
         }
     } else {
@@ -849,7 +865,9 @@ fn update_from_edited_file(path: &str, raw_contents: String) {
         ss.replace_node(node, true);
         println!("Replaced node");
 
-        lock.app_handle.emit_all("node-changed", path).ok();
+        lock.app_handle
+            .emit_to(window_title, "node-changed", path)
+            .ok();
         println!("Told editor");
     }
 }

@@ -42,6 +42,13 @@ pub struct SingleMessage {
     filename: String,
 }
 
+#[derive(Serialize, Debug)]
+pub struct SingleMessageBrief {
+    from: String,
+    subject: String,
+}
+
+
 impl MailStore {
     pub fn new(path: impl AsRef<Path>, config_path: impl AsRef<Path>) -> MailStore {
         MailStore {
@@ -120,6 +127,14 @@ impl MailStore {
             tags: message.tags().collect(),
             filename: message.filename().to_string_lossy().to_string(),
         })
+    }
+    pub fn get_message_brief(&self, msg_id: &str) -> anyhow::Result<SingleMessageBrief> {
+        let database = self.open_db();
+        let message = database.find_message(msg_id)?.context("not found")?;
+        return Ok(SingleMessageBrief {
+            from: message.header("from").unwrap_or(None).map(|x| x.to_string()).unwrap_or_else(||"".to_string()),
+            subject: message.header("subject").unwrap_or(None).map(|x| x.to_string()).unwrap_or_else(||"".to_string()),
+        });
     }
 
     pub fn add_tags(&self, msg_id: &str, tags: &Vec<String>) -> anyhow::Result<()> {

@@ -1,15 +1,20 @@
 <script lang="ts">
-  import { keypress } from "keypress.js";
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
   //import { get_last_path } from "../lib/mode_stack.ts";
-  import { escape_html, error_toast, removeItemOnce } from "$lib/util.ts";
+  import {
+    escape_html,
+    error_toast,
+    removeItemOnce,
+    dispatch_keyup,
+    focus_first_in_node,
+  } from "$lib/util.ts";
   import { createEventDispatcher } from "svelte";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
   import { goto } from "$app/navigation";
   import { tag_class } from "$lib/colors.ts";
   import PostalMime from "postal-mime";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, afterUpdate } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
   import Expander from "$lib/../components/Expander.svelte";
@@ -44,86 +49,46 @@
     { key: "l", text: "toggle html" },
     { key: "i", text: "toggle images" },
     { key: "c", text: "copy menu" },
+    { key: "d", text: "dump attachments" },
     { key: "H", text: "Show all headers" },
     { key: "s", text: "search" },
     { key: "n/N", text: "in page search" },
   ];
 
-  var listener = new keypress.Listener();
-  listener.reset();
-  listener.stop_listening();
-
-  onMount(async () => {
-    overlay = "";
-    listener.listen();
-    window.scroll(0, 0);
-  });
-
-  onDestroy(() => {
-    listener.stop_listening();
-  });
-
-  listener.register_combo({
-    keys: "escape",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      window.history.back();
-    },
-  });
-
-  listener.register_combo({
-    keys: "l",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      if (data.parsed.html != null) {
-        show_html = !show_html;
+  let keys = {
+    Escape: () => {
+      if (overlay != "") {
+        overlay = "";
+        return true;
       }
     },
-  });
-  listener.register_combo({
-    keys: "h",
-    prevent_default: true,
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
-      console.log("help");
-      overlay = "help";
-    },
-  });
 
-  listener.register_combo({
-    keys: "m",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      toggle_tag({ detail: "unread" });
+    l: () => {
+      if (data.parsed.html != null) {
+        show_html = !show_html;
+        return true;
+      }
     },
-  });
-  listener.register_combo({
-    keys: "f",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    h: () => {
+      overlay = "help";
+      return true;
+    },
+    m: () => {
+      toggle_tag({ detail: "unread" });
+      return true;
+    },
+    H: () => {
+      all_headers = !all_headers;
+      return true;
+    },
+    f: () => {
       toggle_tag({ detail: "flagged" });
     },
-  });
-
-  listener.register_combo({
-    keys: "t",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    t: () => {
       overlay = "tags";
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "p",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
+    d: async () => {
       if (data.tags.indexOf("attachment") != -1) {
         if (
           await invoke("mail_message_store_attachments", {
@@ -138,41 +103,11 @@
         toast("No attachments");
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "shift h",
-    prevent_default: true,
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
-      all_headers = !all_headers;
-    },
-  });
-
-  listener.register_combo({
-    keys: "c",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    c: () => {
       overlay = "copying";
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "t",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "tags";
-    },
-  });
-
-  listener.register_combo({
-    keys: "i",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    i: () => {
       if (data.parsed.html != null) {
         show_images = !show_images;
         show_html = false;
@@ -184,54 +119,55 @@
         }, 10);
       }
     },
-  });
-  listener.register_combo({
-    keys: "s",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    s: () => {
       overlay = "search";
+      search_mode = "pick";
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    n: () => {
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
       } else {
         overlay = "search";
         search_mode = "in_page";
       }
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "shift n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
+    N: () => {
       if (in_page_search_term != "") {
-        window.find(in_page_search_term, false, false, true, false);
+        window.find(in_page_search_term, false, false, true, True);
       } else {
         overlay = "search";
         search_mode = "in_page";
       }
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "g",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    g: () => {
       overlay = "goto";
+      return true;
     },
+  };
+
+  function handle_keys(ev) {
+    return dispatch_keyup(keys)(ev);
+  }
+
+  onMount(async () => {
+    overlay = "";
+    window.scroll(0, 0);
+    document.getElementById("wrapper").addEventListener("keyup", handle_keys);
+
+    focus_first_in_node(document.getElementById("wrapper"));
+  });
+
+  onDestroy(() => {
+    document
+      .getElementById("wrapper")
+      .removeEventListener("keyup", handle_keys);
+  });
+
+  afterUpdate(() => {
+    //focus_first_in_node(document.getElementById("wrapper"));
   });
 
   function get_header(parsed, header) {
@@ -330,7 +266,7 @@
   function handle_copy(ev) {
     let target = ev.detail;
     if (target == "link") {
-      copy_to_clipboard(`[${data.parsed.subject}](mail:${message.id})`);
+	  copy_to_clipboard(`<<mail:${data.id}>>`);
     } else if (target == "text") {
       if (data.parsed.text != null) {
         copy_to_clipboard(extractContent(data.parsed.text));
@@ -472,8 +408,7 @@
   </div>
 
   <div slot="footer">
-    {overlay}
-    <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+    <Overlay on:leave={handle_overlay_leave} bind:overlay>
       {#if overlay == "help"}
         <Help bind:entries={help_entries} />
       {:else if overlay == "copying"}

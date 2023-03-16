@@ -565,6 +565,17 @@ fn get_mail_message(id: &str) -> Option<mail::SingleMessage> {
     }
     res.ok()
 }
+
+#[tauri::command]
+fn get_mail_message_brief(id: &str) -> Option<mail::SingleMessageBrief> {
+    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let res = lock.notmuch_db.get_message_brief(id);
+    if !res.is_ok() {
+        dbg!(&res);
+    }
+    res.ok()
+}
+
 #[tauri::command]
 fn mail_message_add_tags(id: &str, tags: Vec<String>) -> bool {
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -991,6 +1002,7 @@ fn main() -> Result<()> {
             set_cached_node,
             query_mail,
             get_mail_message,
+            get_mail_message_brief,
             mail_message_add_tags,
             mail_message_remove_tags,
             mail_message_toggle_tag,

@@ -43,7 +43,6 @@
 		"gptoken": "^0.0.5",
 		"highlight.js": "^11.7.0",
 		"html2plaintext": "^2.1.4",
-		"keypress.js": "^2.1.5",
 		"marked": "^4.2.12",
 		"openai": "^3.2.1",
 		"postal-mime": "^1.0.15",

@@ -15,7 +15,6 @@
   import { goto, invalidateAll } from "$app/navigation";
   import { tag_class } from "$lib/colors.ts";
   import { invoke } from "@tauri-apps/api/tauri";
-  import { keypress } from "keypress.js";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
 
   export let data;

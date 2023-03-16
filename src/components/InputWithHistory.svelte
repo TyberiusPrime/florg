@@ -20,7 +20,6 @@
         selectedIndex = history.length - 1;
       }
       showHistory = true;
-      overlay_handles_escape.update((_) => false);
     } else if (event.key === "ArrowDown" && history.length > 0) {
       event.preventDefault();
       if (showHistory) {
@@ -29,13 +28,11 @@
         selectedIndex = history.length - 1;
       }
       showHistory = true;
-      overlay_handles_escape.update((_) => false);
     } else if (event.key === "Enter") {
       if (showHistory && selectedIndex >= 0 && selectedIndex < history.length) {
         event.preventDefault();
         input_value = history[selectedIndex];
         showHistory = false;
-        overlay_handles_escape.update((_) => true);
       } else if (input_value) {
         dispatch("accept", null);
       }
@@ -44,14 +41,12 @@
       if (showHistory) {
         showHistory = false;
         window.setTimeout(() => {
-          overlay_handles_escape.update((_) => true);
         }, 10);
       } else {
         dispatch("leave", input_value);
       }
     } else {
       showHistory = false;
-      overlay_handles_escape.update((_) => true);
     }
   }
 

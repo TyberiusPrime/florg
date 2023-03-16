@@ -42,7 +42,7 @@
     if (search_mode == "root") {
       history_mode = "node";
     }
-	console.log(history_mode);
+    console.log(history_mode);
     let history = await invoke("history_get", {
       name: "search" + history_mode,
     });
@@ -59,8 +59,8 @@
       toast.push("Could not store search history");
     }
     if (search_mode == "in_page") {
-      window.find(search_term, false, false, true, false);
       in_page_search_term = search_term;
+      window.find(in_page_search_term, false, false, true, false);
     } else if (search_mode == "node" || search_mode == "root") {
       let path = null;
       if (search_mode == "root") {
@@ -80,12 +80,14 @@
 
   let items = [];
   async function get_history() {
- let history_mode = search_mode;
+    let history_mode = search_mode;
     if (search_mode == "root") {
       history_mode = "node";
     }
 
-    let history = await invoke("history_get", { name: "search" + history_mode });
+    let history = await invoke("history_get", {
+      name: "search" + history_mode,
+    });
     items = [];
     for (let entry of history) {
       items.push(entry);

@@ -62,8 +62,7 @@
     prevent_repeat: true,
     prevent_default: false,
     is_exclusive: true,
-    on_keyup: async (e, count, repeated) => {
-    },
+    on_keyup: async (e, count, repeated) => {},
   });
 
   listener.register_combo({
@@ -273,7 +272,7 @@
 
     console.log(JSON.stringify(messages, 2, null));
     try {
-    let prompt_tokens = countTokensExt(JSON.stringify(messages));
+      let prompt_tokens = countTokensExt(JSON.stringify(messages));
       let live_response = document.getElementById("live_response");
       live_response.innerText = "";
       let response = await openAiCompletion(api_key, messages, (text) => {
@@ -288,7 +287,7 @@
         let prompt_tokens = countTokensExt(JSON.stringify(messages));
         let completion_tokens = countTokensExt(response);
         let res = {
-		  choices: [{message: {content: {response}}}],
+          choices: [{ message: { content: response } }],
           usage: {
             prompt_tokens: prompt_tokens,
             prompt_tokens_netto: prompt_tokens - last_input_tokens,
@@ -297,17 +296,19 @@
         };
         //res.usage.prompt_tokens_netto = res.usage.prompt_tokens - last_input_tokens;
         data.messages.push(["output", res]);
-		data = data;
+        data = data;
       }
       await save_convo();
       highlight_code();
+      processing = false;
+      return response;
     } catch (err) {
       data.messages.push(["error", "Error: " + err]);
 
       console.log(err);
       toast.push("" + err);
+      processing = false;
     }
-    processing = false;
 
     /*
     let args = {
@@ -619,14 +620,12 @@
           </tr>
         {/if}
       {/each}
-      {#if processing}
-        <tr>
-          <td colspan="2"><LoadBars color="#303030" /> </td>
-        </tr>
-      {/if}
       <tr>
         <th> Live response</th>
-        <td id="live_response" />
+        <td>
+          {#if processing} <LoadBars color="#303030" /> {/if}
+          <div id="live_response" />
+        </td>
       </tr>
 
       <tr>

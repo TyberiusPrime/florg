@@ -11,7 +11,7 @@
     error_toast,
     removeItemOnce,
   } from "$lib/util.ts";
-  import { goto } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { tag_class } from "$lib/colors.ts";
   import { invoke } from "@tauri-apps/api/tauri";
   import { keypress } from "keypress.js";
@@ -31,6 +31,7 @@
     { key: "c", text: "copy" },
     { key: "s", text: "search" },
     { key: "n/N", text: "in page search" },
+    { key: "r", text: "refresh mails" },
   ];
   let copy_entries = [{ key: "c", text: "link", target_path: "link" }];
   let tag_entries = Object.keys(data.tags).map((key) => {
@@ -108,6 +109,16 @@
     on_keyup: (e, count, repeated) => {
       if (no_text_inputs_focused()) {
         toggle_tag({ detail: "unread" });
+      }
+    },
+  });
+  listener.register_combo({
+    keys: "r",
+    prevent_repeat: true,
+    is_exclusive: true,
+    on_keyup: async (e, count, repeated) => {
+      if (no_text_inputs_focused()) {
+        await invalidateAll();
       }
     },
   });
@@ -264,11 +275,12 @@
     {#each data.messages as el, index}
       {#if data.mode == "threads"}
         <tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
-          <td class="index">{index}
-		  {#if el.tags.indexOf("flagged") > -1}
-		  <b class="flagged">★</b>
-		  {/if}
-		  </td>
+          <td class="index"
+            >{index}
+            {#if el.tags.indexOf("flagged") > -1}
+              <b class="flagged">★</b>
+            {/if}
+          </td>
           <td class="unread_count">
             {#if count_unread(el) > 0}
               <span class="new">{count_unread(el)}/{el.messages.length}</span>
@@ -320,7 +332,7 @@
       {:else if overlay == "copying"}
         <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
       {:else if overlay == "goto"}
-        <Goto bind:overlay/>
+        <Goto bind:overlay />
       {:else if overlay == "search"}
         <Search
           bind:overlay
@@ -402,7 +414,7 @@
   }
 
   .flagged {
-  color:red;
-  font-size:1.5em;
+    color: red;
+    font-size: 1.5em;
   }
 </style>

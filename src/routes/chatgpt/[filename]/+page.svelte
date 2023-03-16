@@ -5,15 +5,18 @@
   import { onMount, onDestroy, afterUpdate } from "svelte";
   import View from "$lib/../components/View.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
+  import Search from "$lib/../components/Search.svelte";
+  import Goto from "$lib/../components/Goto.svelte";
+  import QuickPick from "$lib/../components/QuickPick.svelte";
   import Help from "$lib/../components/Help.svelte";
   import {
     format_date,
     add_code_clipboards,
     no_text_inputs_focused,
+    dispatch_keyup,
   } from "../../../lib/util.ts";
   import Select from "svelte-select";
   import { LoadBars } from "svelte-loading-animation";
-  import { keypress } from "keypress.js";
   import DOMPurify from "dompurify";
   import SvelteTooltip from "svelte-tooltip";
   //import {encode, decode, countTokens, tokenStats} from "gptoken/browser.js"
@@ -49,72 +52,41 @@
     { key: "t", text: "title", target_path: "title" },
   ];
 
-  var listener = new keypress.Listener();
-  listener.reset();
-  listener.stop_listening();
-
-  listener.simple_combo("esc", () => {
-    window.history.back();
-  });
-
-  listener.register_combo({
-    keys: "enter",
-    prevent_repeat: true,
-    prevent_default: false,
-    is_exclusive: true,
-    on_keyup: async (e, count, repeated) => {},
-  });
-
-  listener.register_combo({
-    keys: "shift enter",
-    prevent_repeat: true,
-    prevent_default: false,
-    is_exclusive: true,
-    on_keyup: async (e, count, repeated) => {
-      await query_chat_gtp(input, true);
+  let keys = {
+    Escape: () => {
+      if (overlay != "") {
+        console.log("clearing overlay");
+        overlay = "";
+        return true;
+      }
     },
-  });
-
-  listener.register_combo({
-    keys: "s",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    Enter: async (e) => {
+      if (e.shiftKey) {
+        if (document.activeElement == document.getElementById("input")) {
+          await query_chat_gtp(input, true);
+          return true;
+        }
+      }
+    },
+    s: () => {
       if (no_text_inputs_focused()) {
         overlay = "search";
-        e.preventDefault();
       }
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "i",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
-      if (no_text_inputs_focused()) {
-        toast.push("todo");
-        e.preventDefault();
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "h",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    h: () => {
       if (no_text_inputs_focused()) {
         overlay = "help";
       }
+      return true;
     },
-  });
-
-  listener.register_combo({
-    keys: "n",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    g: () => {
+      if (no_text_inputs_focused()) {
+        overlay = "goto";
+      }
+      return true;
+    },
+    n: () => {
       if (no_text_inputs_focused()) {
         if (in_page_search_term != "") {
           window.find(in_page_search_term, false, false, true, false);
@@ -122,38 +94,27 @@
           overlay = "search";
           search_mode = "in_page";
         }
+        return true;
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "shift n",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    N: () => {
       if (no_text_inputs_focused()) {
         if (in_page_search_term != "") {
-          window.find(in_page_search_term, false, false, true, false);
+          window.find(in_page_search_term, false, false, true, true);
         } else {
           overlay = "search";
           search_mode = "in_page";
         }
+        return true;
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "c",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    c: (e) => {
       if (no_text_inputs_focused() && !e.ctrlKey && !e.metaKey) {
         overlay = "copying";
-        e.preventDefault();
+        return true;
       }
     },
-  });
-
+  };
   async function save_convo() {
     await invoke("chatgpt_save_conversation", {
       conversation: data,
@@ -361,6 +322,10 @@
 	*/
   }
 
+  function handle_keys(ev) {
+    return dispatch_keyup(keys)(ev);
+  }
+
   onMount(async () => {
     let p = await invoke("chatgpt_get_prompts", {});
     items.length = 0;
@@ -377,12 +342,12 @@
         }
       }
     }
-    //listener.listen();
     highlight_code();
     document.getElementById("input").scrollIntoView({
       behavior: "smooth",
       block: "end",
     });
+    document.getElementById("wrapper").addEventListener("keyup", handle_keys);
   });
 
   function highlight_code() {
@@ -393,7 +358,9 @@
   }
 
   onDestroy(() => {
-    listener.stop_listening();
+    document
+      .getElementById("wrapper")
+      .removeEventListener("keyup", handle_keys);
   });
 
   function set_prompt(ev) {
@@ -647,17 +614,14 @@
   </div>
 
   <div slot="footer">
-    <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+    <Overlay on:leave={handle_overlay_leave} bind:overlay>
       {#if overlay == "help"}
         <Help bind:entries={help_entries} />
       {:else if overlay == "search"}
         <Search bind:overlay bind:in_page_search_term bind:search_mode />
       {:else if overlay == "goto"}
         Goto node:
-        <Goto on:action={handle_goto_action} />
-      {:else if overlay == "new_below"}
-        Create new node below
-        <Goto on:action={handle_new_node_below} />
+        <Goto />
       {:else if overlay == "copying"}
         <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
       {:else if overlay == ""}

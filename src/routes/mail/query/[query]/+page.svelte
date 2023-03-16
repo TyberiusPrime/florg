@@ -10,6 +10,7 @@
     no_text_inputs_focused,
     error_toast,
     removeItemOnce,
+    dispatch_keyup,
   } from "$lib/util.ts";
   import { goto, invalidateAll } from "$app/navigation";
   import { tag_class } from "$lib/colors.ts";
@@ -38,109 +39,82 @@
     return { key: key, text: data.tags[key], target_path: data.tags[key] };
   });
 
-  var listener = new keypress.Listener();
-  listener.reset();
-  listener.stop_listening();
-
-  listener.register_combo({
-    keys: "h",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+  let keys = {
+    Escape: () => {
+      if (overlay != "") {
+        overlay = "";
+		let chosen = document.getElementsByClassName("chosen");
+		console.log(chosen);
+		if (chosen.length > 0)
+		{
+		console.log('chosen is', chosen);
+			chosen[0].scrollIntoView();
+		}
+        return true;
+      }
+    },
+    h: () => {
       if (no_text_inputs_focused()) {
         overlay = "help";
+        return true;
       }
     },
-  });
-  listener.register_combo({
-    keys: "t",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    t: () => {
       if (no_text_inputs_focused()) {
         overlay = "tags";
+        return true;
       }
     },
-  });
-  listener.register_combo({
-    keys: "s",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "search";
-    },
-  });
-
-  listener.register_combo({
-    keys: "n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      if (in_page_search_term != "") {
-        window.find(in_page_search_term, false, false, true, false);
-      } else {
+    s: () => {
+      if (no_text_inputs_focused()) {
         overlay = "search";
-        search_mode = "in_page";
+        return true;
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "shift n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      if (in_page_search_term != "") {
-        window.find(in_page_search_term, false, false, true, false);
-      } else {
-        overlay = "search";
-        search_mode = "in_page";
+    n: () => {
+      if (no_text_inputs_focused) {
+        if (in_page_search_term != "") {
+          window.find(in_page_search_term, false, false, true, false);
+          return true;
+        } else {
+          overlay = "search";
+          search_mode = "in_page";
+          return true;
+        }
       }
     },
-  });
 
-  listener.register_combo({
-    keys: "m",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    N: () => {
+      if (no_text_inputs_focused) {
+        if (in_page_search_term != "") {
+          window.find(in_page_search_term, false, false, true, true);
+          return true;
+        } else {
+          overlay = "search";
+          search_mode = "in_page";
+          return true;
+        }
+      }
+    },
+    m: () => {
       if (no_text_inputs_focused()) {
         toggle_tag({ detail: "unread" });
       }
     },
-  });
-  listener.register_combo({
-    keys: "r",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: async (e, count, repeated) => {
+    r: async () => {
       if (no_text_inputs_focused()) {
         await invalidateAll();
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "f",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    f: () => {
       if (no_text_inputs_focused()) {
         toggle_tag({ detail: "flagged" });
       }
     },
-  });
-  listener.register_combo({
-    keys: "g",
-    prevent_repeat: true,
-    is_exclusive: true,
-    on_keyup: (e, count, repeated) => {
+    g: () => {
       overlay = "goto";
     },
-  });
+  };
 
   function latest_date(entry) {
     //go through all the messages, extract date, keep the largest one
@@ -242,14 +216,18 @@
     overlay = false;
   }
 
+  function handle_keys(ev) {
+    dispatch_keyup(keys)(ev);
+  }
+
   onMount(async () => {
-    listener.listen();
-    console.log("start lest");
+    document.getElementById("wrapper").addEventListener("keyup", handle_keys);
   });
 
   onDestroy(() => {
-    console.log("stop lest");
-    listener.stop_listening();
+    document
+      .getElementById("wrapper")
+      .removeEventListener("keyup", handle_keys);
   });
 
   function handle_overlay_leave() {
@@ -263,7 +241,7 @@
   }
 </script>
 
-<Picker on:action={handle_action} bind:focused bind:enable_filter>
+<Picker on:action={handle_action} bind:focused bind:enable_filter bind:overlay>
   <div slot="message">
     <h1>Mail result</h1>
     Query: {data.query}
@@ -324,7 +302,7 @@
     {/each}
   </svelte:fragment>
   <div slot="footer">
-    <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+    <Overlay on:leave={handle_overlay_leave} bind:overlay>
       {#if overlay == "help"}
         <Help bind:entries={help_entries} />
       {:else if overlay == "tags"}
@@ -337,6 +315,7 @@
         <Search
           bind:overlay
           bind:in_page_search_term
+          bind:default_search_term={data.query}
           bind:search_mode
           on:leave
         />

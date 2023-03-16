@@ -1,12 +1,12 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
-  import { keypress } from "keypress.js";
   import * as chrono from "chrono-node";
   import { createEventDispatcher, tick } from "svelte";
   const dispatch = createEventDispatcher();
   import { Fzf, byLengthAsc } from "fzf";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
   import { set_temp_history, get_temp_history } from "../lib/mode_stack.ts";
+  import { no_text_inputs_focused, focus_first_in_node } from "../lib/util.ts";
 
   import View from "./View.svelte";
   import { isElementInViewport } from "../lib/util.ts";
@@ -19,95 +19,19 @@
   let last_text = "";
   let test_text = "shu";
   let downstream_elements = [];
-  var listener = new keypress.Listener();
-  listener.reset();
-  listener.stop_listening();
 
-  listener.register_combo({
-    keys: "esc",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      window.history.back();
-    },
-  });
-
-  listener.register_combo({
-    keys: "enter",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      if (downstream_elements.length > 0) {
-        dispatch("action", {
-          cmd: downstream_elements[focused].dataset.cmd,
-        });
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "down",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      if (focused < downstream_elements.length - 1) {
-        focused += 1;
-        update_chosen();
-      }
-    },
-  });
-  listener.register_combo({
-    keys: "up",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      if (focused > 0) {
-        focused -= 1;
-        update_chosen();
-      }
-    },
-  });
-  listener.register_combo({
-    keys: "home",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      focused = 0;
-      update_chosen();
-    },
-  });
-  listener.register_combo({
-    keys: "end",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      focused = downstream_elements.length - 1;
-      update_chosen();
-    },
-  });
-
-  listener.register_combo({
-    keys: "pagedown",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      focused = Math.min(downstream_elements.length - 1, focused + 10);
-      update_chosen();
-    },
-  });
-
-  listener.register_combo({
-    keys: "pageup",
-    is_unordered: true,
-    prevent_default: true,
-    on_keydown: (e, count, repeated) => {
-      focused = Math.max(0, focused - 10);
-      update_chosen();
-    },
-  });
-
+  function handle_key_down(ev) {
+    if (
+      ev.key == "ArrowUp" ||
+      ev.key == "ArrowDown" ||
+      ev.key == "Home" ||
+      ev.key == "End" ||
+      ev.key == "PageUp" ||
+      ev.key == "PageDown"
+    ) {
+      ev.preventDefault();
+    }
+  }
   function handle_text_change(ev) {
     const fzf = new Fzf(elements, {
       selector: (item) => item.innerText,
@@ -131,6 +55,55 @@
         { ...history.state, input_text: input_text },
         undefined
       );
+    }
+    if (ev != null) {
+      console.log("picker", ev);
+      if (ev.key != "Escape") {
+        if (ev.key == "ArrowDown") {
+          ev.stopPropagation();
+          ev.preventDefault();
+          if (focused < downstream_elements.length - 1) {
+            focused += 1;
+            update_chosen();
+          }
+        } else if (ev.key == "ArrowUp") {
+          ev.stopPropagation();
+          ev.preventDefault();
+          if (focused > 0) {
+            focused -= 1;
+            update_chosen();
+          }
+        } else if (ev.key == "PageUp") {
+          focused = Math.max(0, focused - 10);
+          update_chosen();
+          ev.preventDefault();
+          ev.stopPropagation();
+        } else if (ev.key == "PageDown") {
+          focused = Math.min(downstream_elements.length - 1, focused + 10);
+          update_chosen();
+          ev.preventDefault();
+          ev.stopPropagation();
+        } else if (ev.key == "Home") {
+          focused = 0;
+          update_chosen();
+          ev.preventDefault();
+          ev.stopPropagation();
+        } else if (ev.key == "End") {
+          console.log("end", no_text_inputs_focused());
+          focused = downstream_elements.length - 1;
+          update_chosen();
+          ev.preventDefault();
+          ev.stopPropagation();
+        } else if (ev.key == "Enter") {
+          if (downstream_elements.length > 0) {
+            dispatch("action", {
+              cmd: downstream_elements[focused].dataset.cmd,
+            });
+            ev.preventDefault();
+            ev.stopPropagation();
+          }
+        }
+      }
     }
   }
 
@@ -177,6 +150,7 @@
     let index = Array.from(el.parentNode.children).indexOf(el);
     focused = index;
     update_chosen();
+    focus_first_in_node(document.getElementById("pickerdiv"));
   }
 
   function handle_double_click(ev) {
@@ -215,12 +189,10 @@
       }
 
       update_chosen(false);
-      listener.listen();
     }, 100);
   });
 
   onDestroy(async () => {
-    listener.stop_listening();
     window.removeEventListener("popstate", popStateChanged);
   });
 
@@ -236,10 +208,11 @@
     await tick();
 
     update_chosen();
+    focus_first_in_node(document.getElementById("pickerdiv"));
   });
 </script>
 
-<div on:keyup={handle_text_change}>
+<div on:keyup={handle_text_change} on:keydown={handle_key_down} id="pickerdiv">
   <View>
     <div slot="header">
       <slot name="message" />
@@ -247,7 +220,7 @@
         filter: <input id="typebox" autofocus bind:value={input_text} />
       {/if}
     </div>
-    <div slot="content">
+    <div slot="content" tabIndex="0">
       <div id="the_content">
         <table
           id="pick_table"

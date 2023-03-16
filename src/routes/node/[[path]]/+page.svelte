@@ -1,12 +1,13 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
   import { render_text } from "./funcs";
-  import { keypress } from "keypress.js";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
   import { emit, listen } from "@tauri-apps/api/event";
-  import { add_code_clipboards } from "$lib/util.ts";
+  import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
+  import { add_code_clipboards, dispatch_keyup } from "$lib/util.ts";
   import { goto, invalidateAll } from "$app/navigation";
   import { toast } from "@zerodevx/svelte-toast";
+  import { appWindow } from '@tauri-apps/api/window';
   import {
     set_last_path,
     check_and_reset_mode_ignore_enter,
@@ -65,204 +66,105 @@
     add_code_clipboards();
     return "";
   }
-
-  var listener = new keypress.Listener();
-
-  listener.register_combo({
-    keys: "h",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      console.log("listener h");
-      if (!repeated) {
-        show_help();
-      }
-    },
-  });
-
   function show_help() {
     overlay = "help";
   }
 
-  listener.register_combo({
-    keys: "s",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "search";
-    },
-  });
-
-  listener.register_combo({
-    keys: "space",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
+  let keys = {
+    " ": () => {
       goto("/nav/" + data.path);
+      return true;
     },
-  });
+    Escape: () => {
+      if (overlay != "") {
+        overlay = "";
+        return true;
+      }
+    },
+    g: () => {
+      overlay = "goto";
+      return true;
+    },
+    s: () => {
+      overlay = "search";
+      return true;
+    },
+    h: () => {
+      show_help();
+      return true;
+    },
+    z: () => {
+      overlay = "new_below";
+      return true;
+    },
+    m: () => {
+      //overlay = "move_node";
+      toast.push("todo");
+      return true;
+    },
+    a: async () => {
+      let next_empty = await invoke("find_next_empty_child", {
+        path: data.path,
+      });
+      goto("/node/" + next_empty + "?edit=true");
 
-  listener.register_combo({
-    keys: "#",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
+      return true;
+    },
+    c: () => {
+      overlay = "copying";
+      return true;
+    },
+    d: () => {
+      overlay = "delete";
+      return true;
+    },
+    n: () => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
+      }
+    },
+    N: () => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+        overlay = "search";
+        search_mode = "in_page";
+      }
+    },
+    "#": () => {
       toast.push("hello");
-      overlay = "datenav";
+      //overlay = "datenav";
       date_nav_target = data.path;
     },
-  });
-  listener.register_combo({
-    keys: "backspace",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
+    Backspace: () => {
       if (data.path.length > 0) goto("/node/" + data.path.slice(0, -1));
     },
-  });
-  listener.register_combo({
-    keys: "esc",
-    is_unordered: true,
-    exclusive: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
-      console.log("from esc in listener");
-      window.history.back();
+    i: () => {
+      toast.push("todo");
+      overlay = "mail_queries";
     },
-  });
-  listener.register_combo({
-    keys: "shift esc",
-    is_unordered: true,
-    exclusive: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
-      console.log("from esc in listener");
-      window.history.forward();
-    },
-  });
-
-  listener.register_combo({
-    keys: "n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      if (in_page_search_term != "") {
-        window.find(in_page_search_term, false, false, true, false);
-      } else {
-        overlay = "search";
-        search_mode = "in_page";
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "shift n",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      if (in_page_search_term != "") {
-        window.find(in_page_search_term, false, false, true, false);
-      } else {
-        overlay = "search";
-        search_mode = "in_page";
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "enter",
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (ev) => {
-      if (!check_and_reset_mode_ignore_enter()) {
+    Enter: (ev) => {
+      if (!ev.ctrlKey) {
         edit_current_node();
       }
     },
-  });
-
-  listener.register_combo({
-    keys: "g",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "goto";
-    },
-  });
-
-  listener.register_combo({
-    keys: "z",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "new_below";
-    },
-  });
-
-  listener.register_combo({
-    keys: "i",
-    is_unordered: true,
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: async (e, count, repeated) => {
-      overlay = "mail_queries";
-    },
-  });
-
-  listener.register_combo({
-    keys: "c",
-    prevent_default: true,
-    prevent_repeat: true,
-    on_keyup: (e, count, repeated) => {
-      overlay = "copying";
-    },
-  });
-  listener.register_combo({
-    keys: "a",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: async (e, count, repeated) => {
-      console.log("listener h");
-      if (!repeated) {
-        let next_empty = await invoke("find_next_empty_child", {
-          path: data.path,
-        });
-        goto("/node/" + next_empty + "?edit=true");
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "d",
-    prevent_default: true,
-    prevent_repeat: false,
-    on_release: (e, count, repeated) => {
-      overlay = "delete";
-    },
-  });
+  };
 
   async function edit_current_node() {
     data.currently_edited = true;
     data.org_text = data.text;
     data.org_rendered = data.rendered;
     data = data;
-    return await invoke("edit_node", { path: data.path });
+    return await invoke("edit_node", {
+      path: data.path,
+      windowTitle: appWindow.label,
+    });
   }
 
-  onMount(async () => {
-    listener.listen();
-  });
+  onMount(async () => {});
 
   afterUpdate(async () => {
     if ($page.url.searchParams.get("edit") == "true") {
@@ -317,7 +219,6 @@
     (await unliste_node_unchanged)();
     (await unliste_node_temp_changed)();
     (await unlisten_message)();
-    listener.stop_listening();
   });
 
   function handle_overlay_leave() {
@@ -354,13 +255,14 @@
     console.log("copy_to_clipboard", mode);
     let out = null;
     if (mode == "link") {
-      out = `[${content_title}](${current_path})`;
+      //out = `[${data.title}](${data.path})`;
+      out = `<<${data.path}>>`;
     } else if (mode == "content") {
       out = data.text;
     } else if (mode == "rendered_content") {
       out = document.getElementById("the_content").innerHTML;
     } else if (mode == "title") {
-      out = content_title;
+      out = data.title;
     } else if (mode == "path") {
       out = await invoke("get_node_folder_path", { path: current_path });
     } else {
@@ -396,7 +298,7 @@
     invoke("delete_node", { path: data.path })
       .then(() => {
         toast.push("node deleted");
-        goto("/node/" + data.path.slice(0,-1));
+        goto("/node/" + data.path.slice(0, -1));
       })
       .catch((e) => {
         toast.push(`Error ${e}`);
@@ -406,7 +308,7 @@
 </script>
 
 <div>
-  <View>
+  <View on:keyup={dispatch_keyup(keys)}>
     <div slot="header">
       <TopTree bind:data />
     </div>
@@ -436,7 +338,7 @@
       {/if}
     </div>
     <div slot="footer">
-      <Overlay {listener} on:leave={handle_overlay_leave} bind:overlay>
+      <Overlay on:leave={handle_overlay_leave} bind:overlay>
         {#if overlay == "help"}
           <Help bind:entries={help_entries} />
         {:else if overlay == "search"}

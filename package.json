@@ -49,6 +49,7 @@
 		"postal-mime": "^1.0.15",
 		"svelte-loading-animation": "^0.0.1",
 		"svelte-select": "^5.5.2",
-		"svelte-tooltip": "^1.2.0"
+		"svelte-tooltip": "^1.2.0",
+		"tabbable": "^6.1.1"
 	}
 }

@@ -3,7 +3,6 @@ import { error_toast } from "./util";
 
 //wether the overlay handles the esc button
 //or there is *another* layer
-export let overlay_handles_escape = writable(true);
 
 let last_path = "";
 

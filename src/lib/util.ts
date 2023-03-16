@@ -1,6 +1,7 @@
 import { readText, writeText } from "@tauri-apps/api/clipboard";
 import { invoke } from "@tauri-apps/api/tauri";
 import { toast } from "@zerodevx/svelte-toast";
+import { tabbable } from "tabbable";
 
 export function format_date(date: any, br = false) {
   //todo :centralize / dry
@@ -34,22 +35,22 @@ export function format_date(date: any, br = false) {
 }
 
 export function add_code_clipboards() {
-	window.setTimeout( () => {
-  for (let tag of ["code", "pre", "p"]) {
-    const codeBlocks = document.getElementsByTagName(tag);
+  window.setTimeout(() => {
+    for (let tag of ["code", "pre", "p"]) {
+      const codeBlocks = document.getElementsByTagName(tag);
 
-	for (let block of codeBlocks) {
-      const copyButton = document.createElement("button");
-      copyButton.classList.add("copy-button");
-      copyButton.innerText = "📋";
-      copyButton.onclick = async () => {
-        await writeText(block.innerText);
-      };
-      block.parentElement.style.position = "relative";
-      block.parentElement.appendChild(copyButton);
+      for (let block of codeBlocks) {
+        const copyButton = document.createElement("button");
+        copyButton.classList.add("copy-button");
+        copyButton.innerText = "📋";
+        copyButton.onclick = async () => {
+          await writeText(block.innerText);
+        };
+        block.parentElement.style.position = "relative";
+        block.parentElement.appendChild(copyButton);
+      }
     }
-  }
-	}, 10);
+  }, 10);
 }
 
 export function escape_html(html: string) {
@@ -75,7 +76,6 @@ export async function get_node(path: string) {
 }
 
 export function isElementInViewport(el): boolean {
-
   var rect = el.getBoundingClientRect();
   let header_height = document.getElementById("header").offsetHeight;
   let footer_height = document.getElementById("footer").offsetHeight;
@@ -117,7 +117,47 @@ export const replaceAsync = async (
   return str.replace(regex, () => data.shift());
 };
 
-
 export function trim_eol(multi_lines: string) {
   return multi_lines.replace(/[ \t]+$/gm, "");
+}
+
+export function dispatch_keyup(keys) {
+  return (ev) => {
+    console.log("dispatch key up", ev.key);
+    let action = keys[ev.key];
+    if (action) {
+		console.log("action");
+      if (action(ev)) {
+        ev.stopPropagation();
+		ev.stopImmediatePropagation();
+        ev.preventDefault();
+      }
+    }
+  };
+}
+
+export function focus_first_in_node(node) {
+  if (node == null) {
+    console.log("focus_first_in_node: node is null");
+    return;
+  }
+  let f = tabbable(node)[0];
+  if (f == null) {
+    node.focus();
+  } else {
+    console.log("focusing on", f);
+    f.focus();
+  }
+}
+export function find_first_focusable(node) {
+  if (node == null) {
+    console.log("find_first_focusable(: node is null");
+    return null;
+  }
+  let f = tabbable(node)[0];
+  if (f == null) {
+    return node;
+  } else {
+    return f;
+  }
 }

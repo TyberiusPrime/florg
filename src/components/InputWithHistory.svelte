@@ -2,7 +2,6 @@
   import { createPopper } from "@popperjs/core";
   import { createEventDispatcher } from "svelte";
   const dispatch = createEventDispatcher();
-  import { overlay_handles_escape } from "../lib/mode_stack.ts";
 
   export let input_value = "";
   export let history = [];
@@ -56,6 +55,10 @@
     }
   }
 
+  function handle_key_up(ev) {
+	event.stopPropagation();
+  }
+
   function popout() {
     window.setTimeout(() => {
       let el = document.getElementById("history_popcorn");
@@ -97,7 +100,9 @@
     placeholder="Type something..."
     value={input_value}
     on:keydown={handleInput}
+	on:keyup={handle_key_up}
     autofocus
+	style="width:80%; padding-left:.25em;"
   />
 </svelet:element>
 

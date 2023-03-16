@@ -412,3 +412,8 @@ p:hover + .copy-button, pre:hover + .copy-button  {
     background-color: #552be4;
     color: #eeeee;
   }
+
+
+  p:focus {
+	  font-weight:bold;
+  }

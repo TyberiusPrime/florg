@@ -1,4 +1,5 @@
 import { replaceAsync } from "$lib/util";
+  import { invoke } from "@tauri-apps/api/tauri";
 import asciidoctor from "asciidoctor";
 
 export async function render_text(text: string) {
@@ -18,9 +19,10 @@ export async function render_text(text: string) {
     async (_match, args) => {
       let path = args[0];
       let title = await invoke("get_node_title", { path });
-      return `<a href="#/node/${path}">${path}:${title}`;
+      return `<a href="/node/${path}">${path}:${title}`;
     },
   );
+  rendered = rendered.replaceAll("<p", "<p tabIndex=0 ");
 
   return rendered;
 }

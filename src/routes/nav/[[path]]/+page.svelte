@@ -1,7 +1,6 @@
 <script lang="ts">
   import { toast } from "@zerodevx/svelte-toast";
   import { get_node, no_text_inputs_focused } from "$lib/util.ts";
-  import { keypress } from "keypress.js";
   import { onMount, onDestroy } from "svelte";
   import { check_and_reset_mode_ignore_enter } from "$lib/mode_stack.ts";
 
@@ -18,49 +17,6 @@
     { key: "Space", text: "Open current node" },
     { key: "Enter", text: "Open&Edit current node" },
   ];
-  var listener = new keypress.Listener();
-  listener.reset();
-  listener.stop_listening();
-
-  listener.register_combo({
-    keys: "esc",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      if (!repeated) {
-        console.log("listener nav leave");
-        window.history.back();
-      }
-    },
-  });
-  listener.register_combo({
-    keys: "space",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      if (!repeated) {
-        goto("/node/" + path, { replaceState: true });
-      }
-    },
-  });
-
-  listener.register_combo({
-    keys: "enter",
-    is_unordered: true,
-    prevent_repeat: true,
-    prevent_default: true,
-    on_keyup: (e, count, repeated) => {
-      if (!repeated) {
-        toast.push("edit");
-        if (!check_and_reset_mode_ignore_enter()) {
-          toast.push("edit2");
-          goto("/node/" + path + "?edit=true", { replaceState: true });
-        }
-      }
-    },
-  });
 
   let last_path = "---";
   let current_node;
@@ -71,16 +27,18 @@
       last_path = path;
       current_node = await get_node(path);
     }
+    if (ev.key == "Enter") {
+      goto("/node/" + path + "?edit=true", { replaceState: true });
+    } else if (ev.key == " ") {
+      goto("/node/" + path, { replaceState: true });
+    }
   }
 
   onMount(async () => {
     await handle_input_changed();
-    listener.listen();
   });
 
-  onDestroy(async () => {
-    listener.stop_listening();
-  });
+  onDestroy(async () => {});
 
   function indent(depth) {
     return "&nbsp;".repeat(depth);

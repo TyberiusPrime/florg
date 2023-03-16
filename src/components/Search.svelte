@@ -12,10 +12,11 @@
   export let path = "";
   export let overlay;
   export let in_page_search_term = "";
-  let search_term;
+  export let default_search_term = "";
+  let search_term = default_search_term;
 
   export let search_entries = [
-    { key: "s", target_path: "node", text: "Node search (below this node)" },
+    { key: "s", target_path: "node", text: "Node search (below last node)" },
     { key: "r", target_path: "root", text: "Node search (all nodes)" },
     { key: "m", target_path: "mail", text: "Mail search" },
     { key: "p", target_path: "in_page", text: "in page" },

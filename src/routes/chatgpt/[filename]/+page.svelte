@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/tauri";
 
+  import { toast } from "@zerodevx/svelte-toast";
   import { onMount, onDestroy, afterUpdate } from "svelte";
   import View from "$lib/../components/View.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
@@ -15,11 +16,13 @@
   import { keypress } from "keypress.js";
   import DOMPurify from "dompurify";
   import SvelteTooltip from "svelte-tooltip";
+  //import {encode, decode, countTokens, tokenStats} from "gptoken/browser.js"
+  import { countTokens as countTokensExt } from "gptoken";
 
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
-  import { fetch, Body } from "@tauri-apps/api/http";
   import { marked } from "marked";
   import hljs from "highlight.js";
+  import { Configuration, OpenAIApi } from "openai";
 
   export let data;
   let overlay = "";
@@ -60,7 +63,6 @@
     prevent_default: false,
     is_exclusive: true,
     on_keyup: async (e, count, repeated) => {
-      console.log("etner");
     },
   });
 
@@ -159,13 +161,73 @@
       filename: data.filename,
     });
   }
+  async function openAiCompletion(api_key, messages, onText) {
+    try {
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${api_key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages,
+            model: "gpt-3.5-turbo",
+            max_tokens: 150,
+            stream: true,
+          }),
+        }
+      );
+
+      const decoder = new TextDecoder("utf8");
+      const reader = response.body.getReader();
+
+      let fullText = "";
+      let lastFire = 0;
+
+      async function read() {
+        const { value, done } = await reader.read();
+
+        if (done) return onText(fullText);
+
+        const delta = decoder
+          .decode(value)
+          .match(/"delta":\s*({.*?"content":\s*".*?"})/)?.[1];
+
+        if (delta) {
+          const content = JSON.parse(delta).content;
+
+          fullText += content;
+
+          //Detects punctuation, if yes, fires onText once per .5 sec
+          if (/[\p{P}\p{S}]/u.test(content)) {
+            const now = Date.now();
+
+            if (now - lastFire > 500) {
+              lastFire = now;
+              onText(fullText);
+            }
+          }
+        }
+
+        await read();
+      }
+
+      await read();
+
+      return fullText;
+    } catch (error) {
+      console.log("error return from fetch");
+      return error;
+    }
+  }
 
   async function query_chat_gtp(input, record_in_convo = true) {
     if (input == "") {
       return;
     }
     processing = true;
-    let url = "https://api.openai.com/v1/chat/completions";
     let api_key = await invoke("chatgpt_get_api_key", {});
     let messages = [];
     messages.push({
@@ -204,13 +266,50 @@
       role: "user",
       content: input,
     });
-    console.log(JSON.stringify(messages, 2, null));
-    //return
     if (record_in_convo) {
       data.messages.push(["input", input]);
       data = data;
     }
 
+    console.log(JSON.stringify(messages, 2, null));
+    try {
+    let prompt_tokens = countTokensExt(JSON.stringify(messages));
+      let live_response = document.getElementById("live_response");
+      live_response.innerText = "";
+      let response = await openAiCompletion(api_key, messages, (text) => {
+        if (record_in_convo) {
+          live_response.innerText = text;
+        }
+      });
+      console.log("Response", response);
+      if (record_in_convo) {
+        live_response.innerText = "";
+        //res.usage.prompt_tokens_netto = res.usage.prompt_tokens - last_input_tokens;
+        let prompt_tokens = countTokensExt(JSON.stringify(messages));
+        let completion_tokens = countTokensExt(response);
+        let res = {
+		  choices: [{message: {content: {response}}}],
+          usage: {
+            prompt_tokens: prompt_tokens,
+            prompt_tokens_netto: prompt_tokens - last_input_tokens,
+            completion_tokens: completion_tokens,
+          },
+        };
+        //res.usage.prompt_tokens_netto = res.usage.prompt_tokens - last_input_tokens;
+        data.messages.push(["output", res]);
+		data = data;
+      }
+      await save_convo();
+      highlight_code();
+    } catch (err) {
+      data.messages.push(["error", "Error: " + err]);
+
+      console.log(err);
+      toast.push("" + err);
+    }
+    processing = false;
+
+    /*
     let args = {
       method: "POST",
       timeout: 1000,
@@ -226,7 +325,7 @@
         messages: messages,
       }),
     };
-    console.log(args);
+    console.log("sending", args);
     let response = null;
     try {
       response = await fetch(url, args);
@@ -258,6 +357,7 @@
     processing = false;
     data = data;
     return response;
+	*/
   }
 
   onMount(async () => {
@@ -524,6 +624,10 @@
           <td colspan="2"><LoadBars color="#303030" /> </td>
         </tr>
       {/if}
+      <tr>
+        <th> Live response</th>
+        <td id="live_response" />
+      </tr>
 
       <tr>
         <th>New input</th>

@@ -5,6 +5,8 @@
   import { goto } from "$app/navigation";
   import { keypress } from "keypress.js";
   import { no_text_inputs_focused } from "$lib/util.ts";
+  import { Buffer } from "buffer";
+  globalThis.Buffer = Buffer;
 
   const unlisten_mouse_button_pressed = listen(
     "mouse-button-pressed",
@@ -84,10 +86,12 @@
   listener.register_combo({
     keys: "p",
     is_unordered: true,
-    prevent_default: true,
     prevent_repeat: true,
     on_keyup: (e, count, repeated) => {
-      goto("/palette");
+      if (no_text_inputs_focused()) {
+        goto("/palette");
+        e.preventDefault();
+      }
     },
   });
 

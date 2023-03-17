@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -37,9 +37,9 @@ pub struct MailStore {
 #[derive(Serialize, Debug)]
 pub struct SingleMessage {
     id: String,
-    raw: String,
     tags: Vec<String>,
     filename: String,
+    json: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -47,7 +47,6 @@ pub struct SingleMessageBrief {
     from: String,
     subject: String,
 }
-
 
 impl MailStore {
     pub fn new(path: impl AsRef<Path>, config_path: impl AsRef<Path>) -> MailStore {
@@ -120,20 +119,32 @@ impl MailStore {
         let database = self.open_db();
         let message = database.find_message(msg_id)?.context("not found")?;
         let raw = std::fs::read_to_string(message.filename())?;
+        let parsed = mail_parser::Message::parse(raw.as_bytes()).unwrap();
+
+        let json: String = serde_json::to_string_pretty(&parsed).unwrap();
 
         Ok(SingleMessage {
             id: msg_id.to_string(),
-            raw,
+            json,
             tags: message.tags().collect(),
             filename: message.filename().to_string_lossy().to_string(),
         })
     }
+
     pub fn get_message_brief(&self, msg_id: &str) -> anyhow::Result<SingleMessageBrief> {
         let database = self.open_db();
         let message = database.find_message(msg_id)?.context("not found")?;
         return Ok(SingleMessageBrief {
-            from: message.header("from").unwrap_or(None).map(|x| x.to_string()).unwrap_or_else(||"".to_string()),
-            subject: message.header("subject").unwrap_or(None).map(|x| x.to_string()).unwrap_or_else(||"".to_string()),
+            from: message
+                .header("from")
+                .unwrap_or(None)
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "".to_string()),
+            subject: message
+                .header("subject")
+                .unwrap_or(None)
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "".to_string()),
         });
     }
 
@@ -206,5 +217,44 @@ impl MailStore {
         }
 
         Ok(())
+    }
+
+    pub fn new_mail(
+        &mut self,
+        prev: Option<String>,
+        accounts: Vec<crate::storage::MailAccount>,
+    ) -> (PathBuf, String) {
+        let hostname = gethostname::gethostname().to_string_lossy().to_string();
+        //create a maildir filename from unix time, current process identifier, hostename,
+        //concactenated with a .
+        let maildir_mail_filename = format!(
+            "{}.{}.florg.{}.{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            std::process::id(),
+            hostname,
+            "mail"
+        );
+        let from = format!(
+            "From: {}\n",
+            accounts
+                .get(0)
+                .map(|x| &x.sender[..])
+                .unwrap_or("Configure mail accounts in settings!")
+        );
+        let mut content = match prev {
+            Some(_) => from, //todo
+            None => from,
+        };
+        content.push_str("\n");
+        let maildir_file_path = self
+            .database_path
+            .join(".Drafts")
+            .join("cur")
+            .join(maildir_mail_filename);
+        std::fs::write(&maildir_file_path, &content).expect("Failed to write mail draft file");
+        (maildir_file_path, content)
     }
 }

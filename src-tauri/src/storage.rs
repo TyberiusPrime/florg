@@ -36,6 +36,11 @@ pub(crate) struct Storage {
     pub(crate) chatgpt: Option<openai::ChatGPT>,
 }
 
+pub struct MailAccount{
+    pub sender: String,
+    pub addresses: Vec<String>
+}
+
 pub const FLORG_FILENAME: &'static str = "node.adoc";
 pub const FLORG_CACHE_FILENAME: &'static str = "node.cache";
 pub const FLORG_SUFFIX: &'static str = ".adoc";
@@ -302,6 +307,26 @@ impl Storage {
         let raw = serde_json::to_string(&entries)?;
         std::fs::write(&filename, raw)?;
         Ok(())
+    }
+
+    pub fn get_mail_accounts(&self) -> Vec<MailAccount> {
+        let  inner = || -> Option<Vec<MailAccount>> {
+            let mut accounts = Vec::new();
+            for acc in (&self.settings)
+            .get("mail.accounts")?
+            .as_table()?
+            .iter() {
+                let name = acc.0;
+                let sender = acc.1.get("sender")?.as_str()?;
+                //let addresses: Vec<String> = acc.1.get("sender")?.as_array()?.collect();
+                ////todo
+                //let addresses = Vec::new();
+
+            }
+            Some(accounts)
+        };
+        let res = inner();
+        res.unwrap_or_else(|| Vec::new())
     }
 }
 

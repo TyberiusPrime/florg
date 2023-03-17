@@ -25,18 +25,6 @@ pub struct ConversationListEntry {
 
 const STORAGE_PREFIX: &'static str = "chatgpt";
 
-fn get_str_table(toml_value: &toml_edit::Document, key: &str) -> Result<HashMap<String, String>> {
-    Ok(toml_value
-        .get(key)
-        .context("Key not found")?
-        .as_table()
-        .context("key was not a table")?
-        .iter()
-        .map(|(k, v)| (Some((k.to_string(), v.as_str()?.to_string()))))
-        .filter_map(|x| x)
-        .collect())
-}
-
 impl ChatGPT {
     pub fn new(api_key: String, data_path: PathBuf) -> Self {
         Self { api_key, data_path }

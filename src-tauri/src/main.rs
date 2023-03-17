@@ -31,6 +31,7 @@ pub struct OpenEditor {
     org_content: String,
     process: std::process::Child,
     window_title: String,
+    remove_after: bool,
 }
 
 #[derive(Debug)]
@@ -187,81 +188,102 @@ fn edit_node(path: &str, window_title: &str) -> bool {
             content += "Content after the next line. First line = new title \n--\n\n";
             let node = ss.get_node(path).map(|x| x.clone());
             content += node.as_ref().map(|x| &x.raw[..]).unwrap_or("");
-            let tf_name = tf.to_str().expect("temp file was not unicode name?");
             std::fs::write(&tf, &content).expect("temp file write failure");
 
             if let None = node {
                 let place_holder = Node::new(path, "(placeholder)");
                 ss.replace_node(place_holder, false);
             }
-
-            let process = std::process::Command::new("kitty")
-                .arg("--")
-                .arg("nvim")
-                .arg(format!("+{}", skip_lines))
-                .arg(tf_name)
-                .spawn()
-                .expect("Failed to spawn kitty&neovim");
-            let tf_name_for_thread = tf.file_name().map(|x| x.to_os_string()).unwrap();
-            let tf_for_thread = tf.clone();
-            let node_path = path.to_string();
-            thread::spawn(move || {
-                let mut inotify = Inotify::init().expect("inotify init failed");
-                inotify
-                    .add_watch(
-                        tf_folder,
-                        WatchMask::CLOSE_WRITE | WatchMask::DELETE | WatchMask::MOVED_TO,
-                    )
-                    .expect("inotify add watch failed");
-                loop {
-                    let mut buffer = [0; 1024];
-                    let events = inotify
-                        .read_events_blocking(&mut buffer)
-                        .expect("Error while reading events");
-
-                    for event in events {
-                        dbg!(&event);
-                        if event.mask.contains(EventMask::DELETE) {
-                            if let Some(event_filename) = event.name {
-                                if event_filename == tf_name_for_thread {
-                                    break;
-                                };
-                            }
-                        } else if event.mask.contains(EventMask::CLOSE_WRITE) {
-                            if let Some(event_filename) = event.name {
-                                if event_filename == tf_name_for_thread {
-                                    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-                                    let content = std::fs::read_to_string(&tf_for_thread)
-                                        .expect("could not read temp file");
-                                    let content = parse_raw_content(&content);
-                                    //println!("Telling viewer about changed temp file");
-                                    lock.app_handle
-                                        .emit_all("node-temp-changed", (&node_path, content))
-                                        .ok();
-                                }
-                            }
-                        }
-                        //dbg!(event);
-                        //http://localhost:1420/#/node/T
-                        //http://localhost:1420/#T
-                        //dbg!(&tf_name_for_thread);
-                        // Handle event
-                    }
-                }
-            });
-            runtime_state.open_editors.push(OpenEditor {
-                path: path.to_string(),
-                temp_file: tf,
-                org_content: content,
-                process,
-                window_title: window_title.to_string(),
-            });
+            edit_file(
+                tf,
+                content,
+                skip_lines,
+                "node-temp-changed",
+                path.to_string(),
+                window_title,
+                &mut runtime_state,
+                true,
+            );
         }
 
         true
     } else {
         false
     }
+}
+fn edit_file(
+    path: PathBuf,
+    content: String,
+    skip_lines: usize,
+    msg_to_js: &'static str,
+    path_for_js: String,
+    window_title: &str,
+    runtime_state: &mut MutexGuard<RuntimeState>,
+    remove_after: bool,
+) {
+    let process = std::process::Command::new("kitty")
+        .arg("--")
+        .arg("nvim")
+        .arg(format!("+{}", skip_lines))
+        .arg(path.to_string_lossy().to_string())
+        .spawn()
+        .expect("Failed to spawn kitty&neovim");
+    let tf_name_for_thread = path.file_name().map(|x| x.to_os_string()).unwrap();
+    let tf_for_thread = path.clone();
+    let path_for_thread = path_for_js.to_string();
+    thread::spawn(move || {
+        let mut inotify = Inotify::init().expect("inotify init failed");
+        let tf_folder = tf_for_thread.parent().unwrap();
+        inotify
+            .add_watch(
+                tf_folder,
+                WatchMask::CLOSE_WRITE | WatchMask::DELETE | WatchMask::MOVED_TO,
+            )
+            .expect("inotify add watch failed");
+        loop {
+            let mut buffer = [0; 1024];
+            let events = inotify
+                .read_events_blocking(&mut buffer)
+                .expect("Error while reading events");
+
+            for event in events {
+                dbg!(&event);
+                if event.mask.contains(EventMask::DELETE) {
+                    if let Some(event_filename) = event.name {
+                        if event_filename == tf_name_for_thread {
+                            break;
+                        };
+                    }
+                } else if event.mask.contains(EventMask::CLOSE_WRITE) {
+                    if let Some(event_filename) = event.name {
+                        if event_filename == tf_name_for_thread {
+                            let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                            let content = std::fs::read_to_string(&tf_for_thread)
+                                .expect("could not read temp file");
+                            let content = parse_raw_content(&content);
+                            //println!("Telling viewer about changed temp file");
+                            lock.app_handle
+                                .emit_all(&msg_to_js, (&path_for_thread, content))
+                                .ok();
+                        }
+                    }
+                }
+                //dbg!(event);
+                //http://localhost:1420/#/node/T
+                //http://localhost:1420/#T
+                //dbg!(&tf_name_for_thread);
+                // Handle event
+            }
+        }
+    });
+    runtime_state.open_editors.push(OpenEditor {
+        path: path_for_js.to_string(),
+        temp_file: path,
+        org_content: content,
+        process,
+        window_title: window_title.to_string(),
+        remove_after: remove_after,
+    });
 }
 
 fn get_settings_temp_filename(ss: &MutexGuard<Storage>) -> PathBuf {
@@ -272,6 +294,7 @@ fn get_settings_temp_filename(ss: &MutexGuard<Storage>) -> PathBuf {
 }
 
 fn spawn_settings_editor(tf: PathBuf, content: String, lock: &mut MutexGuard<RuntimeState>) {
+    //todo: combine with edit_file
     let tf_name = tf.to_str().expect("temp file was not unicode name?");
     let process = std::process::Command::new("kitty")
         .arg("--")
@@ -286,6 +309,7 @@ fn spawn_settings_editor(tf: PathBuf, content: String, lock: &mut MutexGuard<Run
         org_content: content,
         process,
         window_title: "Settings".to_string(),
+        remove_after: true,
     });
 }
 
@@ -624,6 +648,22 @@ fn mail_message_store_attachments(id: &str) -> bool {
     }
     res.is_ok()
 }
+#[tauri::command]
+fn mail_message_new(id: Option<String>, window_title: &str) {
+    let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+    let (filename, org_content) = lock.notmuch_db.new_mail(id, Vec::new());
+    let path_for_js = filename.file_name().unwrap().to_string_lossy().to_string();
+    edit_file(
+        filename,
+        org_content,
+        0, //todo
+        "mail-temp-changed",
+        path_for_js,
+        window_title,
+        &mut lock,
+        false,
+    );
+}
 
 #[tauri::command]
 fn chatgpt_get_prompts() -> HashMap<String, HashMap<String, String>> {
@@ -819,7 +859,9 @@ fn editor_ended() {
     for (ii, path, result) in remove {
         let window_title = {
             let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-            std::fs::remove_file(&lock.open_editors[ii].temp_file).ok();
+            if lock.open_editors[ii].remove_after {
+                std::fs::remove_file(&lock.open_editors[ii].temp_file).ok();
+            }
             let window_title = lock.open_editors[ii].window_title.clone();
             lock.open_editors.remove(ii);
             window_title
@@ -1007,6 +1049,7 @@ fn main() -> Result<()> {
             mail_message_remove_tags,
             mail_message_toggle_tag,
             mail_message_store_attachments,
+            mail_message_new,
             mail_get_tags,
             chatgpt_get_prompts,
             chatgpt_update_prompts,

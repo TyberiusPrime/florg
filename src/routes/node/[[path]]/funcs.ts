@@ -25,9 +25,8 @@ export async function render_text(text: string) {
         if (msg == null) {
           title = "Unknown email";
         } else {
-			title = `${msg.from}: ${msg.subject}`;
-		}
-
+          title = `${msg.from}: ${msg.subject}`;
+        }
 
         let id = path.slice(5);
         return `<a href="/mail/message/${id}">mail:${title}`;
@@ -40,4 +39,25 @@ export async function render_text(text: string) {
   rendered = rendered.replaceAll("<p", "<p tabIndex=0 ");
 
   return rendered;
+}
+
+export async function render_text_cached(path: string, raw: string) {
+  let rendered_cached = await invoke("get_cached_node", { path });
+  if (rendered_cached == null) {
+    let start_time = performance.now();
+
+    rendered_cached = await render_text(raw);
+
+    let end_time = performance.now();
+    if (end_time - start_time > 100) {
+      // probably just as fast to not cache...
+      await invoke("set_cached_node", {
+        path: path,
+        raw: raw,
+        rendered: rendered_cached,
+      });
+    }
+  } else {
+  }
+  return rendered_cached;
 }

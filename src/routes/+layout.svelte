@@ -90,6 +90,3 @@
 />
 <SvelteToast bind:options={toast_options} />
 <slot />
-<div>
-  {window.location.href}
-</div>

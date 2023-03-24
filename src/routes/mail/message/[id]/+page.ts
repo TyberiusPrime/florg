@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/tauri";
-import PostalMime from "postal-mime";
 import html2plaintext from "html2plaintext";
 
 import { removeItemOnce } from "../../../../lib/util";
@@ -10,7 +9,6 @@ export async function load({ params }) {
   let msg = await invoke("get_mail_message", {
     id: mail_id,
   });
-  let raw_message = msg.raw;
   let tags = msg.tags;
 
   if (tags.indexOf("unread") > -1) {
@@ -21,15 +19,30 @@ export async function load({ params }) {
     });
     removeItemOnce(tags, "unread");
   }
-  const parser = new PostalMime();
-  const email = await parser.parse(raw_message);
+  let parsed = JSON.parse(msg.json);
+  let headers = parsed.parts[0].headers;
+  let text = "";
+  for (let ii = 0; ii < parsed.parts.length; ii++) {
+	if ("Text" in parsed.parts[ii].body){
+	  text += parsed.parts[ii].body.Text;
+	}
+  }
+  let html = "";
+  for (let ii = 0; ii < parsed.parts.length; ii++) {
+	if ("Html" in parsed.parts[ii].body){
+	  html += parsed.parts[ii].body.Html;
+	}
+  }
+  //console.log(msg.json);
   let res = {
     id: mail_id,
-    raw: raw_message,
-    parsed: email,
+    parsed: parsed,
+	headers: headers,
     tags: tags,
     filename: msg.filename,
     available_tags: await invoke("mail_get_tags", {}),
+	text: text,
+	html: html,
   };
 
   return res;

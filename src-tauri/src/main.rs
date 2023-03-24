@@ -118,10 +118,45 @@ fn get_node(path: &str) -> NodeForJS {
         children,
     }
 }
+
 #[tauri::command]
 fn get_node_title(path: &str) -> Option<String> {
     let s = STORAGE.get().unwrap().lock().unwrap();
     s.get_node(path).map(|x| x.header.title.clone())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TreeForJS {
+    pub path: String,
+    pub title: String,
+    pub first_paragraph: String,
+    pub more_text: bool,
+    pub children: Vec<TreeForJS>,
+    pub has_children: bool,
+}
+
+fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> TreeForJS {
+    let node = storage.get_node(path).unwrap();
+    let children = storage.children_paths_for(path);
+    let has_children = !children.is_empty();
+    TreeForJS {
+        path: path.to_string(),
+        title: node.header.title.clone(),
+        first_paragraph: node.header.first_paragraph.clone(),
+        more_text: node.header.has_more_content,
+        children: if remaining_depth > 0 {
+            children.iter().map(|x| descend(x, storage, remaining_depth - 1)).collect()
+        } else {
+            Vec::new()
+        },
+        has_children,
+    }
+}
+
+#[tauri::command]
+fn get_tree(path: &str, max_depth: i32) -> TreeForJS {
+    let s = STORAGE.get().unwrap().lock().unwrap();
+    descend(path, &s, max_depth)
 }
 
 #[tauri::command]
@@ -1029,6 +1064,7 @@ fn main() -> Result<()> {
             get_node,
             get_node_title,
             get_node_folder_path,
+            get_tree,
             delete_node,
             list_open_paths,
             date_to_path,

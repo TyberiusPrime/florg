@@ -47,8 +47,8 @@ body {
 
          .main_content {
            grid-area: content;
-      width:100%;
-      min-width:50%;
+		  width:100%;
+		  min-width:50%;
 
            /* General appearance */
          }
@@ -74,7 +74,7 @@ body {
          .sticky-content {
            position: sticky;
            bottom: var(--footer-height);
-           min-height: calc(100vh - var(--footer-height));
+           height: calc(100vh - var(--footer-height) - var(--header-height));
            box-sizing: border-box;
 
            --padding: 0px;
@@ -84,6 +84,10 @@ body {
              var(--padding);
            margin-top: calc(0px - var(--header-height));
          }
+
+		 .main_div {
+           height: calc(100vh - var(--footer-height) - var(--header-height));
+		 }
 
     .error {
       color:red;

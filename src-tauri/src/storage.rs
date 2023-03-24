@@ -16,6 +16,7 @@ use walkdir::WalkDir;
 pub(crate) struct Header {
     pub title: String,
     pub first_paragraph: String,
+    pub has_more_content: bool,
 }
 
 #[derive(Debug, Clone, Eq, Serialize)]
@@ -36,9 +37,9 @@ pub(crate) struct Storage {
     pub(crate) chatgpt: Option<openai::ChatGPT>,
 }
 
-pub struct MailAccount{
+pub struct MailAccount {
     pub sender: String,
-    pub addresses: Vec<String>
+    pub addresses: Vec<String>,
 }
 
 pub const FLORG_FILENAME: &'static str = "node.adoc";
@@ -47,13 +48,17 @@ pub const FLORG_SUFFIX: &'static str = ".adoc";
 
 impl Storage {
     fn get_chatgtp_key(settings: &toml_edit::Document) -> Option<String> {
-        settings.get("chatgpt")?.get("api_key")?.as_str().map(|x| x.to_string())
+        settings
+            .get("chatgpt")?
+            .get("api_key")?
+            .as_str()
+            .map(|x| x.to_string())
     }
     pub(crate) fn new(data_path: PathBuf, git_binary: String) -> Storage {
         let settings =
             Self::load_settings(&data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
         //todo: make this robust
-        let chatgpt =  Storage::get_chatgtp_key(&settings)
+        let chatgpt = Storage::get_chatgtp_key(&settings)
             .map(|s| openai::ChatGPT::new(s.to_string(), data_path.clone()));
 
         let mut s = Storage {
@@ -70,10 +75,10 @@ impl Storage {
     pub fn reload(&mut self) {
         let nodes = Self::parse_path(&self.data_path);
         self.nodes = nodes;
-        let settings =
-            Self::load_settings(&self.data_path, None).unwrap_or_else(|_| toml_edit::Document::new());
+        let settings = Self::load_settings(&self.data_path, None)
+            .unwrap_or_else(|_| toml_edit::Document::new());
 
-        let chatgpt =  Storage::get_chatgtp_key(&settings)
+        let chatgpt = Storage::get_chatgtp_key(&settings)
             .map(|s| openai::ChatGPT::new(s.to_string(), self.data_path.clone()));
         self.settings = settings;
         self.chatgpt = chatgpt;
@@ -136,7 +141,7 @@ impl Storage {
         self.nodes.iter().filter(|n| n.path == path).next()
     }
 
-    pub (crate) fn delete_node(&mut self, path: &str) -> Result<(), String> {
+    pub(crate) fn delete_node(&mut self, path: &str) -> Result<(), String> {
         let node = self.get_node(path).ok_or("node not found")?;
         let file_path = node.dirname(&self.data_path);
         std::fs::remove_dir_all(file_path).map_err(|e| e.to_string())?;
@@ -166,6 +171,18 @@ impl Storage {
             .nodes
             .iter()
             .filter(|n| n.path.len() == lp && n.path.starts_with(path))
+            .collect();
+        res.sort();
+        res
+    }
+
+    pub(crate) fn children_paths_for(&self, path: &str) -> Vec<String> {
+        let lp = path.len() + 1;
+        let mut res: Vec<_> = self
+            .nodes
+            .iter()
+            .filter(|n| n.path.len() == lp && n.path.starts_with(path))
+            .map(|n| n.path.clone())
             .collect();
         res.sort();
         res
@@ -310,18 +327,14 @@ impl Storage {
     }
 
     pub fn get_mail_accounts(&self) -> Vec<MailAccount> {
-        let  inner = || -> Option<Vec<MailAccount>> {
+        let inner = || -> Option<Vec<MailAccount>> {
             let mut accounts = Vec::new();
-            for acc in (&self.settings)
-            .get("mail.accounts")?
-            .as_table()?
-            .iter() {
+            for acc in (&self.settings).get("mail.accounts")?.as_table()?.iter() {
                 let name = acc.0;
                 let sender = acc.1.get("sender")?.as_str()?;
                 //let addresses: Vec<String> = acc.1.get("sender")?.as_array()?.collect();
                 ////todo
                 //let addresses = Vec::new();
-
             }
             Some(accounts)
         };
@@ -363,21 +376,23 @@ impl Node {
             Some((first_line, _)) => first_line.trim_start_matches("= "),
             _ => contents,
         };
-        let first_para = match contents.split_once("\n\n") {
-            Some((first_para, _)) => {
+        let (first_para, has_more) = match contents.split_once("\n\n") {
+            Some((first_para, _)) => (
                 if first_para.contains('\n') {
                     first_para.strip_prefix(title).unwrap().trim()
                 } else {
                     let mut it = contents.split("\n\n");
                     it.next();
                     it.next().unwrap().trim()
-                }
-            }
-            _ => contents,
+                },
+                false,
+            ),
+            _ => (contents, true),
         };
         Header {
             title: title.to_string(),
             first_paragraph: first_para.to_string(),
+            has_more_content: has_more,
         }
     }
 

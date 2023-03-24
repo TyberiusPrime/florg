@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { appWindow } from "@tauri-apps/api/window";
   import { invoke } from "@tauri-apps/api/tauri";
   import { toast } from "@zerodevx/svelte-toast";
   //import { get_last_path } from "../lib/mode_stack.ts";
@@ -8,12 +9,12 @@
     removeItemOnce,
     dispatch_keyup,
     focus_first_in_node,
+    format_date,
   } from "$lib/util.ts";
   import { createEventDispatcher } from "svelte";
   import { writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
   import { goto } from "$app/navigation";
   import { tag_class } from "$lib/colors.ts";
-  import PostalMime from "postal-mime";
   import { onMount, onDestroy, afterUpdate } from "svelte";
   import SvelteTooltip from "svelte-tooltip";
   import html2plaintext from "html2plaintext";
@@ -46,6 +47,7 @@
 
   let help_entries = [
     { key: "Esc", text: "Go back" },
+    { key: "r", text: "reply menu" },
     { key: "l", text: "toggle html" },
     { key: "i", text: "toggle images" },
     { key: "c", text: "copy menu" },
@@ -64,7 +66,7 @@
     },
 
     l: () => {
-      if (data.parsed.html != null) {
+      if (data.html != null) {
         show_html = !show_html;
         return true;
       }
@@ -108,7 +110,7 @@
       return true;
     },
     i: () => {
-      if (data.parsed.html != null) {
+      if (data.html != null) {
         show_images = !show_images;
         show_html = false;
         //we need it to retrigger building the iframe
@@ -146,6 +148,10 @@
       overlay = "goto";
       return true;
     },
+    r: () => {
+      overlay = "reply";
+      return true;
+    },
   };
 
   function handle_keys(ev) {
@@ -172,11 +178,25 @@
 
   function get_header(parsed, header) {
     for (let i = 0; i < parsed.headers.length; i++) {
-      if (
-        parsed.headers[i].key != null &&
-        parsed.headers[i].key.toLowerCase()! == header
-      ) {
-        return parsed.headers[i].value;
+      if (parsed.headers[i].name.Rfc?.toLowerCase()! == header) {
+        let value;
+        if ("Address" in parsed.headers[i].value) {
+          value = `${parsed.headers[i].value.Address.name} <${parsed.headers[i].value.Address.address}>`;
+        } else if ("DateTime" in parsed.headers[i].value) {
+		console.log('date')
+          let input_date = parsed.headers[i].value.DateTime;
+          value = new Date(
+            input_date.year,
+            input_date.month - 1,
+            input_date.day,
+            input_date.hour,
+            input_date.minute,
+            input_date.second
+          );
+        } else {
+          value = parsed.headers[i].value.Text;
+        }
+        return value;
       }
     }
   }
@@ -263,33 +283,40 @@
     { key: "f", target_path: "filename", text: "Copy filename" },
   ];
 
+  let reply_entries = [
+    { key: "r", target_path: "reply", text: "reply" },
+    { key: "n", target_path: "new_to_sender", text: "new message to sender" },
+    { key: "N", target_path: "new", text: "new message (no receiver)" },
+    { key: "A", target_path: "reply_all", text: "Reply all" },
+  ];
+
   function handle_copy(ev) {
     let target = ev.detail;
     if (target == "link") {
-	  copy_to_clipboard(`<<mail:${data.id}>>`);
+      copy_to_clipboard(`<<mail:${data.id}>>`);
     } else if (target == "text") {
-      if (data.parsed.text != null) {
-        copy_to_clipboard(extractContent(data.parsed.text));
+      if (data.text != null) {
+        copy_to_clipboard(extractContent(data.text));
       } else {
         error_toast("No text part found");
       }
     } else if (target == "html") {
-      if (data.parsed.html != null) {
-        copy_to_clipboard(extractContent(data.parsed.html));
+      if (data.html != null) {
+        copy_to_clipboard(extractContent(data.html));
       }
     } else if (target == "raw_html") {
-      if (data.parsed.html != null) {
-        copy_to_clipboard(data.parsed.html);
+      if (data.html != null) {
+        copy_to_clipboard(data.html);
       } else {
         error_toast("No html part found");
       }
     } else if (target == "headers") {
       let headers = "";
-      for (let i = 0; i < data.parsed.headers.length; i++) {
+      for (let i = 0; i < data.headers.length; i++) {
         headers +=
-          data.parsed.headers[i].key +
+          data.headers[i].key +
           ": " +
-          data.parsed.headers[i].value +
+          data.headers[i].value +
           "\n";
       }
       copy_to_clipboard(headers);
@@ -319,6 +346,38 @@
     data = data;
     overlay = "";
   }
+
+  async function handle_reply(ev) {
+    switch (ev.detail) {
+      case "reply":
+        await invoke("mail_message_reply", {
+          id: data.id,
+          reply_all: false,
+        });
+        break;
+      case "reply_all":
+        await invoke("mail_message_reply", {
+          id: data.id,
+          reply_all: true,
+        });
+        break;
+      case "new":
+        await invoke("mail_message_new", {
+          id: null,
+          windowTitle: appWindow.label,
+        });
+        break;
+      case "new_to_sender":
+        await invoke("mail_message_new", {
+          id: data.id,
+          windowTitle: appWindow.label,
+        });
+        break;
+      default:
+        error_toast("Unknown reply target: " + ev.detail);
+    }
+    overlay = "";
+  }
 </script>
 
 <View>
@@ -326,36 +385,36 @@
     <table>
       <tr>
         <th>From</th>
-        <td>{get_header(data.parsed, "from")}</td>
+        <td>{get_header(data, "from")}</td>
       </tr>
       <tr>
         <th>To</th>
-        <td><Expander text={format_to(get_header(data.parsed, "to"))} /></td>
+        <td><Expander text={format_to(get_header(data, "to"))} /></td>
       </tr>
       <tr>
         <th>Subject</th>
-        <td>{get_header(data.parsed, "subject")}</td>
+        <td>{get_header(data, "subject")}</td>
       </tr>
       <tr>
         <th>Date</th>
         <td>
           <SvelteTooltip
-            tip={get_header(data.parsed, "date")}
+            tip={get_header(data, "date")}
             right
             color="#DFDFDF;border:1px dashed grey;"
           >
-            {local_date(get_header(data.parsed, "date"))}
+            {local_date(get_header(data, "date"))}
           </SvelteTooltip>
         </td>
       </tr>
       {#each optional_headers as opt_header}
-        {#if get_header(data.parsed, opt_header) != null}
+        {#if get_header(data, opt_header) != null}
           <tr>
             <th>{opt_header}</th>
             {#if opt_header.toLowerCase() == "cc"}
-              <td>{format_to(get_header(data.parsed, opt_header))}</td>
+              <td>{format_to(get_header(data, opt_header))}</td>
             {:else}
-              <td>{get_header(data.parsed, opt_header)}</td>
+              <td>{get_header(data, opt_header)}</td>
             {/if}
           </tr>
         {/if}
@@ -376,7 +435,7 @@
   <div slot="content">
     {#if all_headers}
       <table>
-        {#each data.parsed.headers as header}
+        {#each data.headers as header}
           <tr>
             <th>{header.key}</th>
             <td>{header.value}</td>
@@ -388,23 +447,26 @@
 
     {#if show_html}
       <iframe
-        srcdoc={csp(data.parsed.html)}
+        srcdoc={csp(data.html)}
         sandbox=""
         style="width:95%; border: 3px solid purple;height:100vh;"
         id="mail_content_iframe"
       />
-    {:else if data.parsed.text == null}
-      {#if data.parsed.html != null}
+    {:else if data.text == null}
+      {#if data.html != null}
         (extracted from html)
-        <pre>{wrap(extractContent(data.parsed.html))}</pre>
+        <pre>{wrap(extractContent(data.html))}</pre>
       {:else}
         (no text, no html)
       {/if}
     {:else}
-      {#if data.parsed.html != null}
+      {#if data.html != null}
         (html available){/if}
-      <pre>{@html wrap(escape_html(data.parsed.text))}</pre>
+      <pre>{@html wrap(escape_html(data.text))}</pre>
     {/if}
+	<pre>
+	{JSON.stringify(data.parsed, null, 2)}
+	</pre>
   </div>
 
   <div slot="footer">
@@ -430,6 +492,8 @@
         />
       {:else if overlay == "goto"}
         <Goto />
+      {:else if overlay == "reply"}
+        <QuickPick bind:entries={reply_entries} on:action={handle_reply} />
       {:else if overlay == ""}
         Press <span class="hotkey">h</span> for help.
       {/if}

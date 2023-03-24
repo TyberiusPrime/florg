@@ -126,7 +126,7 @@ export function dispatch_keyup(keys) {
     console.log("dispatch key up", ev.key);
     let action = keys[ev.key];
     if (action) {
-		console.log("action");
+		console.log("action", action);
       if (action(ev)) {
         ev.stopPropagation();
 		ev.stopImmediatePropagation();

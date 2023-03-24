@@ -9,6 +9,7 @@
   } from "../lib/util.ts";
 
   export let overlay = false;
+  let last_overlay = "";
 
   onMount(async () => {});
 
@@ -25,8 +26,8 @@
   onDestroy(async () => {});
 
   afterUpdate(() => {
-    console.log("afterUpdate");
-    if (overlay != "") {
+    if (overlay != last_overlay) {
+	last_overlay = overlay;
       window.setTimeout(
         () => focus_first_in_node(document.getElementById("overlay")),
         10

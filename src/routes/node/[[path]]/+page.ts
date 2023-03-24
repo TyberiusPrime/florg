@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/tauri";
-import {render_text} from "./funcs";
+import { render_text, render_text_cached } from "./funcs";
 
 /** @type {import('./$types').PageLoad} */
-export async function load({ params }: {params: any}) {
-	console.log(params);
+export async function load({ params }: { params: any }) {
+  console.log(params);
   let path = params.path || "";
   console.log(path);
 
@@ -18,26 +18,7 @@ export async function load({ params }: {params: any}) {
     res.raw = "(empty node - enter to create)";
     res.title = "(empty node)";
   }
-  let rendered_cached = await invoke("get_cached_node", { path });
-  if (rendered_cached == null) {
-    let start_time = performance.now();
-
-    console.log(res.raw);
-
-    res.rendered = await render_text(res.raw);
-
-    let end_time = performance.now();
-    if (end_time - start_time > 100) {
-      // probably just as fast to not cache...
-      await invoke("set_cached_node", {
-        path: path,
-        raw: res.raw,
-        rendered: res.rendered,
-      });
-    }
-  } else {
-    res.rendered = rendered_cached;
-  }
+  res.rendered = render_text_cached(path, res.raw);
 
   let children = [];
   node.children.forEach((c) => {

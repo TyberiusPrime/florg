@@ -7,7 +7,7 @@
   import { add_code_clipboards, dispatch_keyup } from "$lib/util.ts";
   import { goto, invalidateAll } from "$app/navigation";
   import { toast } from "@zerodevx/svelte-toast";
-  import { appWindow } from '@tauri-apps/api/window';
+  import { appWindow } from "@tauri-apps/api/window";
   import {
     set_last_path,
     check_and_reset_mode_ignore_enter,
@@ -150,6 +150,9 @@
       if (!ev.ctrlKey) {
         edit_current_node();
       }
+    },
+    t: () => {
+      goto("/tree/" + data.path);
     },
   };
 

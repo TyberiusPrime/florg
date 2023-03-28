@@ -24,7 +24,10 @@
   import { tag_class } from "$lib/colors.ts";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
-  import { readText as read_clipboard, writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
+  import {
+    readText as read_clipboard,
+    writeText as copy_to_clipboard,
+  } from "@tauri-apps/api/clipboard";
   import { add_code_clipboards, dispatch_keyup, iso_date } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -71,6 +74,19 @@
     { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
 
+  function map_tags(tags) {
+    if (tags !== undefined) {
+      let res = [];
+	  console.log(tags);
+      for (let key in tags) {
+        let tag = tags[key];
+        res.push({ key: key, text: tag, target_path: tag });
+      }
+      return res;
+    }
+  }
+
+  let tag_entries = map_tags(data.tags);
   let keys = {
     " ": () => {
       nav_text = "nav";
@@ -84,10 +100,12 @@
     h: () => {
       viewComponent.enter_overlay("help");
     },
-  c: () => {
+    c: () => {
       viewComponent.enter_overlay("copying");
     },
-
+    t: () => {
+      viewComponent.enter_overlay("tag");
+    },
     g: () => {
       viewComponent.enter_overlay("goto");
     },
@@ -689,8 +707,10 @@
     if (out != null) {
       await copy_to_clipboard(out);
     }
-	viewComponent.leave_overlay();
+    viewComponent.leave_overlay();
   }
+
+  async function handle_tag(ev) {}
 </script>
 
 <View
@@ -784,6 +804,9 @@
       <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
     {:else if overlay == "copying"}
       <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+    {:else if overlay == "tag"}
+      tag
+      <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input
@@ -795,6 +818,8 @@
         id="fetch_url_input"
         style="width:98%;"
       />
+    {:else}
+      Unknown overlay {overlay}
     {/if}
   </svelte:fragment>
 </View>

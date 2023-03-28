@@ -93,18 +93,32 @@ export function find_siblings(flat, index) {
   let parent = path.substring(0, path.length - 1);
   let prev = null;
   let next = null;
-  if (index > 0) {
-    if (
-      flat[index - 1].path.startsWith(parent) &&
-      flat[index - 1].path.length == path.length //not the parent
-    ) {
-      prev = flat[index - 1].path;
+  let new_index = index - 1;
+  while (new_index > 0) {
+    if (flat[new_index].path.length == path.length) {
+      if (flat[new_index].path.startsWith(parent)) {
+        prev = flat[new_index ].path;
+        break;
+      } else if (flat[new_index ].path.length < path.length) {
+        break;
+      }
     }
+    new_index -= 1;
   }
-  if (index < flat.length - 1) {
-    if (flat[index + 1].path.startsWith(parent)) {
-      next = flat[index + 1].path;
+  new_index = index + 1;
+  while (new_index < flat.length) {
+    if (flat[new_index ].path.length == path.length) {
+      if (
+        flat[new_index ].path.startsWith(parent)
+      ) {
+        next = flat[new_index ].path;
+        break;
+      }
+    } else if (flat[new_index ].path.length < path.length) {
+      break;
     }
+    new_index += 1;
   }
+
   return [prev, next];
 }

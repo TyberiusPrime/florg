@@ -123,10 +123,10 @@ export function trim_eol(multi_lines: string) {
 
 export function dispatch_keyup(keys) {
   return (ev) => {
-    console.log("dispatch key up", ev.key);
+    //console.log("dispatch key up", ev.key);
     let action = keys[ev.key];
     if (action) {
-		console.log("action", action);
+		//console.log("action", action);
       if (action(ev)) {
         ev.stopPropagation();
 		ev.stopImmediatePropagation();
@@ -145,13 +145,13 @@ export function focus_first_in_node(node) {
   if (f == null) {
     node.focus();
   } else {
-    console.log("focusing on", f);
+    //console.log("focusing on", f);
     f.focus();
   }
 }
 export function find_first_focusable(node) {
   if (node == null) {
-    console.log("find_first_focusable(: node is null");
+    //console.log("find_first_focusable(: node is null");
     return null;
   }
   let f = tabbable(node)[0];

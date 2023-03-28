@@ -15,7 +15,7 @@
     flattenObject,
     expand_path,
     delete_from_tree,
-	find_siblings,
+    find_siblings,
   } from "./funcs";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
@@ -402,7 +402,7 @@
     });
     //toast.push("moving to " + new_path);
     let siblings = find_siblings(data.flat, activeIndex);
-	console.log('siblings', siblings);
+    console.log("siblings", siblings);
     let res = await invoke("move_node", {
       orgPath: data.current_item,
       newPath: new_path,
@@ -457,6 +457,43 @@
   let filter_goto_for_move = (target_path) => {
     return !target_path.startsWith("mail:");
   };
+
+  let handle_shift_up = async () => {
+    let siblings = find_siblings(data.flat, activeIndex);
+    let path = data.current_item;
+    if (siblings[0] !== null) {
+      let res = await invoke("swap_node_with_previous", { path: path });
+      if (res !== null) {
+        toast.push(res);
+        return false;
+      }
+      let parent = path.substring(0, path.length - 1);
+      await toggle_node(parent, true);
+      await toggle_node(parent, false);
+      await goto_node(siblings[0]);
+      return false; //no action by the Focusable
+    }
+  };
+
+  let handle_shift_down = async () => {
+	let siblings = find_siblings(data.flat, activeIndex);
+	let path = data.current_item;
+	if (siblings[1] !== null) {
+	  let res = await invoke("swap_node_with_next", { path: path });
+	  if (res !== null) {
+		toast.push(res);
+		return false;
+	  }
+	  let parent = path.substring(0, path.length - 1);
+	  await toggle_node(parent, true);
+	  await toggle_node(parent, false);
+	  toast.push("going to " + siblings[1]);
+	  await goto_node(siblings[1]);
+	  return false; //no action by the Focusable
+	} else {
+	}
+  };
+
 </script>
 
 <View on:keyup={dispatch_keyup(keys)} bind:this={viewComponent} bind:overlay>
@@ -473,6 +510,8 @@
         on:itemSelected={item_selected}
         bind:can_expand
         bind:can_contract
+        bind:handle_shift_up
+		bind:handle_shift_down
       >
         {#each data.flat as node, ii}
           <tr
@@ -543,6 +582,9 @@
 
   .more {
     color: #3636ff;
+  }
+
+  td {
   }
 
   .column {

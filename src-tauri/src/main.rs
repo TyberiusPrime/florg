@@ -143,7 +143,8 @@ fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> O
         Some(TreeForJS {
             path: path.to_string(),
             title: node.map_or_else(|| "(empty node)".to_string(), |x| x.header.title.clone()),
-            first_paragraph: node.map_or_else(|| "".to_string(), |x| x.header.first_paragraph.clone()),
+            first_paragraph: node
+                .map_or_else(|| "".to_string(), |x| x.header.first_paragraph.clone()),
             more_text: node.map_or(false, |x| x.header.has_more_content),
             children: if remaining_depth > 0 {
                 children
@@ -167,9 +168,35 @@ fn get_tree(path: &str, max_depth: i32) -> Option<TreeForJS> {
 #[tauri::command]
 fn move_node(org_path: &str, new_path: &str) -> Option<String> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    match s.move_node(org_path, new_path) {
+    match s.move_node(org_path, new_path, true) {
         Ok(_) => None,
-        Err(e) => Some(e.to_string()),
+        Err(e) => {
+            println!("{:?}", &e);
+            Some(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+fn swap_node_with_previous(path: &str) -> Option<String> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    match s.swap_node_with_previous(path) {
+        Ok(_) => None,
+        Err(e) => {
+            println!("{:?}", &e);
+            Some(e.to_string())
+        }
+    }
+}
+#[tauri::command]
+fn swap_node_with_next(path: &str) -> Option<String> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    match s.swap_node_with_next(path) {
+        Ok(_) => None,
+        Err(e) => {
+            println!("{:?}", &e);
+            Some(e.to_string())
+        }
     }
 }
 
@@ -1080,6 +1107,8 @@ fn main() -> Result<()> {
             get_node_folder_path,
             get_tree,
             move_node,
+            swap_node_with_previous,
+    swap_node_with_next,
             delete_node,
             list_open_paths,
             date_to_path,

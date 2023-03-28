@@ -10,6 +10,8 @@
   let lastJumpUp = [];
   export let can_expand = (path, do_expand) => false;
   export let can_contract = (path, do_expand) => false;
+  export let handle_shift_up = async () => false;
+  export let handle_shift_down = async () => false;
 
   let container;
 
@@ -25,7 +27,7 @@
         }
       }
     });
-  }
+  };
 
   function setActiveIndex(index, scroll = true) {
     if (activeIndex !== index) {
@@ -40,9 +42,33 @@
   async function handleKeyDown(event) {
     switch (event.key) {
       case "ArrowUp":
-        setActiveIndex(Math.max(activeIndex - 1, 0));
         event.preventDefault();
         event.stopPropagation();
+        if (event.ctrlKey) {
+		console.log("shift up");
+          if (!(await handle_shift_up())) {
+            return;
+          }
+        }
+        let new_index;
+        if (event.shiftKey) {
+          //todo: skip to next node with same or shorter prefix length
+
+          const last = childNodes[activeIndex];
+          const dataPath = last.dataset.path;
+          const prefix_length = dataPath.length;
+          new_index = Math.max(activeIndex - 1, 0);
+          while (
+			new_index > 0 &&
+            childNodes[new_index].dataset.path.length > prefix_length
+          ) {
+            new_index -= 1;
+          }
+        } else {
+          new_index = Math.max(activeIndex - 1, 0);
+        }
+		console.log('going to', new_index);
+        setActiveIndex(new_index);
         break;
       case "ArrowLeft":
         {
@@ -123,7 +149,15 @@
         break;
 
       case "ArrowDown":
+        event.stopPropagation();
+        event.preventDefault();
+        if (event.ctrlKey) {
+          if (!(await handle_shift_down())) {
+            return;
+          }
+        }
         if (event.shiftKey) {
+          //todo: refactor into siblings_flat or such...
           const last = childNodes[activeIndex];
           const dataPath = last.dataset.path;
           let new_index = Math.min(activeIndex + 1, childNodes.length - 1);
@@ -137,8 +171,6 @@
         } else {
           setActiveIndex(Math.min(activeIndex + 1, childNodes.length - 1));
         }
-        event.stopPropagation();
-        event.preventDefault();
         break;
       case "PageUp":
         setActiveIndex(Math.max(activeIndex - 10, 0));

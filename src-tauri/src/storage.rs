@@ -159,6 +159,7 @@ impl Storage {
                 }
             }
         }
+        nodes.sort_by(|a, b| a.path.cmp(&b.path));
         nodes
     }
 
@@ -179,7 +180,7 @@ impl Storage {
         Ok(())
     }
 
-    pub(crate) fn move_node(&mut self, org_path: &str, new_path: &str) -> Result<()> {
+    pub(crate) fn move_node(&mut self, org_path: &str, new_path: &str, commit: bool) -> Result<()> {
         if self.get_node(new_path).is_some() {
             bail!("new path already exists".to_string());
         }
@@ -189,14 +190,119 @@ impl Storage {
         println!("moving {:?} {:?}", &file_path, &new_file_path);
         std::fs::rename(file_path, new_file_path)?;
         self.rename_all_children(org_path, new_path);
-        self.add_and_commit(&format!("Moved node {org_path} to {new_path}"));
+        if commit {
+            self.add_and_commit(&format!("moved node {org_path} to {new_path}"));
+        }
         Ok(())
+    }
+
+    pub(crate) fn swap_node_with_previous(&mut self, path: &str) -> Result<()> {
+        if path.ends_with("A") {
+            bail!("Can not swap first node");
+        }
+        if self.get_node("!").is_some() {
+            bail!("Can not swap, tempmove node ('!') already exists. Manually clean up the storage directory.");
+        }
+        let prev = self.find_previous_sibling(path).context("No prev node")?;
+        self.move_node(&prev, "!", false)
+            .context("failed to move prev to tempmove")?;
+        self.move_node(path, &prev, false)
+            .context("failed to move path to prev")?;
+        self.move_node("!", &path, false)
+            .context("failed to move tempmove into prev")?;
+        self.make_nodes_sorted();
+        self.add_and_commit(&format!("Swapped nodes up: {} and {}", path, prev));
+        Ok(())
+    }
+
+    pub(crate) fn swap_node_with_next(&mut self, path: &str) -> Result<()> {
+        if path.ends_with("Z") {
+            bail!("Can not swap last node");
+        }
+        if self.get_node("!").is_some() {
+            bail!("Can not swap, tempmove node ('!') already exists. Manually clean up the storage directory.");
+        }
+        let next = self.find_next_sibling(path).context("No next node")?;
+        self.move_node(&next, "!", false)
+            .context("failed to move next to tempmove")?;
+        self.move_node(path, &next, false)
+            .context("failed to move path to next")?;
+        self.move_node("!", &path, false)
+            .context("failed to move tempmove into next")?;
+        self.make_nodes_sorted();
+        self.add_and_commit(&format!("Swapped nodes down: {} and {}", path, next));
+        Ok(())
+    }
+
+    fn make_nodes_sorted(&mut self) {
+        self.nodes.sort_by(|a, b| a.path.cmp(&b.path));
+    }
+
+    fn find_previous_sibling(&self, path: &str) -> Option<String> {
+        let node_idx = self
+            .nodes
+            .binary_search_by(|node| node.path.as_str().cmp(path))
+            .ok()?;
+        //find the first previous node that is at the same level (same path.len)
+        //if they share their -1 prefix, return it
+        for node in self.nodes[..node_idx].iter().rev() {
+            println!(
+                "Looking at {} {:?}",
+                node.path,
+                node.path.len().cmp(&path.len())
+            );
+            match node.path.len().cmp(&path.len()) {
+                Ordering::Less => return None,
+                Ordering::Equal => {
+                    if node.path[..path.len() - 1] == path[..path.len() - 1] {
+                        return Some(node.path.clone());
+                    } else {
+                        return None;
+                    }
+                }
+                Ordering::Greater => {}
+            }
+        }
+        None
+    }
+
+    fn find_next_sibling(&self, path: &str) -> Option<String> {
+        let node_idx = self
+            .nodes
+            .binary_search_by(|node| node.path.as_str().cmp(path))
+            .ok()?;
+        //find the first previous node that is at the same level (same path.len)
+        //if they share their -1 prefix, return it
+        for node in self.nodes[node_idx + 1..].iter() {
+            println!(
+                "Looking at {} {:?}",
+                node.path,
+                node.path.len().cmp(&path.len())
+            );
+            match node.path.len().cmp(&path.len()) {
+                Ordering::Less => return None,
+                Ordering::Equal => {
+                    if node.path[..path.len() - 1] == path[..path.len() - 1] {
+                        return Some(node.path.clone());
+                    } else {
+                        return None;
+                    }
+                }
+                Ordering::Greater => {}
+            }
+        }
+        None
     }
 
     fn rename_all_children(&mut self, org_path: &str, new_path: &str) {
         for node in self.nodes.iter_mut() {
             if node.path.starts_with(org_path) {
                 let suffix = &node.path[org_path.len()..];
+                println!(
+                    "Renaming {} to {}",
+                    node.path,
+                    format!("{}{}", new_path, suffix)
+                );
                 node.path = format!("{}{}", new_path, suffix);
             }
         }

@@ -165,6 +165,15 @@ fn get_tree(path: &str, max_depth: i32) -> Option<TreeForJS> {
 }
 
 #[tauri::command]
+fn move_node(org_path: &str, new_path: &str) -> Option<String> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    match s.move_node(org_path, new_path) {
+        Ok(_) => None,
+        Err(e) => Some(e.to_string()),
+    }
+}
+
+#[tauri::command]
 fn change_node_text(path: &str, text: &str) {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
@@ -1070,6 +1079,7 @@ fn main() -> Result<()> {
             get_node_title,
             get_node_folder_path,
             get_tree,
+            move_node,
             delete_node,
             list_open_paths,
             date_to_path,

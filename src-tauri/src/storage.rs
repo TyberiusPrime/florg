@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 use crate::openai;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
 
 use std::collections::{HashMap, HashSet};
@@ -166,12 +166,30 @@ impl Storage {
         self.nodes.iter().filter(|n| n.path == path).next()
     }
 
+    pub(crate) fn get_node_mut(&mut self, path: &str) -> Option<&mut Node> {
+        self.nodes.iter_mut().filter(|n| n.path == path).next()
+    }
+
     pub(crate) fn delete_node(&mut self, path: &str) -> Result<(), String> {
         let node = self.get_node(path).ok_or("node not found")?;
         let file_path = node.dirname(&self.data_path);
         std::fs::remove_dir_all(file_path).map_err(|e| e.to_string())?;
         self.add_and_commit(&format!("Deleted node {path} and children"));
         self.nodes.retain(|n| !n.path.starts_with(path));
+        Ok(())
+    }
+
+    pub(crate) fn move_node(&mut self, org_path: &str, new_path: &str) -> Result<()> {
+        if self.get_node(new_path).is_some() {
+            bail!("new path already exists".to_string());
+        }
+        let new_file_path = Node::dirname_from_path(&self.data_path, new_path);
+        let node = self.get_node(org_path).context("node not found")?;
+        let file_path = node.dirname(&self.data_path);
+        println!("moving {:?} {:?}", &file_path, &new_file_path);
+        std::fs::rename(file_path, new_file_path)?;
+        self.get_node_mut(org_path).unwrap().path = new_path.to_string();
+        self.add_and_commit(&format!("Moved node {org_path} to {new_path}"));
         Ok(())
     }
 
@@ -326,7 +344,6 @@ impl Storage {
         //dbg!("Read cache");
         let (stored_hash, content) = input.split_once("\n")?;
         if stored_hash == hash {
-            dbg!("hash match");
             Some(content.to_string())
         } else {
             //dbg!("hash mismatch", &hash, &stored_hash);
@@ -353,7 +370,7 @@ impl Storage {
 
     pub fn get_mail_accounts(&self) -> Vec<MailAccount> {
         let inner = || -> Option<Vec<MailAccount>> {
-            let mut accounts = Vec::new();
+            let accounts = Vec::new();
             for acc in (&self.settings).get("mail.accounts")?.as_table()?.iter() {
                 let name = acc.0;
                 let sender = acc.1.get("sender")?.as_str()?;

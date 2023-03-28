@@ -23,6 +23,7 @@
   import { emit, listen } from "@tauri-apps/api/event";
   export let data;
 
+  let viewComponent;
   let cache = {};
   let activeIndex;
   let scroll_to_active;
@@ -31,6 +32,8 @@
   let nav_start_index = 0;
   let nav_start_path = "";
   let nav_start_tree = null;
+  let move_and_goto = false;
+  let highlight_node = false;
   $: data.current_item = data?.flat[activeIndex]?.path;
   let help_entries = [{ key: "Esc", text: "Go back" }];
   let delete_entries = [{ key: "d", text: "delete node & children" }];
@@ -40,22 +43,29 @@
       nav_start_path = nav_path;
       nav_start_index = activeIndex;
       nav_start_tree = structuredClone(data.tree);
-      enter_overlay("nav");
+      viewComponent.enter_overlay("nav");
     },
     h: () => {
-      enter_overlay("help");
+      viewComponent.enter_overlay("help");
     },
     g: () => {
-      enter_overlay("goto");
+      viewComponent.enter_overlay("goto");
     },
     a: () => {
       add_node();
     },
     d: () => {
-      enter_overlay("delete");
+      viewComponent.enter_overlay("delete");
     },
-    m: () => {
-      enter_overlay("move");
+    m: (ev) => {
+      highlight_node = false;
+      move_and_goto = false;
+      viewComponent.enter_overlay("move");
+    },
+    M: (ev) => {
+      highlight_node = false;
+      move_and_goto = true;
+      viewComponent.enter_overlay("move");
     },
   };
 
@@ -84,19 +94,6 @@
         toggleElementAndChildren(child, isDisabled);
       }
     }
-  }
-
-  function enter_overlay(ov) {
-    overlay = ov;
-    toggleElementAndChildren(document.getElementById("main_content"), true);
-  }
-
-  function leave_overlay() {
-    overlay = "";
-    toggleElementAndChildren(document.getElementById("main_content"), false);
-    window.setTimeout(() => {
-      focus_first_in_node(document.getElementById("tree_parent"));
-    }, 10);
   }
 
   async function add_node() {
@@ -284,9 +281,6 @@
     (await unlisten_message)();
   });
 
-  function handle_overlay_leave() {
-    leave_overlay();
-  }
 
   async function handle_key_up_content(ev) {
     if (ev.key == "ArrowLeft") {
@@ -295,7 +289,7 @@
     }
   }
   function show_help() {
-    enter_overlay("help");
+    viewComponent.enter_overlay("help");
   }
 
   async function goto_node(path) {
@@ -324,7 +318,7 @@
       data.path = nav_start_path;
       data.tree = nav_start_tree;
       data.flat = flattenObject(data.tree);
-      leave_overlay();
+      viewComponent.leave_overlay();
       data = data;
       focus_first_in_node(document.getElementById("tree_parent"));
       ev.stopPropagation();
@@ -332,10 +326,10 @@
       return;
     } else if (ev.key == " ") {
       toast.push("space");
-      leave_overlay();
+      viewComponent.leave_overlay();
       data = data;
     } else if (ev.key == "Enter") {
-      leave_overlay();
+      viewComponent.leave_overlay();
       edit_current_node();
     }
 
@@ -376,7 +370,7 @@
       toast.push("Could not go to node" + e);
     }
 
-    leave_overlay();
+    viewComponent.leave_overlay();
     await tick();
     window.setTimeout(() => {
       focus_first_in_node(document.getElementById("tree_parent"));
@@ -385,7 +379,7 @@
   };
 
   let handle_move = async (path) => {
-    leave_overlay();
+    viewComponent.leave_overlay();
     let ppath = await parse_path(path);
     if (ppath.startsWith("mail:")) {
       toast.push("can't goto mail");
@@ -399,17 +393,40 @@
       }
       return;
     }
-    if (
-      ppath ==
-      data.current_item.substring(0, data.current_item.length - 1)
-    ) {
+    if (ppath == data.current_item.substring(0, data.current_item.length - 1)) {
       toast.push("Won't move on same level");
       return;
     }
-    let new_name = await invoke("find_next_empty_child", {
+    let new_path = await invoke("find_next_empty_child", {
       path: ppath,
     });
-    toast.push("moving to " + new_name);
+    toast.push("moving to " + new_path);
+    let res = await invoke("move_node", {
+      orgPath: data.current_item,
+      newPath: new_path,
+    });
+    if (res !== null) {
+      toast.push(res);
+    } else {
+      let parent = data.current_item.substring(0, data.current_item.length - 1);
+      let new_parent = new_path.substring(0, new_path.length - 1);
+      //await toggle_node(new_parent, true);
+      //await toggle_node(new_parent, false);
+      //await expand_path(data.tree, new_path, 1);
+      await toggle_node(new_parent, true);
+      await toggle_node(new_parent, false);
+
+      await goto_node(new_path);
+      await toggle_node(parent, true);
+      await toggle_node(parent, false);
+      if (move_and_goto) {
+        await goto_node(new_path);
+      } else {
+        await goto_node(parent);
+      }
+      scroll_to_active();
+      highlight_node = new_path;
+    }
   };
 
   function handle_delete(ev) {
@@ -424,7 +441,7 @@
         .catch((e) => {
           toast.push(`Error ${e}`);
         });
-      leave_overlay();
+      viewComponent.leave_overlay();
       //delete_from_tree(data.tree, data.current_item);
       //console.log(data.tree);
       //data.flat = flattenObject(data.tree);
@@ -436,7 +453,7 @@
   };
 </script>
 
-<View on:keyup={dispatch_keyup(keys)}>
+<View on:keyup={dispatch_keyup(keys)} bind:this={viewComponent} bind:overlay={overlay}>
   <div slot="header">
     {window.location}
   </div>
@@ -458,6 +475,7 @@
               ? 'edited'
               : ''}
 			  {ii == activeIndex ? 'chosen' : ''}
+			  {node.path === highlight_node ? 'highlight' : ''}
 			  "
           >
             <td class="mono">
@@ -486,9 +504,7 @@
       {/await}
     </div>
   </svelte:fragment>
-  <div slot="footer">
-    {#if overlay != ""}
-      <Overlay on:leave={handle_overlay_leave} bind:overlay>
+  <svelte:fragment slot="overlays">
         {#if overlay == "help"}
           <Help bind:entries={help_entries} />
         {:else if overlay == "nav"}
@@ -509,14 +525,8 @@
           />
         {:else if overlay == "delete"}
           <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
-        {:else if overlay == ""}{/if}
-      </Overlay>
-    {:else}
-      <div on:click={show_help}>
-        Press <span class="hotkey">h</span> for help.
-      </div>
-    {/if}
-  </div>
+		{/if}
+  </svelte:fragment>
 </View>
 
 <style>
@@ -547,6 +557,9 @@
 
   :global(.edited) {
     background-color: #ffdfdf;
+  }
+  :global(.highlight) {
+    background-color: #ffff7f;
   }
 
   :global(.notfound) {

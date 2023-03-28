@@ -32,6 +32,8 @@
   let activeIndex;
   let scroll_to_active;
   let overlay = "";
+  let nav_text = "";
+  let nav_mode = "nav";
   let nav_path = "";
   let nav_start_index = 0;
   let nav_start_path = "";
@@ -43,6 +45,8 @@
   let delete_entries = [{ key: "d", text: "delete node & children" }];
   let keys = {
     " ": () => {
+      nav_text = "nav";
+      nav_mode = "nav";
       nav_path = data.flat[activeIndex].path;
       nav_start_path = nav_path;
       nav_start_index = activeIndex;
@@ -62,9 +66,19 @@
       viewComponent.enter_overlay("delete");
     },
     m: (ev) => {
-      highlight_node = false;
-      move_and_goto = false;
-      viewComponent.enter_overlay("move");
+      if (ev.ctrlKey) {
+        nav_text = `move ${data.current_item} - ${data.flat[activeIndex].title} to`;
+        nav_mode = "move";
+        nav_path = data.flat[activeIndex].path;
+        nav_start_path = nav_path;
+        nav_start_index = activeIndex;
+        nav_start_tree = structuredClone(data.tree);
+        viewComponent.enter_overlay("nav");
+      } else {
+        highlight_node = false;
+        move_and_goto = false;
+        viewComponent.enter_overlay("move");
+      }
     },
     M: (ev) => {
       highlight_node = false;
@@ -336,9 +350,11 @@
       ev.preventDefault();
       return;
     } else if (ev.key == " ") {
-      toast.push("space");
-      viewComponent.leave_overlay();
-      data = data;
+      if (nav_mode == "nav") {
+        toast.push("space");
+        viewComponent.leave_overlay();
+        data = data;
+      }
     }
     nav_path = nav_path.toUpperCase();
     nav_path = nav_path.replace(/[^A-Z0-9]/g, "");
@@ -354,10 +370,43 @@
 
     if (ev.key == "Enter") {
       viewComponent.leave_overlay();
-      if (found) {
-        edit_current_node();
-      } else {
-        edit_node(nav_path);
+      if (nav_mode == "nav") {
+        if (found) {
+          edit_current_node();
+        } else {
+          edit_node(nav_path);
+        }
+      } else if (nav_mode == "move") {
+        let new_path;
+        if (found) {
+          new_path = await invoke("find_next_empty_child", {
+            path: nav_path,
+          });
+        } else {
+          new_path = nav_path;
+        }
+        let res = await invoke("move_node", {
+          orgPath: nav_start_path,
+          newPath: new_path,
+        });
+        if (res !== null) {
+          toast.push(res);
+        } else {
+          let parent = data.current_item.substring(
+            0,
+            data.current_item.length - 1
+          );
+          let new_parent = new_path.substring(0, new_path.length - 1);
+          await toggle_node(new_parent, true);
+          await toggle_node(new_parent, false);
+
+          await goto_node(new_path);
+          await toggle_node(parent, true);
+          await toggle_node(parent, false);
+          await goto_node(new_path);
+          scroll_to_active();
+          highlight_node = new_path;
+        }
       }
     }
 
@@ -522,6 +571,10 @@
     } else {
     }
   };
+
+  function handle_nav_blur(ev) {
+    document.getElementById("nav_path_input").focus();
+  }
 </script>
 
 <View
@@ -587,11 +640,13 @@
     {#if overlay == "help"}
       <Help bind:entries={help_entries} />
     {:else if overlay == "nav"}
+      {nav_text} <br />
       <input
         type="text"
         bind:value={nav_path}
         autofocus
         on:keyup={handle_nav_change}
+        on:blur={handle_nav_blur}
         id="nav_path_input"
       />
     {:else if overlay == "goto"}

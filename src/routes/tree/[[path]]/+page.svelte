@@ -22,10 +22,16 @@
   } from "./funcs";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
+  import { readText as readClipboard } from "@tauri-apps/api/clipboard";
   import { add_code_clipboards, dispatch_keyup, iso_date } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
+  import { fetch as tauri_fetch } from "@tauri-apps/api/http";
+
+  import readabilityLib from "@mozilla/readability";
   export let data;
+
+  var Readability = readabilityLib.Readability;
 
   let viewComponent;
   let cache = {};
@@ -40,8 +46,19 @@
   let nav_start_tree = null;
   let move_and_goto = false;
   let highlight_node = false;
+  let fetch_url_text = "";
   $: data.current_item = data?.flat[activeIndex]?.path;
-  let help_entries = [{ key: "Esc", text: "Go back" }];
+
+  let help_entries = [
+    { key: "Esc", text: "Go back" },
+    { key: "g", text: "Go to node" },
+    { key: "m", text: "Move below node" },
+    { key: "M", text: "Move below node&got" },
+    { key: "ctrl+m", text: "Move to/below path" },
+    { key: "space", text: "Enter nav mode" },
+    { key: "a", text: "add node below" },
+    { key: "d", text: "Delete node" },
+  ];
   let delete_entries = [{ key: "d", text: "delete node & children" }];
   let keys = {
     " ": () => {
@@ -65,6 +82,14 @@
     d: () => {
       viewComponent.enter_overlay("delete");
     },
+    x: async () => {
+      fetch_url_text = await readClipboard();
+      if (!fetch_url_text.startsWith("http")) {
+        fetch_url_text = "";
+      }
+      viewComponent.enter_overlay("fetch_url");
+    },
+
     m: (ev) => {
       if (ev.ctrlKey) {
         nav_text = `move ${data.current_item} - ${data.flat[activeIndex].title} to`;
@@ -573,7 +598,50 @@
   };
 
   function handle_nav_blur(ev) {
-    document.getElementById("nav_path_input").focus();
+    //document.getElementById("nav_path_input").focus();
+    ev.target.focus();
+  }
+
+  async function extractTextFromUrl(url) {
+    const response = await tauri_fetch(url, {
+      method: "GET",
+      timeout: 30,
+      responseType: 2,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    let html = response.data;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const reader = new Readability(doc);
+    const article = reader.parse();
+    return article.textContent;
+  }
+
+  async function handle_fetch_url_change(ev) {
+    if (ev.key == "Enter") {
+      if (fetch_url_text.startsWith("http")) {
+        let target_node = data.current_item;
+        viewComponent.leave_overlay();
+        try {
+          let text = "Fetched from " + fetch_url_text + "\n\n" + await extractTextFromUrl(fetch_url_text);
+          let new_path = await invoke("find_next_empty_child", {
+            path: target_node,
+          });
+          await invoke("edit_node", {
+            path: new_path,
+            windowTitle: appWindow.label,
+            newText: text,
+          });
+        } catch (e) {
+          toast.push("Failed to fetch url. No node added");
+          console.log(e);
+        }
+      } else {
+        toast.push("invalid url");
+      }
+    }
   }
 </script>
 
@@ -659,6 +727,17 @@
       />
     {:else if overlay == "delete"}
       <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
+    {:else if overlay == "fetch_url"}
+      Fetch url<br />
+      <input
+        type="text"
+        bind:value={fetch_url_text}
+        autofocus
+        on:keyup={handle_fetch_url_change}
+        on:blur={handle_nav_blur}
+        id="fetch_url_input"
+        style="width:98%;"
+      />
     {/if}
   </svelte:fragment>
 </View>

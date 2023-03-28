@@ -224,7 +224,7 @@ fn delete_node(path: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn edit_node(path: &str, window_title: &str) -> bool {
+fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> bool {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
     if runtime_state
@@ -263,7 +263,14 @@ fn edit_node(path: &str, window_title: &str) -> bool {
             }
             content += "Content after the next line. First line = new title \n--\n\n";
             let node = ss.get_node(path).map(|x| x.clone());
-            content += node.as_ref().map(|x| &x.raw[..]).unwrap_or("");
+            match new_text {
+                Some(text) => {
+                    content += text;
+                }
+                None => {
+                    content += node.as_ref().map(|x| &x.raw[..]).unwrap_or("");
+                }
+            };
             std::fs::write(&tf, &content).expect("temp file write failure");
 
             if let None = node {
@@ -1108,7 +1115,7 @@ fn main() -> Result<()> {
             get_tree,
             move_node,
             swap_node_with_previous,
-    swap_node_with_next,
+            swap_node_with_next,
             delete_node,
             list_open_paths,
             date_to_path,

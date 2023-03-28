@@ -186,6 +186,11 @@ button {
   box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
 }
 
+input {
+
+  padding: 0.25em 0.25em;
+}
+
 button {
   cursor: pointer;
   color: #b32400;

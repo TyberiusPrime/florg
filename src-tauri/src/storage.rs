@@ -295,6 +295,7 @@ impl Storage {
     }
 
     fn rename_all_children(&mut self, org_path: &str, new_path: &str) {
+        //todo: fix all the links
         for node in self.nodes.iter_mut() {
             if node.path.starts_with(org_path) {
                 let suffix = &node.path[org_path.len()..];

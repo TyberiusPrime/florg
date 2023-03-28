@@ -69,7 +69,7 @@ export function delete_from_tree(tree, path) {
     if (child.path == path) {
       tree.children.splice(ii, 1);
       console.log("found and deleted", path);
-	  console.log(tree.children);
+      console.log(tree.children);
       return true;
     } else if (path.startsWith(child.path)) {
       delete_from_tree(child, path);
@@ -86,4 +86,25 @@ export async function expand_path(tree, path: string, maxDepth: int = 2) {
     patch_tree(tree, p, node.children);
     console.log(tree);
   }
+}
+
+export function find_siblings(flat, index) {
+  let path = flat[index].path;
+  let parent = path.substring(0, path.length - 1);
+  let prev = null;
+  let next = null;
+  if (index > 0) {
+    if (
+      flat[index - 1].path.startsWith(parent) &&
+      flat[index - 1].path.length == path.length //not the parent
+    ) {
+      prev = flat[index - 1].path;
+    }
+  }
+  if (index < flat.length - 1) {
+    if (flat[index + 1].path.startsWith(parent)) {
+      next = flat[index + 1].path;
+    }
+  }
+  return [prev, next];
 }

@@ -15,6 +15,7 @@
     flattenObject,
     expand_path,
     delete_from_tree,
+	find_siblings,
   } from "./funcs";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
@@ -281,7 +282,6 @@
     (await unlisten_message)();
   });
 
-
   async function handle_key_up_content(ev) {
     if (ev.key == "ArrowLeft") {
       focus_first_in_node(document.getElementById("tree_parent"));
@@ -400,7 +400,9 @@
     let new_path = await invoke("find_next_empty_child", {
       path: ppath,
     });
-    toast.push("moving to " + new_path);
+    //toast.push("moving to " + new_path);
+    let siblings = find_siblings(data.flat, activeIndex);
+	console.log('siblings', siblings);
     let res = await invoke("move_node", {
       orgPath: data.current_item,
       newPath: new_path,
@@ -422,7 +424,11 @@
       if (move_and_goto) {
         await goto_node(new_path);
       } else {
-        await goto_node(parent);
+        if (siblings[0] !== null) {
+          await goto_node(siblings[0]);
+        } else if (siblings[1] !== null) {
+          await goto_node(siblings[1]);
+        } else await goto_node(parent);
       }
       scroll_to_active();
       highlight_node = new_path;
@@ -453,7 +459,7 @@
   };
 </script>
 
-<View on:keyup={dispatch_keyup(keys)} bind:this={viewComponent} bind:overlay={overlay}>
+<View on:keyup={dispatch_keyup(keys)} bind:this={viewComponent} bind:overlay>
   <div slot="header">
     {window.location}
   </div>
@@ -505,27 +511,27 @@
     </div>
   </svelte:fragment>
   <svelte:fragment slot="overlays">
-        {#if overlay == "help"}
-          <Help bind:entries={help_entries} />
-        {:else if overlay == "nav"}
-          <input
-            type="text"
-            bind:value={nav_path}
-            autofocus
-            on:keyup={handle_nav_change}
-            id="nav_path_input"
-          />
-        {:else if overlay == "goto"}
-          <Goto bind:action={handle_goto} bind:overlay />
-        {:else if overlay == "move"}
-          <Goto
-            bind:action={handle_move}
-            bind:overlay
-            bind:filter={filter_goto_for_move}
-          />
-        {:else if overlay == "delete"}
-          <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
-		{/if}
+    {#if overlay == "help"}
+      <Help bind:entries={help_entries} />
+    {:else if overlay == "nav"}
+      <input
+        type="text"
+        bind:value={nav_path}
+        autofocus
+        on:keyup={handle_nav_change}
+        id="nav_path_input"
+      />
+    {:else if overlay == "goto"}
+      <Goto bind:action={handle_goto} bind:overlay />
+    {:else if overlay == "move"}
+      <Goto
+        bind:action={handle_move}
+        bind:overlay
+        bind:filter={filter_goto_for_move}
+      />
+    {:else if overlay == "delete"}
+      <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
+    {/if}
   </svelte:fragment>
 </View>
 

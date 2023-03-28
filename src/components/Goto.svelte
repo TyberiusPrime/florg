@@ -53,7 +53,7 @@
   });
 
   function handle_action(event) {
-    console.log("action", event.detail, action);
+    //console.log("action", event.detail, action);
     let path = event.detail;
     if (action != null) {
       action(path);

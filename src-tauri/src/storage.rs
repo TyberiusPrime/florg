@@ -188,9 +188,18 @@ impl Storage {
         let file_path = node.dirname(&self.data_path);
         println!("moving {:?} {:?}", &file_path, &new_file_path);
         std::fs::rename(file_path, new_file_path)?;
-        self.get_node_mut(org_path).unwrap().path = new_path.to_string();
+        self.rename_all_children(org_path, new_path);
         self.add_and_commit(&format!("Moved node {org_path} to {new_path}"));
         Ok(())
+    }
+
+    fn rename_all_children(&mut self, org_path: &str, new_path: &str) {
+        for node in self.nodes.iter_mut() {
+            if node.path.starts_with(org_path) {
+                let suffix = &node.path[org_path.len()..];
+                node.path = format!("{}{}", new_path, suffix);
+            }
+        }
     }
 
     pub(crate) fn levels(&self, path: &str) -> Vec<(String, String)> {

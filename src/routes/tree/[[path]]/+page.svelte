@@ -77,7 +77,7 @@
   function map_tags(tags) {
     if (tags !== undefined) {
       let res = [];
-	  console.log(tags);
+      console.log(tags);
       for (let key in tags) {
         let tag = tags[key];
         res.push({ key: key, text: tag, target_path: tag });
@@ -182,15 +182,36 @@
     });
   }
 
+  function render_tags(in_tags) {
+    if (in_tags === undefined) {
+      return "";
+    }
+    let tags = "";
+    for (let tag of in_tags) {
+      tags +=
+        "<div class='tags " +
+        tag_class(tag.slice(1)) +
+        "'>" +
+        tag +
+        "</div>";
+    }
+	if (tags) {
+		tags += "<br style='clear:both'>"
+	}
+
+    return tags;
+  }
+
   async function get_rendered_node(path) {
     if (data.currently_edited[path] != undefined) {
-      return render_text(data.currently_edited[path]);
+	  let tags = await invoke ("extract_tags", {text: data.currently_edited[path]});
+      return render_tags(tags) + await render_text(data.currently_edited[path]);
     }
     if (cache[path] === undefined) {
       let node = await invoke("get_node", { path: path + "" });
       if (node !== undefined && node.node !== null && node.node.raw != "") {
         let rt = await render_text_cached(path, node.node.raw);
-        cache[path] = rt;
+        cache[path] = render_tags(node.tags) + rt;
       } else {
         cache[path] = "(empty node)";
       }
@@ -305,12 +326,12 @@
   const unlisten_node_changed = listen("node-changed", async (event) => {
     // a specific node was reread
     data.currently_edited[event.payload] = undefined;
+    highlight_node = event.payload;
     let new_node = await invoke("get_node", { path: event.payload });
     cache[event.payload] = undefined;
     //patch_tree_content(data.tree, event.payload, new_node.node.raw);
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
-    toast.push("expanding " + prefix);
     let p = data.current_item;
     if (p == "") {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
@@ -321,6 +342,7 @@
 
     data.flat = flattenObject(data.tree);
     data = data;
+    await appWindow.setFocus();
   });
 
   const unliste_node_unchanged = listen("node-unchanged", async (event) => {
@@ -328,7 +350,9 @@
     //reload to refresh the currently edited thing?
     data.currently_edited[event.payload] = undefined;
     data = data;
+    await appWindow.setFocus();
   });
+
   const unliste_node_temp_changed = listen(
     "node-temp-changed",
     async (event) => {
@@ -710,7 +734,9 @@
     viewComponent.leave_overlay();
   }
 
-  async function handle_tag(ev) {}
+  async function handle_tag(ev) {
+    viewComponent.leave_overlay();
+  }
 </script>
 
 <View
@@ -743,17 +769,24 @@
               ? 'edited'
               : ''}
 			  {ii == activeIndex ? 'chosen' : ''}
-			  {node.path === highlight_node ? 'highlight_in_tree' : ''}
 			  "
           >
-            <td class="mono">
+            <td
+              class="mono
+			"
+            >
               {@html node.indention}{node.path}{#if node.has_children && !node.children_shown}<span
                   class="more">+</span
                 >
               {/if}
             </td>
             <td
-              ><div style="float:left">{node.title}</div>
+              ><div
+                style="float:left"
+                class={node.path === highlight_node ? "highlight_in_tree" : ""}
+              >
+                {node.title}
+              </div>
               {#each filter_tags(node.tags) as tag}
                 <div class="tags {tag_class(tag.substring(1))}">
                   {tag}

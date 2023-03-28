@@ -105,6 +105,7 @@ pub(crate) struct NodeForJS {
     pub node: Option<Node>,
     pub levels: Vec<(String, String)>,
     pub children: Vec<Node>,
+    pub tags: Vec<String>,
 }
 
 #[tauri::command]
@@ -112,10 +113,12 @@ fn get_node(path: &str) -> NodeForJS {
     let s = STORAGE.get().unwrap().lock().unwrap();
     let node = s.get_node(path).map(|x| x.clone());
     let children = s.children_for(path).iter().map(|x| (*x).clone()).collect();
+    let tags = node.as_ref().map_or_else(|| Vec::new(), |x| x.get_tags());
     NodeForJS {
         node,
         levels: s.levels(path),
         children,
+        tags: tags,
     }
 }
 
@@ -133,7 +136,7 @@ pub(crate) struct TreeForJS {
     pub more_text: bool,
     pub children: Vec<TreeForJS>,
     pub has_children: bool,
-    pub tags: Vec<String>
+    pub tags: Vec<String>,
 }
 
 fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> Option<TreeForJS> {
@@ -846,6 +849,11 @@ fn start_terminal(folder: String) -> bool {
     process.is_ok()
 }
 
+#[tauri::command]
+fn extract_tags(text: &str) -> Vec<String> {
+    Node::extract_tags(text)
+}
+
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     Some(
@@ -1150,6 +1158,7 @@ fn main() -> Result<()> {
             history_get,
             history_store,
             start_terminal,
+            extract_tags
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

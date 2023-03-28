@@ -37,6 +37,7 @@
       },
       "window": {
         "create": true,
+        "setFocus": true,
         "setTitle": true
       }
     },

@@ -2,9 +2,9 @@
 #![allow(unused_imports)]
 use crate::openai;
 use anyhow::{bail, Context, Result};
-use serde::{ser::Serializer, Deserialize, Serialize};
 use once_cell::unsync::Lazy;
 use regex::Regex;
+use serde::{ser::Serializer, Deserialize, Serialize};
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -561,16 +561,14 @@ impl Node {
         &self.raw
     }
 
-    pub fn get_tags(&self) -> Vec<String> {
-        let re = Lazy::new(|| {
-                Regex::new(r"#[A-Za-z][A-Za-z0-9]+").unwrap()
-        });
-        let res = re
-            .find_iter(&self.raw)
-            .map(|m| m.as_str().to_string())
-            .collect();
+    pub fn extract_tags(text: &str) -> Vec<String> {
+        let re = Lazy::new(|| Regex::new(r"#[A-Za-z][A-Za-z0-9]+").unwrap());
+        let res = re.find_iter(text).map(|m| m.as_str().to_string()).collect();
         res
+    }
 
+    pub fn get_tags(&self) -> Vec<String> {
+        return Node::extract_tags(&self.raw);
     }
 }
 

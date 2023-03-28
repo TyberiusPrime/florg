@@ -236,6 +236,7 @@
       clickedChild = clickedChild.parentNode;
     }
     const clickedIndex = childNodes.indexOf(clickedChild);
+	console.log("clicked index", clickedIndex);
     setActiveIndex(clickedIndex, false);
   }
 

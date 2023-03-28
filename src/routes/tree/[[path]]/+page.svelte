@@ -9,7 +9,10 @@
   import QuickPick from "$lib/../components/QuickPick.svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { goto, invalidateAll } from "$app/navigation";
-  import { render_text_cached } from "$lib/../routes/node/[[path]]/funcs";
+  import {
+    render_text_cached,
+    render_text,
+  } from "$lib/../routes/node/[[path]]/funcs";
   import {
     patch_tree,
     flattenObject,
@@ -108,6 +111,9 @@
   }
 
   async function get_rendered_node(path) {
+    if (data.currently_edited[path] != undefined) {
+      return render_text(data.currently_edited[path]);
+    }
     if (cache[path] === undefined) {
       let node = await invoke("get_node", { path: path + "" });
       if (node !== undefined && node.node !== null && node.node.raw != "") {
@@ -206,9 +212,12 @@
 
   async function edit_current_node() {
     let path = data.flat[activeIndex].path;
+    edit_node(path);
+  }
+  async function edit_node(path) {
     if (data.currently_edited[path] == undefined) {
       let node = await invoke("get_node", { path: path });
-      data.currently_edited[path] = [node.node.raw];
+      data.currently_edited[path] = node?.node?.raw;
       data = data;
       await invoke("edit_node", {
         path: path,
@@ -230,7 +239,15 @@
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
     toast.push("expanding " + prefix);
-    toggle_node(prefix, false);
+    let p = data.current_item;
+    if (p == "") {
+      data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
+    } else {
+      goto_node(event.payload);
+      goto_node(p);
+    }
+
+    data.flat = flattenObject(data.tree);
     data = data;
   });
 
@@ -243,16 +260,10 @@
   const unliste_node_temp_changed = listen(
     "node-temp-changed",
     async (event) => {
-      //some node was edited, but not confirmed yet.
-      //reload to refresh the currently edited thing?
-      //todo
-      /*
-      if (event.payload[0] == data.path) {
-        let content_text = event.payload[1];
-        data.rendered = await render_text(content_text);
+      if (event.payload[0] == data.current_item) {
+        data.currently_edited[data.current_item] = event.payload[1];
         data = data;
       }
-	  */
     }
   );
   const unlisten_message = listen("message", (event) => {
@@ -328,11 +339,7 @@
       toast.push("space");
       viewComponent.leave_overlay();
       data = data;
-    } else if (ev.key == "Enter") {
-      viewComponent.leave_overlay();
-      edit_current_node();
     }
-
     nav_path = nav_path.toUpperCase();
     nav_path = nav_path.replace(/[^A-Z0-9]/g, "");
     let el = document.getElementById("nav_path_input");
@@ -342,6 +349,18 @@
     } else {
       el.classList.remove("notfound");
     }
+    await tick();
+    document.querySelector(".chosen").scrollIntoView();
+
+    if (ev.key == "Enter") {
+      viewComponent.leave_overlay();
+      if (found) {
+        edit_current_node();
+      } else {
+        edit_node(nav_path);
+      }
+    }
+
     ev.stopPropagation();
     //key is a..z
   }
@@ -439,10 +458,20 @@
     if (data.current_item != "") {
       invoke("delete_node", { path: data.current_item })
         .then(async () => {
-          toast.push("node deleted");
-          await goto_node(
-            data.current_item.substring(0, data.current_item.length - 1)
+          toast.push("node deleted: " + data.current_item);
+          let prefix = data.current_item.substring(
+            0,
+            data.current_item.length - 1
           );
+          if (prefix != "") {
+            await goto_node(prefix);
+          } else {
+            toggle_node("", true);
+            let tree = await invoke("get_tree", { path: "", maxDepth: 2 });
+            data.tree = tree;
+            data.flat = flattenObject(data.tree);
+            await goto_node("");
+          }
         })
         .catch((e) => {
           toast.push(`Error ${e}`);
@@ -476,27 +505,32 @@
   };
 
   let handle_shift_down = async () => {
-	let siblings = find_siblings(data.flat, activeIndex);
-	let path = data.current_item;
-	if (siblings[1] !== null) {
-	  let res = await invoke("swap_node_with_next", { path: path });
-	  if (res !== null) {
-		toast.push(res);
-		return false;
-	  }
-	  let parent = path.substring(0, path.length - 1);
-	  await toggle_node(parent, true);
-	  await toggle_node(parent, false);
-	  toast.push("going to " + siblings[1]);
-	  await goto_node(siblings[1]);
-	  return false; //no action by the Focusable
-	} else {
-	}
+    let siblings = find_siblings(data.flat, activeIndex);
+    let path = data.current_item;
+    if (siblings[1] !== null) {
+      let res = await invoke("swap_node_with_next", { path: path });
+      if (res !== null) {
+        toast.push(res);
+        return false;
+      }
+      let parent = path.substring(0, path.length - 1);
+      await toggle_node(parent, true);
+      await toggle_node(parent, false);
+      toast.push("going to " + siblings[1]);
+      await goto_node(siblings[1]);
+      return false; //no action by the Focusable
+    } else {
+    }
   };
-
 </script>
 
-<View on:keyup={dispatch_keyup(keys)} bind:this={viewComponent} bind:overlay>
+<View
+  on:keyup={dispatch_keyup(keys, () => {
+    return overlay != "";
+  })}
+  bind:this={viewComponent}
+  bind:overlay
+>
   <div slot="header">
     {window.location}
   </div>
@@ -511,7 +545,7 @@
         bind:can_expand
         bind:can_contract
         bind:handle_shift_up
-		bind:handle_shift_down
+        bind:handle_shift_down
       >
         {#each data.flat as node, ii}
           <tr
@@ -520,7 +554,7 @@
               ? 'edited'
               : ''}
 			  {ii == activeIndex ? 'chosen' : ''}
-			  {node.path === highlight_node ? 'highlight' : ''}
+			  {node.path === highlight_node ? 'highlight_in_tree' : ''}
 			  "
           >
             <td class="mono">
@@ -606,7 +640,7 @@
   :global(.edited) {
     background-color: #ffdfdf;
   }
-  :global(.highlight) {
+  :global(.highlight_in_tree) {
     background-color: #ffff7f;
   }
 

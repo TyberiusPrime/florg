@@ -121,16 +121,18 @@ export function trim_eol(multi_lines: string) {
   return multi_lines.replace(/[ \t]+$/gm, "");
 }
 
-export function dispatch_keyup(keys) {
+export function dispatch_keyup(keys, is_disabled) {
   return (ev) => {
-    //console.log("dispatch key up", ev.key);
-    let action = keys[ev.key];
-    if (action) {
-		//console.log("action", action);
-      if (action(ev)) {
-        ev.stopPropagation();
-		ev.stopImmediatePropagation();
-        ev.preventDefault();
+    if (is_disabled == null || !is_disabled()) {
+      //console.log("dispatch key up", ev.key);
+      let action = keys[ev.key];
+      if (action) {
+        //console.log("action", action);
+        if (action(ev)) {
+          ev.stopPropagation();
+          ev.stopImmediatePropagation();
+          ev.preventDefault();
+        }
       }
     }
   };

@@ -53,7 +53,7 @@
   }
 
   function focus_first_in_content() {
-    let wrapper = document.getElementById("content");
+    let wrapper = document.getElementById("main_content");
     if (wrapper != null) {
       focus_first_in_node(wrapper);
     }

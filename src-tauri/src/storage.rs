@@ -3,6 +3,8 @@
 use crate::openai;
 use anyhow::{bail, Context, Result};
 use serde::{ser::Serializer, Deserialize, Serialize};
+use once_cell::unsync::Lazy;
+use regex::Regex;
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -164,6 +166,7 @@ impl Storage {
     }
 
     pub(crate) fn get_node(&self, path: &str) -> Option<&Node> {
+        //todo: replace with binary search
         self.nodes.iter().filter(|n| n.path == path).next()
     }
 
@@ -556,6 +559,18 @@ impl Node {
 
     pub fn content(&self) -> &str {
         &self.raw
+    }
+
+    pub fn get_tags(&self) -> Vec<String> {
+        let re = Lazy::new(|| {
+                Regex::new(r"#[A-Za-z][A-Za-z0-9]+").unwrap()
+        });
+        let res = re
+            .find_iter(&self.raw)
+            .map(|m| m.as_str().to_string())
+            .collect();
+        res
+
     }
 }
 

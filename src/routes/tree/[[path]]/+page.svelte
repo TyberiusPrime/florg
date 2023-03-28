@@ -20,9 +20,11 @@
     delete_from_tree,
     find_siblings,
   } from "./funcs";
+
+  import { tag_class } from "$lib/colors.ts";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
-  import { readText as readClipboard } from "@tauri-apps/api/clipboard";
+  import { readText as read_clipboard, writeText as copy_to_clipboard } from "@tauri-apps/api/clipboard";
   import { add_code_clipboards, dispatch_keyup, iso_date } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -60,6 +62,15 @@
     { key: "d", text: "Delete node" },
   ];
   let delete_entries = [{ key: "d", text: "delete node & children" }];
+
+  let copy_entries = [
+    { key: "c", text: "link", target_path: "link" },
+    { key: "y", text: "content", target_path: "content" },
+    { key: "t", text: "title", target_path: "title" },
+    { key: "p", text: "node folder path", target_path: "path" },
+    { key: "r", text: "rendered_content", target_path: "rendered_content" },
+  ];
+
   let keys = {
     " ": () => {
       nav_text = "nav";
@@ -73,6 +84,10 @@
     h: () => {
       viewComponent.enter_overlay("help");
     },
+  c: () => {
+      viewComponent.enter_overlay("copying");
+    },
+
     g: () => {
       viewComponent.enter_overlay("goto");
     },
@@ -83,7 +98,7 @@
       viewComponent.enter_overlay("delete");
     },
     x: async () => {
-      fetch_url_text = await readClipboard();
+      fetch_url_text = await read_clipboard();
       if (!fetch_url_text.startsWith("http")) {
         fetch_url_text = "";
       }
@@ -625,7 +640,11 @@
         let target_node = data.current_item;
         viewComponent.leave_overlay();
         try {
-          let text = "Fetched from " + fetch_url_text + "\n\n" + await extractTextFromUrl(fetch_url_text);
+          let text =
+            "Fetched from " +
+            fetch_url_text +
+            "\n\n" +
+            (await extractTextFromUrl(fetch_url_text));
           let new_path = await invoke("find_next_empty_child", {
             path: target_node,
           });
@@ -642,6 +661,35 @@
         toast.push("invalid url");
       }
     }
+  }
+
+  function filter_tags(tags) {
+    return tags.filter((item) => Object.values(data.tags).includes(item));
+  }
+
+  async function handle_copy(ev) {
+    let mode = ev.detail;
+    console.log("copy_to_clipboard", mode);
+    let out = null;
+    if (mode == "link") {
+      //out = `[${data.title}](${data.path})`;
+      out = `<<${data.current_item}>>`;
+    } else if (mode == "content") {
+      let node = await invoke("get_node", { path: data.current_item + "" });
+      out = node?.node.raw;
+    } else if (mode == "rendered_content") {
+      out = await get_rendered_node(data.current_item);
+    } else if (mode == "title") {
+      out = data.flat[activeIndex].title;
+    } else if (mode == "path") {
+      out = await invoke("get_node_folder_path", { path: data.current_item });
+    } else {
+      console.log("unknown copy_to_clipboard mode", mode);
+    }
+    if (out != null) {
+      await copy_to_clipboard(out);
+    }
+	viewComponent.leave_overlay();
   }
 </script>
 
@@ -684,7 +732,14 @@
                 >
               {/if}
             </td>
-            <td>{node.title} </td>
+            <td
+              ><div style="float:left">{node.title}</div>
+              {#each filter_tags(node.tags) as tag}
+                <div class="tags {tag_class(tag.substring(1))}">
+                  {tag}
+                </div>
+              {/each}
+            </td>
           </tr>
         {/each}
       </Focusable>
@@ -727,6 +782,8 @@
       />
     {:else if overlay == "delete"}
       <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
+    {:else if overlay == "copying"}
+      <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input

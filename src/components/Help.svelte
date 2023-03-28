@@ -12,7 +12,6 @@
       </div>
     {/each}
   </div>
-  done
 </div>
 
 <style>

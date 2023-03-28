@@ -133,6 +133,7 @@ pub(crate) struct TreeForJS {
     pub more_text: bool,
     pub children: Vec<TreeForJS>,
     pub has_children: bool,
+    pub tags: Vec<String>
 }
 
 fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> Option<TreeForJS> {
@@ -155,6 +156,7 @@ fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> O
                 Vec::new()
             },
             has_children,
+            tags: node.map_or_else(|| Vec::new(), |x| x.get_tags()),
         })
     }
 }

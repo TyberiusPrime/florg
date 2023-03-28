@@ -86,13 +86,6 @@
       ev.stopPropagation();
     }
   }
-
-  function handle_blur(ev) {
-  toast.push("pblur");
-	  if (overlay != "") {
-	  focus_first_in_node(document.getElementById("footer"));
-	  }
-  }
 </script>
 
 <div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
@@ -105,7 +98,7 @@
       <slot name="content" />
     </div>
   </div>
-  <div class="footer" id="footer" on:keyup={handle_keyup} on:blur={handle_blur}>
+  <div class="footer" id="footer" on:keyup={handle_keyup}>
     <slot name="footer">
       {#if overlay != ""}
         <slot name="overlays" />

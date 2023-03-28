@@ -17,6 +17,7 @@ export function flattenObject(
     more_text: obj.more_text,
     has_children: obj.has_children,
     children_shown: obj.has_children && (obj.children.length > 0),
+	tags: obj.tags,
   });
 
   const len = obj.children ? obj.children.length : 0;

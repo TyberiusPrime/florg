@@ -34,5 +34,6 @@ export async function load({ params }: { params: any }) {
     tree: tree,
     currently_edited: {},
 	start_item: start_item,
+	tags: await invoke("get_tags", {}),
   };
 }

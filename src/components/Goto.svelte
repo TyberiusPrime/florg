@@ -10,6 +10,7 @@
 
   export let action = null;
   export let overlay;
+  export let filter = (x) => true;
 
   async function get_entries() {
     let entries = [];
@@ -21,6 +22,9 @@
 	}
     for (let key in nav) {
       let target_path = nav[key];
+	  if (!filter(target_path)) {
+		continue;
+	  }
       let query_path = target_path;
       if (query_path.startsWith("#") || query_path.startsWith("!")) {
         query_path = query_path.slice(1);

@@ -29,7 +29,7 @@
   });
 </script>
 
-<div tabIndex="0" on:keyup={handle_key_up}>
+<div on:keyup={handle_key_up} tabIndex=0>
   {text}
   {#each entries as entry}
     <div>

@@ -3,36 +3,116 @@
   import Expander from "$lib/../components/Expander.svelte";
   import Focusable from "$lib/../components/Focusable.svelte";
   import View from "$lib/../components/View.svelte";
+  import Goto from "$lib/../components/Goto.svelte";
+  import Help from "$lib/../components/Help.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
+  import QuickPick from "$lib/../components/QuickPick.svelte";
   import { invoke } from "@tauri-apps/api/tauri";
+  import { goto, invalidateAll } from "$app/navigation";
   import { render_text_cached } from "$lib/../routes/node/[[path]]/funcs";
-  import { patch_tree, patch_tree_content, flattenObject } from "./funcs";
-  import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
+  import {
+    patch_tree,
+    flattenObject,
+    expand_path,
+    delete_from_tree,
+  } from "./funcs";
+  import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
-  import { add_code_clipboards, dispatch_keyup } from "$lib/util.ts";
-  import { focus_first_in_node} from "$lib/util.ts";
+  import { add_code_clipboards, dispatch_keyup, iso_date } from "$lib/util.ts";
+  import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   export let data;
 
   let cache = {};
   let activeIndex;
+  let scroll_to_active;
   let overlay = "";
+  let nav_path = "";
+  let nav_start_index = 0;
+  let nav_start_path = "";
+  let nav_start_tree = null;
+  $: data.current_item = data?.flat[activeIndex]?.path;
   let help_entries = [{ key: "Esc", text: "Go back" }];
+  let delete_entries = [{ key: "d", text: "delete node & children" }];
   let keys = {
-    x: () => {
-      toast.push("hello");
-      document
-        .getElementById("node_content")
-        .find("all", false, false, true, false);
-      return true;
+    " ": () => {
+      nav_path = data.flat[activeIndex].path;
+      nav_start_path = nav_path;
+      nav_start_index = activeIndex;
+      nav_start_tree = structuredClone(data.tree);
+      enter_overlay("nav");
+    },
+    h: () => {
+      enter_overlay("help");
+    },
+    g: () => {
+      enter_overlay("goto");
+    },
+    a: () => {
+      add_node();
+    },
+    d: () => {
+      enter_overlay("delete");
+    },
+    m: () => {
+      enter_overlay("move");
     },
   };
 
+  //todo: refactor
+  function toggleElementAndChildren(element, isDisabled) {
+    // Add wrapper functions to event handlers the first time this function is called on this element
+
+    // Set disabled/enabled state of the element
+    element.disabled = isDisabled;
+
+    // Unset/re-set the tabIndex attribute on the element
+    if (isDisabled) {
+      //element.orgiginalTabIndex = element.tabIndex;
+      //element.removeAttribute("tabIndex");
+      element.classList.add("disabled");
+    } else {
+      //element.tabIndex = element.originalTabIndex;
+      element.classList.remove("disabled");
+    }
+
+    // Disable/enable all children of the element
+    var childNodes = element.childNodes;
+    for (var i = 0; i < childNodes.length; i++) {
+      var child = childNodes[i];
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        toggleElementAndChildren(child, isDisabled);
+      }
+    }
+  }
+
+  function enter_overlay(ov) {
+    overlay = ov;
+    toggleElementAndChildren(document.getElementById("main_content"), true);
+  }
+
+  function leave_overlay() {
+    overlay = "";
+    toggleElementAndChildren(document.getElementById("main_content"), false);
+    window.setTimeout(() => {
+      focus_first_in_node(document.getElementById("tree_parent"));
+    }, 10);
+  }
+
+  async function add_node() {
+    let new_path = await invoke("find_next_empty_child", {
+      path: data.current_item,
+    });
+    await invoke("edit_node", {
+      path: new_path,
+      windowTitle: appWindow.label,
+    });
+  }
+
   async function get_rendered_node(path) {
-    console.log("retreiving rendered node", path);
     if (cache[path] === undefined) {
-      let node = await invoke("get_node", { path: path });
-      if (node.node.raw != "") {
+      let node = await invoke("get_node", { path: path + "" });
+      if (node !== undefined && node.node !== null && node.node.raw != "") {
         let rt = await render_text_cached(path, node.node.raw);
         cache[path] = rt;
       } else {
@@ -65,7 +145,6 @@
             data.flat = flattenObject(data.tree);
             data = data;
           } else {
-            console.log("expanding", path);
             let subtree = await invoke("get_tree", { path: path, maxDepth: 1 });
             patch_tree(data.tree, path, subtree.children);
             data.flat = flattenObject(data.tree);
@@ -86,7 +165,6 @@
   }
 
   let can_expand = (path, do_expand) => {
-    console.log("querying expandability", path);
     for (let ii = 0; ii < data.flat.length; ii++) {
       if (data.flat[ii].path == path) {
         if (data.flat[ii].has_children) {
@@ -108,29 +186,28 @@
   };
 
   let can_contract = (path, do_contract) => {
-	console.log("querying contractability", path);
-	for (let ii = 0; ii < data.flat.length; ii++) {
-	  if (data.flat[ii].path == path) {
-		if (data.flat[ii].has_children) {
-		  let was_expanded = false;
-		  let yy = ii + 1;
-		  if (yy > data.flat.length - 1) {
-			was_expanded = false;
-		  } else {
-			was_expanded = data.flat[yy].path.startsWith(path);
-		  }
-		  if (do_contract && was_expanded) {
-			toggle_node(path, true);
-		  }
-		  return was_expanded;
-		}
-	  }
-	}
-	return false;
+    for (let ii = 0; ii < data.flat.length; ii++) {
+      if (data.flat[ii].path == path) {
+        if (data.flat[ii].has_children) {
+          let was_expanded = false;
+          let yy = ii + 1;
+          if (yy > data.flat.length - 1) {
+            was_expanded = false;
+          } else {
+            was_expanded = data.flat[yy].path.startsWith(path);
+          }
+          if (do_contract && was_expanded) {
+            toggle_node(path, true);
+          }
+          return was_expanded;
+        }
+      }
+    }
+    return false;
   };
 
-  async function item_selected(ev) {
-    let path = ev.detail.path;
+  async function edit_current_node() {
+    let path = data.flat[activeIndex].path;
     if (data.currently_edited[path] == undefined) {
       let node = await invoke("get_node", { path: path });
       data.currently_edited[path] = [node.node.raw];
@@ -141,6 +218,10 @@
       });
     }
   }
+
+  async function item_selected(ev) {
+    edit_current_node();
+  }
   //this is an event from rust
   const unlisten_node_changed = listen("node-changed", async (event) => {
     // a specific node was reread
@@ -149,14 +230,15 @@
     cache[event.payload] = undefined;
     //patch_tree_content(data.tree, event.payload, new_node.node.raw);
     //data.flat = flattenObject(data.tree);
-    console.log("node changed", new_node.node.raw);
+    let prefix = event.payload.substr(0, event.payload.length - 1);
+    toast.push("expanding " + prefix);
+    toggle_node(prefix, false);
     data = data;
   });
 
   const unliste_node_unchanged = listen("node-unchanged", async (event) => {
     //some node was not changed / editing aborted.
     //reload to refresh the currently edited thing?
-    console.log("node unchanged", event.payload);
     data.currently_edited[event.payload] = undefined;
     data = data;
   });
@@ -165,7 +247,6 @@
     async (event) => {
       //some node was edited, but not confirmed yet.
       //reload to refresh the currently edited thing?
-      console.log("node temp-changed", event.payload[0]);
       //todo
       /*
       if (event.payload[0] == data.path) {
@@ -181,48 +262,203 @@
     //reload to refresh the currently edited thing
   });
 
-  onMount(async () => {});
-
+  onMount(async () => {
+    await goto_node(data.flat[data.start_item].path);
+  });
+  beforeUpdate(async () => {
+    if (data.current_item != "" && activeIndex == undefined) {
+      console.log("setting active index", data.current_item);
+      for (let ii = 0; ii < data.flat.length; ii++) {
+        if (data.flat[ii].path == data.current_item) {
+          activeIndex = ii;
+          console.log("hit", ii);
+          break;
+        }
+      }
+    }
+  });
   onDestroy(async () => {
     (await unlisten_node_changed)();
     (await unliste_node_unchanged)();
     (await unliste_node_temp_changed)();
     (await unlisten_message)();
   });
+
   function handle_overlay_leave() {
-    // toast.push("overlay:leave in node");
-    overlay = "";
+    leave_overlay();
   }
 
   async function handle_key_up_content(ev) {
-  console.log(ev);
-	if (ev.key == "ArrowLeft") {
-	console.log("arrowLeft");
-	focus_first_in_node(document.getElementById("tree_parent"))
-	}
+    if (ev.key == "ArrowLeft") {
+      focus_first_in_node(document.getElementById("tree_parent"));
+      document.querySelector(".chosen").scrollIntoView();
+    }
   }
+  function show_help() {
+    enter_overlay("help");
+  }
+
+  async function goto_node(path) {
+    await expand_path(data.tree, path, 1);
+    data.flat = flattenObject(data.tree);
+
+    let found = false;
+    let expanded = false;
+    for (let ii = 0; ii < data.flat.length; ii++) {
+      if (path.startsWith(data.flat[ii].path)) {
+        activeIndex = ii;
+        if (path == data.flat[ii].path) {
+          found = true;
+          break;
+        }
+      } else if (data.flat[ii].path > path) {
+        break;
+      }
+    }
+    return found;
+  }
+
+  async function handle_nav_change(ev) {
+    if (ev.key == "Escape") {
+      activeIndex = nav_start_index;
+      data.path = nav_start_path;
+      data.tree = nav_start_tree;
+      data.flat = flattenObject(data.tree);
+      leave_overlay();
+      data = data;
+      focus_first_in_node(document.getElementById("tree_parent"));
+      ev.stopPropagation();
+      ev.preventDefault();
+      return;
+    } else if (ev.key == " ") {
+      toast.push("space");
+      leave_overlay();
+      data = data;
+    } else if (ev.key == "Enter") {
+      leave_overlay();
+      edit_current_node();
+    }
+
+    nav_path = nav_path.toUpperCase();
+    nav_path = nav_path.replace(/[^A-Z0-9]/g, "");
+    let el = document.getElementById("nav_path_input");
+    let found = await goto_node(nav_path);
+    if (!found) {
+      el.classList.add("notfound");
+    } else {
+      el.classList.remove("notfound");
+    }
+    ev.stopPropagation();
+    //key is a..z
+  }
+
+  async function parse_path(path) {
+    if (path.startsWith("!")) {
+      let prefix = path.slice(1);
+      let date_suffix = await invoke("date_to_path", {
+        dateStr: iso_date(new Date()),
+      });
+      path = prefix + date_suffix;
+    } else if (path.startsWith("#")) {
+    }
+    return path;
+  }
+
+  let handle_goto = async (path) => {
+    let ppath = await parse_path(path);
+    if (ppath.startsWith("mail:")) {
+      goto("/mail/query/" + ppath.slice(5));
+      return;
+    }
+    try {
+      await goto_node(ppath);
+    } catch (e) {
+      toast.push("Could not go to node" + e);
+    }
+
+    leave_overlay();
+    await tick();
+    window.setTimeout(() => {
+      focus_first_in_node(document.getElementById("tree_parent"));
+      scroll_to_active();
+    }, 10);
+  };
+
+  let handle_move = async (path) => {
+    leave_overlay();
+    let ppath = await parse_path(path);
+    if (ppath.startsWith("mail:")) {
+      toast.push("can't goto mail");
+      return;
+    }
+    if (ppath.startsWith(data.current_item)) {
+      if (data.current_item == ppath) {
+        toast.push("Can't move to self");
+      } else {
+        toast.push("Can't move to own child");
+      }
+      return;
+    }
+    if (
+      ppath ==
+      data.current_item.substring(0, data.current_item.length - 1)
+    ) {
+      toast.push("Won't move on same level");
+      return;
+    }
+    let new_name = await invoke("find_next_empty_child", {
+      path: ppath,
+    });
+    toast.push("moving to " + new_name);
+  };
+
+  function handle_delete(ev) {
+    if (data.current_item != "") {
+      invoke("delete_node", { path: data.current_item })
+        .then(async () => {
+          toast.push("node deleted");
+          await goto_node(
+            data.current_item.substring(0, data.current_item.length - 1)
+          );
+        })
+        .catch((e) => {
+          toast.push(`Error ${e}`);
+        });
+      leave_overlay();
+      //delete_from_tree(data.tree, data.current_item);
+      //console.log(data.tree);
+      //data.flat = flattenObject(data.tree);
+    }
+  }
+
+  let filter_goto_for_move = (target_path) => {
+    return !target_path.startsWith("mail:");
+  };
 </script>
 
 <View on:keyup={dispatch_keyup(keys)}>
-  <div slot="header" >
-  hello
+  <div slot="header">
+    {window.location}
   </div>
   <svelte:fragment slot="content">
     <div class="smallcolumn main_div" id="tree_parent">
       <Focusable
         on:itemChanged={itemChanged}
-        on:itemSpace={item_toggle_children}
-        bind={activeIndex}
+        on:itemExpand={item_toggle_children}
+        bind:activeIndex
+        bind:scroll_to_active
         on:itemSelected={item_selected}
         bind:can_expand
         bind:can_contract
       >
-        {#each data.flat as node}
+        {#each data.flat as node, ii}
           <tr
             data-path={node.path}
-            class={data.currently_edited[node.path] !== undefined
-              ? "edited"
-              : ""}
+            class="{data.currently_edited[node.path] !== undefined
+              ? 'edited'
+              : ''}
+			  {ii == activeIndex ? 'chosen' : ''}
+			  "
           >
             <td class="mono">
               {@html node.indention}{node.path}{#if node.has_children && !node.children_shown}<span
@@ -236,11 +472,12 @@
       </Focusable>
     </div>
     <div
-      class="main_div column {data.currently_edited[data.current_item] !== undefined
+      class="main_div column {data.currently_edited[data.current_item] !==
+      undefined
         ? 'edited'
         : ''}"
       id="node_content"
-	  on:keyup={handle_key_up_content}
+      on:keyup={handle_key_up_content}
     >
       {#await get_rendered_node(data.current_item)}
         loading...
@@ -250,15 +487,35 @@
     </div>
   </svelte:fragment>
   <div slot="footer">
-    <Overlay on:leave={handle_overlay_leave} bind:overlay>
-      {#if overlay == "help"}
-        <Help bind:entries={help_entries} />
-      {:else if overlay == ""}
-        <div on:click={show_help}>
-          Press <span class="hotkey">h</span> for help.
-        </div>
-      {/if}
-    </Overlay>
+    {#if overlay != ""}
+      <Overlay on:leave={handle_overlay_leave} bind:overlay>
+        {#if overlay == "help"}
+          <Help bind:entries={help_entries} />
+        {:else if overlay == "nav"}
+          <input
+            type="text"
+            bind:value={nav_path}
+            autofocus
+            on:keyup={handle_nav_change}
+            id="nav_path_input"
+          />
+        {:else if overlay == "goto"}
+          <Goto bind:action={handle_goto} bind:overlay />
+        {:else if overlay == "move"}
+          <Goto
+            bind:action={handle_move}
+            bind:overlay
+            bind:filter={filter_goto_for_move}
+          />
+        {:else if overlay == "delete"}
+          <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
+        {:else if overlay == ""}{/if}
+      </Overlay>
+    {:else}
+      <div on:click={show_help}>
+        Press <span class="hotkey">h</span> for help.
+      </div>
+    {/if}
   </div>
 </View>
 
@@ -282,7 +539,7 @@
   .smallcolumn {
     float: left;
     max-width: 49%;
-  overflow-y: scroll;
+    overflow-y: scroll;
     overflow-x: hidden;
 
     padding-right: 0.5em;
@@ -290,5 +547,9 @@
 
   :global(.edited) {
     background-color: #ffdfdf;
+  }
+
+  :global(.notfound) {
+    color: red;
   }
 </style>

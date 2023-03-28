@@ -249,7 +249,10 @@
     let ppath = await parse_path(path);
     console.log(ppath);
     let new_path = await invoke("find_next_empty_child", { path: ppath });
-    goto("/node/" + new_path + "?edit=true");
+    await invoke("edit_node", {
+      path: path,
+      windowTitle: appWindow.label,
+    });
     overlay = "";
   };
 

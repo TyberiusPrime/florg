@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/tauri";
+
 export function flattenObject(
   obj,
   depth = 0,
@@ -43,28 +45,12 @@ export function flattenObject(
 
   return result;
 }
-export async function descend_node(path) {
-  //console.log("getting", path);
-  let node: any = await invoke("get_node", { path });
-  let children = [];
-  for (let ii = 0; ii < node.children.length; ii++) {
-    let c = node.children[ii];
-    let res = await descend_node(c.path);
-    children.push(res);
-  }
-  //console.log(path, children.length);
-  return {
-    title: node.node.header.title,
-    path: path,
-    children: children,
-    first_paragraph: node.node.header.first_paragraph,
-    more_text: false, //todo
-  };
-}
 
 export function patch_tree(tree, path, new_children) {
   if (tree.path == path) {
     tree.children = new_children;
+    tree.children_shown = new_children.length > 0;
+    tree.has_children = tree.has_children || (new_children.length > 0);
     return true;
   } else {
     for (let ii = 0; ii < tree.children.length; ii++) {
@@ -77,17 +63,27 @@ export function patch_tree(tree, path, new_children) {
   return false;
 }
 
-export function patch_tree_content(tree, path, new_text) {
-  if (tree.path == path) {
-    tree.raw = new_text;
-    return true;
-  } else {
-    for (let ii = 0; ii < tree.children.length; ii++) {
-      let child = tree.children[ii];
-      if (patch_tree_content(child, path, new_text)) {
-        return true;
-      }
+export function delete_from_tree(tree, path) {
+  for (let ii = 0; ii < tree.children.length; ii++) {
+    let child = tree.children[ii];
+    if (child.path == path) {
+      tree.children.splice(ii, 1);
+      console.log("found and deleted", path);
+	  console.log(tree.children);
+      return true;
+    } else if (path.startsWith(child.path)) {
+      delete_from_tree(child, path);
     }
   }
-  return false;
+}
+
+export async function expand_path(tree, path: string, maxDepth: int = 2) {
+  console.log("expand_path", path);
+  for (let ii = 0; ii < path.length; ii++) {
+    let p = path.slice(0, ii + 1);
+    console.log("fetch tree", p);
+    let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
+    patch_tree(tree, p, node.children);
+    console.log(tree);
+  }
 }

@@ -1,21 +1,26 @@
 <script lang="ts">
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
-  import { focus_first_in_node, find_first_focusable, no_text_inputs_focused } from "../lib/util.ts";
+  import {
+    focus_first_in_node,
+    find_first_focusable,
+    no_text_inputs_focused,
+  } from "../lib/util.ts";
 
   function focus_first_in_content() {
     let wrapper = document.getElementById("content");
-    focus_first_in_node(wrapper);
+    if (wrapper != null) {
+      focus_first_in_node(wrapper);
+    }
   }
 
   afterUpdate(() => {
-    console.log("afterUpdate");
     window.setTimeout(focus_first_in_content, 10);
   });
 
   function focus(ev) {
     let sel = window.getSelection();
     if (sel.isCollapsed && no_text_inputs_focused()) {
-	console.log("was collapsed");
+      console.log("was collapsed");
       let wrapper = document.getElementById("wrapper");
       let f = find_first_focusable(wrapper);
       if (f != document.activeElement) {
@@ -29,7 +34,7 @@
   <div class="header" id="header">
     <slot name="header" />
   </div>
-  <div class="main_content">
+  <div class="main_content" id="main_content">
     <div class="sticky-spacer" />
     <div class="sticky-content" id="sticky-content">
       <slot name="content" />

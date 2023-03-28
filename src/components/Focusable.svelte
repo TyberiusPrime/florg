@@ -13,6 +13,20 @@
 
   let container;
 
+  export let scroll_to_active = () => {
+    childNodes.forEach((node, i) => {
+      if (i === activeIndex) {
+        // node.classList.add("chosen");
+        if (scroll) {
+          node.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }
+    });
+  }
+
   function setActiveIndex(index, scroll = true) {
     if (activeIndex !== index) {
       const activeChild = childNodes[index];
@@ -20,19 +34,7 @@
       dispatch("itemChanged", { path: dataPath });
     }
     activeIndex = index;
-    childNodes.forEach((node, i) => {
-      if (i === activeIndex) {
-        node.classList.add("chosen");
-        if (scroll) {
-          node.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }
-      } else {
-        node.classList.remove("chosen");
-      }
-    });
+    scroll_to_active();
   }
 
   async function handleKeyDown(event) {
@@ -46,30 +48,29 @@
         {
           const last = childNodes[activeIndex];
           const dataPath = last.dataset.path;
-		  if (can_contract(dataPath, true)) {
-		  }
-		  else {
-			  console.log(dataPath);
-			  //remove last character
-			  let prefix = dataPath.substring(0, dataPath.length - 1);
-			  let new_index = Math.max(0, activeIndex - 1);
-			  while (
-				new_index > 0 &&
-				childNodes[new_index].dataset.path != prefix
-			  ) {
-				new_index -= 1;
-			  }
-			  if (lastJumpUp.length > 0) {
-				if (!lastJumpUp[lastJumpUp.length - 1].startsWith(dataPath)) {
-				  lastJumpUp = [];
-				}
-			  }
-			  lastJumpUp.push(dataPath);
-			  console.log(lastJumpUp);
-			  setActiveIndex(new_index);
-			  event.stopPropagation();
-			  event.preventDefault();
-			  }
+          if (can_contract(dataPath, true)) {
+          } else {
+            console.log(dataPath);
+            //remove last character
+            let prefix = dataPath.substring(0, dataPath.length - 1);
+            let new_index = Math.max(0, activeIndex - 1);
+            while (
+              new_index > 0 &&
+              childNodes[new_index].dataset.path != prefix
+            ) {
+              new_index -= 1;
+            }
+            if (lastJumpUp.length > 0) {
+              if (!lastJumpUp[lastJumpUp.length - 1].startsWith(dataPath)) {
+                lastJumpUp = [];
+              }
+            }
+            lastJumpUp.push(dataPath);
+            console.log(lastJumpUp);
+            setActiveIndex(new_index);
+            event.stopPropagation();
+            event.preventDefault();
+          }
         }
         break;
       case "ArrowRight":
@@ -81,7 +82,7 @@
             const last = childNodes[activeIndex];
             const data_path = last.dataset.path;
             if (can_expand(data_path, true)) {
-			console.log("did expand");
+              console.log("did expand");
               lastJumpUp.push(target_path);
               window.setTimeout(() => {
                 handleKeyDown(event);
@@ -89,7 +90,7 @@
 
               event.stopPropagation();
               event.preventDefault();
-			  return;
+              return;
             } else {
               new_index = Math.min(activeIndex + 1, childNodes.length - 1);
               if (target_path.startsWith(data_path)) {
@@ -110,11 +111,10 @@
               }
             }
           }
-          if (!popped && can_expand(childNodes[activeIndex].dataset.path)) {
-            console.log("expand");
-            dispatch("itemSpace", {
-              path: childNodes[activeIndex].dataset.path,
-            });
+          if (
+            !popped &&
+            can_expand(childNodes[activeIndex].dataset.path, true)
+          ) {
           }
           setActiveIndex(new_index);
           event.stopPropagation();
@@ -160,15 +160,6 @@
         event.preventDefault();
         event.stopPropagation();
         break;
-      case " ":
-        {
-          event.stopPropagation();
-          event.preventDefault();
-          const activeChild = childNodes[activeIndex];
-          const dataPath = activeChild.dataset.path;
-          dispatch("itemSpace", { path: dataPath });
-        }
-        break;
       case "Enter":
         if (!event.ctrlKey) {
           const activeChild = childNodes[activeIndex];
@@ -192,7 +183,6 @@
       case "PageDown":
       case "Home":
       case "Enter":
-      case " ":
       case "End":
         event.preventDefault();
         event.stopPropagation();
@@ -219,7 +209,7 @@
 
   function handleChildDoubleClick(event) {
     const dataPath = childNodes[activeIndex].dataset.path;
-    dispatch("itemSpace", { path: dataPath });
+    dispatch("itemExpand", { path: dataPath });
   }
 
   let observer;

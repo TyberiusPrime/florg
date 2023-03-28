@@ -421,3 +421,9 @@ p:hover + .copy-button, pre:hover + .copy-button  {
   p:focus {
 	  font-weight:bold;
   }
+
+  .disabled {
+    color: #555;
+	pointer-events:none;
+  }
+

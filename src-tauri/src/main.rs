@@ -135,26 +135,31 @@ pub(crate) struct TreeForJS {
     pub has_children: bool,
 }
 
-fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> TreeForJS {
-    let node = storage.get_node(path).unwrap();
-    let children = storage.children_paths_for(path);
-    let has_children = !children.is_empty();
-    TreeForJS {
-        path: path.to_string(),
-        title: node.header.title.clone(),
-        first_paragraph: node.header.first_paragraph.clone(),
-        more_text: node.header.has_more_content,
-        children: if remaining_depth > 0 {
-            children.iter().map(|x| descend(x, storage, remaining_depth - 1)).collect()
-        } else {
-            Vec::new()
-        },
-        has_children,
+fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> Option<TreeForJS> {
+    let node = storage.get_node(path);
+    {
+        let children = storage.children_paths_for(path);
+        let has_children = !children.is_empty();
+        Some(TreeForJS {
+            path: path.to_string(),
+            title: node.map_or_else(|| "(empty node)".to_string(), |x| x.header.title.clone()),
+            first_paragraph: node.map_or_else(|| "".to_string(), |x| x.header.first_paragraph.clone()),
+            more_text: node.map_or(false, |x| x.header.has_more_content),
+            children: if remaining_depth > 0 {
+                children
+                    .iter()
+                    .filter_map(|x| descend(x, storage, remaining_depth - 1))
+                    .collect()
+            } else {
+                Vec::new()
+            },
+            has_children,
+        })
     }
 }
 
 #[tauri::command]
-fn get_tree(path: &str, max_depth: i32) -> TreeForJS {
+fn get_tree(path: &str, max_depth: i32) -> Option<TreeForJS> {
     let s = STORAGE.get().unwrap().lock().unwrap();
     descend(path, &s, max_depth)
 }

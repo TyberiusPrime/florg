@@ -75,6 +75,10 @@ impl Storage {
     pub fn reload(&mut self) {
         let nodes = Self::parse_path(&self.data_path);
         self.nodes = nodes;
+        //print a sorted list of the nodes path...
+        /* let mut paths: Vec<_> = self.nodes.iter().map(|n| n.path.clone()).collect();
+        paths.sort();
+        dbg!(paths); */
         let settings = Self::load_settings(&self.data_path, None)
             .unwrap_or_else(|_| toml_edit::Document::new());
 
@@ -132,6 +136,27 @@ impl Storage {
                 let path = path.replace("/", "");
                 //dbg!(entry.path(), &path);
                 nodes.push(Node::parse(path, entry.path()));
+            }
+        }
+        //nodes that have no FLORG_FILENAME but child nodes need to be patched in.
+        let mut paths: HashSet<_> = nodes.iter().map(|n| n.path.clone()).collect();
+        let paths2 = paths.clone();
+        for p in paths2.iter() {
+            if p.len() > 0 {
+                if !paths.contains(&p[..p.len() - 1]) {
+                    let path = &p[..p.len() - 1];
+                    let node = Node {
+                        path: path.to_string(),
+                        header: Header {
+                            title: "(empty node)".to_string(),
+                            first_paragraph: "".to_string(),
+                            has_more_content: false,
+                        },
+                        raw: "".to_string(),
+                    };
+                    nodes.push(node);
+                    paths.insert(path.to_string());
+                }
             }
         }
         nodes

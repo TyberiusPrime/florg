@@ -28,20 +28,11 @@
         selectedIndex = history.length - 1;
       }
       showHistory = true;
-    } else if (event.key === "Enter") {
-      if (showHistory && selectedIndex >= 0 && selectedIndex < history.length) {
-        event.preventDefault();
-        input_value = history[selectedIndex];
-        showHistory = false;
-      } else if (input_value) {
-        dispatch("accept", null);
-      }
     } else if (event.key === "Escape") {
       event.preventDefault();
       if (showHistory) {
         showHistory = false;
-        window.setTimeout(() => {
-        }, 10);
+        window.setTimeout(() => {}, 10);
       } else {
         dispatch("leave", input_value);
       }
@@ -51,7 +42,16 @@
   }
 
   function handle_key_up(ev) {
-	event.stopPropagation();
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      if (showHistory && selectedIndex >= 0 && selectedIndex < history.length) {
+        event.preventDefault();
+        input_value = history[selectedIndex];
+        showHistory = false;
+      } else if (input_value) {
+        dispatch("accept", null);
+      }
+    }
   }
 
   function popout() {
@@ -95,9 +95,9 @@
     placeholder="Type something..."
     value={input_value}
     on:keydown={handleInput}
-	on:keyup={handle_key_up}
+    on:keyup={handle_key_up}
     autofocus
-	style="width:80%; padding-left:.25em;"
+    style="width:80%; padding-left:.25em;"
   />
 </svelet:element>
 

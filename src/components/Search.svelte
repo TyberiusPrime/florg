@@ -75,7 +75,7 @@
     } else {
       toast.push("Unknown search_mode: " + search_mode);
     }
-    overlay = "";
+    dispatch("leave", {});
   }
 
   let items = [];

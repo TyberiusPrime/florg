@@ -181,9 +181,13 @@
       if (parsed.headers[i].name.Rfc?.toLowerCase()! == header) {
         let value;
         if ("Address" in parsed.headers[i].value) {
-          value = `${parsed.headers[i].value.Address.name} <${parsed.headers[i].value.Address.address}>`;
+          if (parsed.headers[i].value.Address.name != null) {
+            value = `${parsed.headers[i].value.Address.name} <${parsed.headers[i].value.Address.address}>`;
+          } else {
+            value = `${parsed.headers[i].value.Address.address}`;
+          }
         } else if ("DateTime" in parsed.headers[i].value) {
-		console.log('date')
+          console.log("date");
           let input_date = parsed.headers[i].value.DateTime;
           value = new Date(
             input_date.year,
@@ -313,11 +317,7 @@
     } else if (target == "headers") {
       let headers = "";
       for (let i = 0; i < data.headers.length; i++) {
-        headers +=
-          data.headers[i].key +
-          ": " +
-          data.headers[i].value +
-          "\n";
+        headers += data.headers[i].key + ": " + data.headers[i].value + "\n";
       }
       copy_to_clipboard(headers);
     } else if (target == "filename") {
@@ -464,9 +464,9 @@
         (html available){/if}
       <pre>{@html wrap(escape_html(data.text))}</pre>
     {/if}
-	<pre>
+    <!-- <pre>
 	{JSON.stringify(data.parsed, null, 2)}
-	</pre>
+	</pre> -->
   </div>
 
   <div slot="footer">

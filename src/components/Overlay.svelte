@@ -64,6 +64,3 @@
     {stop_listening()}
   {/if}
 </div>
-
-<style>
-</style>

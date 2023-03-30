@@ -10,7 +10,7 @@
   export let data;
 
   async function handle_action(ev) {
-    goto("/node/" + ev.detail.cmd, { replaceState: true });
+    goto("/tree/" + ev.detail.cmd, { replaceState: true });
   }
   let search_results = [];
 </script>

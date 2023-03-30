@@ -378,6 +378,11 @@ p:hover + .copy-button, pre:hover + .copy-button  {
 	padding-top:0
 }
 
+  .disabled {
+    color: #555;
+	pointer-events:none;
+  }
+
 .tags {
     display: inline-block;
     margin-left: 5px !important;
@@ -425,10 +430,5 @@ p:hover + .copy-button, pre:hover + .copy-button  {
 
   p:focus {
 	  font-weight:bold;
-  }
-
-  .disabled {
-    color: #555;
-	pointer-events:none;
   }
 

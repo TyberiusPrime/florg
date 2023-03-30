@@ -7,6 +7,7 @@
   import Help from "$lib/../components/Help.svelte";
   import Overlay from "$lib/../components/Overlay.svelte";
   import QuickPick from "$lib/../components/QuickPick.svelte";
+  import Search from "$lib/../components/Search.svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { goto, invalidateAll } from "$app/navigation";
   import {
@@ -52,7 +53,10 @@
   let move_and_goto = false;
   let highlight_node = false;
   let fetch_url_text = "";
-  let focus_time = Date.now();
+  let focus_time = Date.now() - 1000;
+  let search_mode;
+  let in_page_search_term = "";
+
   $: data.current_item = data?.flat[activeIndex]?.path;
 
   let help_entries = [
@@ -64,6 +68,9 @@
     { key: "space", text: "Enter nav mode" },
     { key: "a", text: "add node below" },
     { key: "d", text: "Delete node" },
+    { key: "s", text: "search" },
+    { key: "n", text: "search: (next hit)" },
+    { key: "N", text: "search: (prev hit)" },
   ];
   let delete_entries = [{ key: "d", text: "delete node & children" }];
 
@@ -109,6 +116,27 @@
     },
     g: () => {
       viewComponent.enter_overlay("goto");
+    },
+    s: () => {
+      viewComponent.enter_overlay("search");
+      return true;
+    },
+
+    n: () => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+      viewComponent.enter_overlay("search");
+        search_mode = "in_page";
+      }
+    },
+    N: () => {
+      if (in_page_search_term != "") {
+        window.find(in_page_search_term, false, false, true, false);
+      } else {
+      viewComponent.enter_overlay("search");
+        search_mode = "in_page";
+      }
     },
     a: () => {
       add_node();
@@ -746,12 +774,18 @@
   function handle_window_focus() {
     focus_time = Date.now();
   }
+
+  function search_mode_leave(ev) {
+	toast.push("search mode leave");
+	viewComponent.leave_overlay();
+	
+  }
 </script>
 
 <svelte:window on:focus={handle_window_focus} />
 <View
   on:keyup={dispatch_keyup(keys, () => {
-    if (Date.now() - focus_time < 1000) {
+    if (Date.now() - focus_time < 500) {
       // toast.push("ignored keypress");
       return true;
     }
@@ -854,6 +888,8 @@
     {:else if overlay == "tag"}
       tag
       <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
+    {:else if overlay == "search"}
+	  <Search bind:overlay bind:in_page_search_term bind:search_mode on:leave={search_mode_leave} />
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input

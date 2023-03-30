@@ -6,6 +6,7 @@
   import Picker from "$lib/../components/Picker.svelte";
   import { get_node } from "$lib/util.ts";
   import { onMount, onDestroy } from "svelte";
+  import { tag_class } from "$lib/colors.ts";
 
   export let data;
 
@@ -20,7 +21,11 @@
     <div slot="message"><h1>Node search</h1></div>
     <svelte:fragment slot="entries">
       {#each data.search_results as result}
-        <tr data-cmd={result.cmd}><td>{@html result.text}</td></tr>
+		<tr data-cmd={result.cmd}><td>{@html result.text}
+		{#each result.tags as tag}
+		<div class='tags {tag_class(tag.slice(1))}'>{tag}</div>
+		{/each}
+		</td></tr>
       {/each}
     </svelte:fragment>
   </Picker>

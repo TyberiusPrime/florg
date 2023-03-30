@@ -35,6 +35,7 @@ export async function load({ params }: { params: any }) {
     translated_results.push({
       cmd: result.path,
       text: text,
+	  tags: result.tags,
     });
   }
   return {

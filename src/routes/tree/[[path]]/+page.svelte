@@ -31,7 +31,12 @@
     readText as read_clipboard,
     writeText as copy_to_clipboard,
   } from "@tauri-apps/api/clipboard";
-  import { add_code_clipboards, dispatch_keyup, iso_date } from "$lib/util.ts";
+  import {
+    add_code_clipboards,
+    dispatch_keyup,
+    iso_date,
+    iso_date_and_time,
+  } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
@@ -88,7 +93,7 @@
   ];
   let palette_entries = [
     { key: "t", text: "Open terminal", target_path: "terminal" },
-    { key: "s", text: "edit settings", target_path: "settings" },
+    { key: "s", text: "edit ettings", target_path: "settings" },
     { key: "d", text: "create_date_nodes", target_path: "create_date_nodes" },
     { key: "x", text: "exit the app", target_path: "exit" },
     { key: "r", text: "reload data", target_path: "reload" },
@@ -102,6 +107,7 @@
         let tag = tags[key];
         res.push({ key: key, text: tag, target_path: tag });
       }
+      res.push({ key: "#", text: "A Date", target_path: "!!date" });
       return res;
     }
   }
@@ -393,15 +399,15 @@
     //patch_tree_content(data.tree, event.payload, new_node.node.raw);
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
-	patch_tags(data.tree, event.payload, new_node.tags);
+    patch_tags(data.tree, event.payload, new_node.tags);
     let p = data.current_item;
     if (p.length <= 1) {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
     } else {
-	  can_expand(event.payload, false);
-	  if (event.payload != p) {
-		  goto_node(p);
-		  }
+      can_expand(event.payload, false);
+      if (event.payload != p) {
+        goto_node(p);
+      }
     }
 
     data.flat = flattenObject(data.tree);
@@ -431,8 +437,10 @@
     }
   );
   const unlisten_message = listen("message", (event) => {
-    //some node was not changed / editing aborted.
-    //reload to refresh the currently edited thing
+    if (event.payload == "Settings updated") {
+      toast.push("settings changed");
+      window.location.reload();
+    }
   });
 
   onMount(async () => {
@@ -917,20 +925,50 @@
   async function handle_tag(ev) {
     viewComponent.leave_overlay();
     let tag = ev.detail;
-    let path = data.current_item;
-    if (data.currently_edited[path] != undefined) {
-      toast.push("Cant toggle tags on currently edited nodes");
-      return;
-    }
-    let node = await invoke("get_node", { path: path + "" });
-    let text = node?.node?.raw;
-    if (text.indexOf(tag) != -1) {
-      text = text.replace(tag, "").trim();
+    if (tag == "!!date") {
+      date_pick_value = iso_date(Date.now());
+      viewComponent.enter_overlay("date_pick_for_tag");
     } else {
-      text = text + "\n" + tag;
+      let path = data.current_item;
+      if (data.currently_edited[path] != undefined) {
+        toast.push("Cant toggle tags on currently edited nodes");
+        return;
+      }
+      let node = await invoke("get_node", { path: path + "" });
+      let text = node?.node?.raw;
+      let add_timestamp = tag.indexOf("<timestamp>") != -1;
+      if (add_timestamp) {
+        let raw_tag = tag.replace("<timestamp>", "");
+        let insert =
+          tag.replace("<timestamp>", "<" + iso_date_and_time(Date.now())) + ">";
+        let query = RegExp(`${raw_tag}<\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}>`);
+        if (text.match(query)) {
+          text = text.replace(query, "");
+        } else {
+          text = text + "\n\n" + insert;
+        }
+      } else {
+        let add_date = tag.indexOf("<date>") != -1;
+        if (add_date) {
+          let raw_tag = tag.replace("<date>", "");
+          let insert = tag.replace("<date>", "<" + iso_date(Date.now())) + ">";
+          let query = RegExp(`${raw_tag}<\\d{4}-\\d{2}-\\d{2}>`);
+          if (text.match(query)) {
+            text = text.replace(query, "");
+          } else {
+            text = text + "\n\n" + insert;
+          }
+        } else {
+          if (text.indexOf(tag) != -1) {
+            text = text.replace(tag, "").trim();
+          } else {
+            text = text + "\n\n" + tag;
+          }
+        }
+      }
+      await invoke("change_node_text", { path, text });
     }
-	await invoke("change_node_text", {path, text});
-	//await goto_node(path);
+    //await goto_node(path);
   }
 
   function handle_window_focus() {
@@ -995,6 +1033,20 @@
     } else {
       edit_current_node();
     }
+  }
+
+  async function handle_date_tag() {
+    viewComponent.leave_overlay();
+    let path = data.current_item;
+    if (data.currently_edited[path] != undefined) {
+      toast.push("Cant add to currently edited item");
+      return;
+    }
+    let node = await invoke("get_node", { path: path + "" });
+    let text = node?.node?.raw || "";
+    text = text + `\n<${date_pick_value}>`;
+    await invoke("change_node_text", { path, text });
+    focus_first_in_node(document.getElementById("tree_parent"));
   }
 </script>
 
@@ -1124,6 +1176,14 @@
         <span id="date_pick_target">...</span>
       </div>
       {#await update_date_pick_choice()}{/await}
+    {:else if overlay == "date_pick_for_tag"}
+      Add date to node:
+      <DateInput
+        bind:value={date_pick_value}
+        on:space_action={handle_date_tag}
+        on:action={handle_date_tag}
+        on:leave={handle_date_leave}
+      />
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input

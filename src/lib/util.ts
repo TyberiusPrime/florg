@@ -65,6 +65,16 @@ export function iso_date(date: Date): String {
   let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
   return `${ye}-${mo}-${da}`;
 }
+
+export function iso_date_and_time(input_date: Date) {
+  let date = new Date(input_date);
+  const isoTime = date.toISOString().split("T")[1].split(".")[0];
+  const hours = isoTime.substr(0, 2);
+  const minutes = isoTime.substr(3, 2);
+  const isoDate = date.toISOString().split("T")[0];
+  return `${isoDate} ${hours}:${minutes}`;
+}
+
 export function no_text_inputs_focused(): Boolean {
   return (
     document.activeElement.tagName != "INPUT" &&
@@ -78,7 +88,7 @@ export async function get_node(path: string) {
 export function isElementInViewport(el): boolean {
   var rect = el.getBoundingClientRect();
   let header_height = document.getElementById("header").offsetHeight;
-  let footer_height = 0;//document.getElementById("footer").offsetHeight;
+  let footer_height = 0; //document.getElementById("footer").offsetHeight;
 
   return (
     rect.top >= header_height &&

@@ -561,14 +561,14 @@ impl Node {
         &self.raw
     }
 
-    pub fn extract_tags(text: &str) -> Vec<String> {
+    pub fn extract_tags(text: &str) -> HashSet<String> {
         let re = Lazy::new(|| Regex::new(r"#[A-Za-z][A-Za-z0-9]+").unwrap());
         let res = re.find_iter(text).map(|m| m.as_str().to_string()).collect();
         res
     }
 
     pub fn get_tags(&self) -> Vec<String> {
-        return Node::extract_tags(&self.raw);
+        return Node::extract_tags(&self.raw).into_iter().collect();
     }
 }
 

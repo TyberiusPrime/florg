@@ -9,7 +9,7 @@ mod storage;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::Datelike;
-use inotify::{EventMask, Inotify, WatchMask};
+use inotify::{Inotify, WatchMask};
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use signal_hook::iterator::Signals;
@@ -605,6 +605,7 @@ struct RipgrepResult {
     title: String,
     parent_titles: Vec<String>,
     lines: Vec<(u32, String)>,
+    tags: Vec<String>,
 }
 
 #[tauri::command]
@@ -648,12 +649,13 @@ fn ripgrep_below_node(
                     None => continue,
                 };
                 let path = format!("{query_path}{path}");
-                let title = ss
-                    .get_node(&path)
-                    .map(|x| x.header.title.clone())
+                let node = ss
+                    .get_node(&path);
+                let title = node                    .map(|x| x.header.title.clone())
                     .unwrap_or_else(|| "(empty node)".to_string());
                 let mut parent_titles = Vec::new();
                 let mut cpath = path.clone();
+                let tags = node.map(|x| x.get_tags()).unwrap_or_default();
                 while !cpath.is_empty() {
                     cpath.pop();
                     parent_titles.push(
@@ -675,6 +677,7 @@ fn ripgrep_below_node(
                     title,
                     parent_titles,
                     lines: hits,
+                    tags: tags,
                 })
             }
             result.sort_by(|a, b| a.path.cmp(&b.path));
@@ -898,7 +901,7 @@ fn start_terminal(folder: String) -> bool {
 
 #[tauri::command]
 fn extract_tags(text: &str) -> Vec<String> {
-    Node::extract_tags(text)
+    Node::extract_tags(text).into_iter().collect()
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {

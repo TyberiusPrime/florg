@@ -110,6 +110,7 @@
     " ": () => {
       nav_text = "nav";
       nav_mode = "nav";
+      start_nav();
       viewComponent.enter_overlay("nav");
     },
     h: () => {

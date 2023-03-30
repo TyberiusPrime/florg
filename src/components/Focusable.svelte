@@ -1,4 +1,5 @@
 <script>
+  import { toast } from "@zerodevx/svelte-toast";
   import { onMount, onDestroy } from "svelte";
   import { createEventDispatcher } from "svelte";
   import { tick } from "svelte";
@@ -19,7 +20,7 @@
     childNodes.forEach((node, i) => {
       if (i === activeIndex) {
         // node.classList.add("chosen");
-        if (scroll) {
+        if (true) {
           node.scrollIntoView({
             behavior: "smooth",
             block: "center",
@@ -30,7 +31,7 @@
   };
 
   function setActiveIndex(index, scroll = true) {
-    if (activeIndex !== index) {
+    if (activeIndex !== index && index != -1) {
       const activeChild = childNodes[index];
       const dataPath = activeChild.dataset.path;
       dispatch("itemChanged", { path: dataPath });
@@ -45,7 +46,7 @@
         event.preventDefault();
         event.stopPropagation();
         if (event.ctrlKey) {
-		console.log("shift up");
+          console.log("shift up");
           if (!(await handle_shift_up())) {
             return;
           }
@@ -59,7 +60,7 @@
           const prefix_length = dataPath.length;
           new_index = Math.max(activeIndex - 1, 0);
           while (
-			new_index > 0 &&
+            new_index > 0 &&
             childNodes[new_index].dataset.path.length > prefix_length
           ) {
             new_index -= 1;
@@ -67,7 +68,6 @@
         } else {
           new_index = Math.max(activeIndex - 1, 0);
         }
-		console.log('going to', new_index);
         setActiveIndex(new_index);
         break;
       case "ArrowLeft":
@@ -236,7 +236,7 @@
       clickedChild = clickedChild.parentNode;
     }
     const clickedIndex = childNodes.indexOf(clickedChild);
-	console.log("clicked index", clickedIndex);
+    console.log("clicked index", clickedIndex);
     setActiveIndex(clickedIndex, false);
   }
 
@@ -264,6 +264,14 @@
   onDestroy(() => {
     observer.disconnect();
   });
+
+  function handle_on_focus(ev) {
+    /*toast.push("focus");
+    window.setTimeout(() => {
+      scroll_to_active();
+    }, 1);
+	*/
+  }
 </script>
 
 <table
@@ -274,6 +282,7 @@
   on:dblclick={handleChildDoubleClick}
   bind:this={container}
   autofocus
+  on:focus={handle_on_focus}
 >
   <slot />
 </table>

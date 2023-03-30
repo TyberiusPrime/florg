@@ -8,6 +8,7 @@
   } from "../lib/util.ts";
 
   export let overlay = "";
+  let last_focused = null;
 
   function toggleElementAndChildren(element, isDisabled) {
     // Add wrapper functions to event handlers the first time this function is called on this element
@@ -37,6 +38,7 @@
 
   export function enter_overlay(ov) {
     document.getElementById("footer").tabIndex = 0;
+    last_focused = document.activeElement;
     overlay = ov;
     toggleElementAndChildren(document.getElementById("main_content"), true);
     window.setTimeout(() => {
@@ -49,7 +51,7 @@
     overlay = "";
     toggleElementAndChildren(document.getElementById("main_content"), false);
     window.setTimeout(() => {
-      focus_first_in_content();
+	  last_focused.focus({preventScroll: true});
     }, 10);
   }
 
@@ -61,16 +63,15 @@
   }
 
   afterUpdate(() => {
-	/*
+    /*
     if (no_text_inputs_focused()) {
       window.setTimeout(focus_first_in_content, 10);
     }
 	*/
-	
   });
 
   function focus(ev) {
-  /*
+    /*
     let sel = window.getSelection();
     if (sel.isCollapsed && no_text_inputs_focused()) {
       console.log("was collapsed");

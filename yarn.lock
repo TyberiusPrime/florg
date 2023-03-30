@@ -1521,6 +1521,16 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
+linkify-string@^4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/linkify-string/-/linkify-string-4.1.1.tgz#461eb30b66752dec21f3557ebe55983ae3f5b195"
+  integrity sha512-9+kj8xr7GLiyNyO9ri7lIxq2ixVYjjqvtomPQpeYNNT56/PxQq6utzXFLm8HxOaGTiMpimj1UAQWwYYPV88L1g==
+
+linkifyjs@^4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/linkifyjs/-/linkifyjs-4.1.1.tgz#73d427e3bbaaf4ca8e71c589ad4ffda11a9a5fde"
+  integrity sha512-zFN/CTVmbcVef+WaDXT63dNzzkfRBKT1j464NJQkV7iSgJU0sLBus9W0HBwnXK13/hf168pbrx/V/bjEHOXNHA==
+
 local-access@^1.0.1:
   version "1.1.0"
   resolved "https://registry.npmjs.org/local-access/-/local-access-1.1.0.tgz"

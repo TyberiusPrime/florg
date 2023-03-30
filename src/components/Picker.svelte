@@ -176,9 +176,8 @@
     console.log("picker onmount");
     focused = 0;
     window.setTimeout(() => {
-      focus_first_in_node(document.getElementById("pickerdiv"));
       document.getElementById("pickerdiv").scrollIntoView();
-
+	  document.getElementById("pick_table").focus();
       update_chosen(false);
     }, 100);
   });

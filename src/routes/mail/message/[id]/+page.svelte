@@ -25,8 +25,10 @@
   import Overlay from "$lib/../components/Overlay.svelte";
   import Help from "$lib/../components/Help.svelte";
   import Goto from "$lib/../components/Goto.svelte";
+  import linkifyStr from 'linkify-string';
 
   export let data;
+  let viewComponent;
 
   let tag_entries = Object.keys(data.available_tags).map((key) => {
     return {
@@ -60,19 +62,19 @@
   let keys = {
     Escape: () => {
       if (overlay != "") {
-        overlay = "";
+	  viewComponent.leave_overlay();
         return true;
       }
     },
 
     l: () => {
-      if (data.html != null) {
+      if (data.html != null && data.html != "") {
         show_html = !show_html;
         return true;
       }
     },
     h: () => {
-      overlay = "help";
+      viewComponent.enter_overlay("help");
       return true;
     },
     m: () => {
@@ -87,7 +89,7 @@
       toggle_tag({ detail: "flagged" });
     },
     t: () => {
-      overlay = "tags";
+      viewComponent.enter_overlay("tags");
       return true;
     },
     d: async () => {
@@ -106,7 +108,7 @@
       }
     },
     c: () => {
-      overlay = "copying";
+      viewComponent.enter_overlay("copying");
       return true;
     },
     i: () => {
@@ -122,7 +124,7 @@
       }
     },
     s: () => {
-      overlay = "search";
+      viewComponent.enter_overlay("search");
       search_mode = "pick";
       return true;
     },
@@ -130,7 +132,7 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
       } else {
-        overlay = "search";
+      viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
       return true;
@@ -139,17 +141,17 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, True);
       } else {
-        overlay = "search";
+      viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
       return true;
     },
     g: () => {
-      overlay = "goto";
+      viewComponent.enter_overlay("goto");
       return true;
     },
     r: () => {
-      overlay = "reply";
+      viewComponent.enter_overlay("reply");
       return true;
     },
   };
@@ -159,17 +161,8 @@
   }
 
   onMount(async () => {
-    overlay = "";
-    window.scroll(0, 0);
-    document.getElementById("wrapper").addEventListener("keyup", handle_keys);
 
     focus_first_in_node(document.getElementById("wrapper"));
-  });
-
-  onDestroy(() => {
-    document
-      .getElementById("wrapper")
-      .removeEventListener("keyup", handle_keys);
   });
 
   afterUpdate(() => {
@@ -274,11 +267,7 @@
     return lines.join("");
   }
 
-  function handle_overlay_leave() {
-    overlay = "";
-  }
-
-  let copy_entries = [
+    let copy_entries = [
     { key: "c", target_path: "link", text: "Copy link" },
     { key: "y", target_path: "text", text: "Copy text" },
     { key: "m", target_path: "html", text: "Copy extract text from html" },
@@ -325,7 +314,7 @@
     } else {
       error_toast("Unknown copy target: " + target);
     }
-    overlay = "";
+    viewComponent.leave_overlay();
   }
 
   async function toggle_tag(ev) {
@@ -344,7 +333,7 @@
       removeItemOnce(data.tags, tag);
     }
     data = data;
-    overlay = "";
+    viewComponent.leave_overlay();
   }
 
   async function handle_reply(ev) {
@@ -376,11 +365,11 @@
       default:
         error_toast("Unknown reply target: " + ev.detail);
     }
-    overlay = "";
+    viewComponent.leave_overlay();
   }
 </script>
 
-<View>
+<View bind:this={viewComponent} bind:overlay>
   <div slot="header">
     <table>
       <tr>
@@ -432,7 +421,7 @@
     </table>
   </div>
 
-  <div slot="content">
+  <div slot="content" on:keyup={handle_keys}>
     {#if all_headers}
       <table>
         {#each data.headers as header}
@@ -455,22 +444,22 @@
     {:else if data.text == null}
       {#if data.html != null}
         (extracted from html)
-        <pre>{wrap(extractContent(data.html))}</pre>
+        <pre>{wrap(linkifyStr(extractContent(data.html)))}</pre>
       {:else}
         (no text, no html)
       {/if}
     {:else}
-      {#if data.html != null}
+      {#if data.html != null && data.html != ""}
         (html available){/if}
-      <pre>{@html wrap(escape_html(data.text))}</pre>
+      <pre class="my_pre">{@html wrap(linkifyStr((data.text), { defaultProtocol: 'https' } ))}</pre>
     {/if}
     <!-- <pre>
+	todo: replace mailto links!
 	{JSON.stringify(data.parsed, null, 2)}
 	</pre> -->
   </div>
 
-  <div slot="footer">
-    <Overlay on:leave={handle_overlay_leave} bind:overlay>
+  <div slot="overlays">
       {#if overlay == "help"}
         <Help bind:entries={help_entries} />
       {:else if overlay == "copying"}
@@ -497,7 +486,6 @@
       {:else if overlay == ""}
         Press <span class="hotkey">h</span> for help.
       {/if}
-    </Overlay>
   </div>
 </View>
 
@@ -507,6 +495,11 @@
     padding-right: 10px;
     vertical-align: top;
   }
+
+  .my_pre {
+
+	margin-left:.25em;
+   }
 
   /*todo: combine with MailContent*/
 </style>

@@ -49,7 +49,9 @@
     overlay = "";
     toggleElementAndChildren(document.getElementById("main_content"), false);
     window.setTimeout(() => {
-      last_focused.focus({ preventScroll: true });
+      if (last_focused != null) {
+        last_focused.focus({ preventScroll: true });
+      }
     }, 10);
   }
 
@@ -59,14 +61,6 @@
       focus_first_in_node(wrapper);
     }
   }
-
-  afterUpdate(() => {
-    /*
-    if (no_text_inputs_focused()) {
-      window.setTimeout(focus_first_in_content, 10);
-    }
-	*/
-  });
 
   function focus(ev) {
     /*
@@ -83,7 +77,11 @@
 	*/
   }
   function show_help() {
-    enter_overlay("help");
+    if (overlay == "help") {
+      leave_overlay();
+    } else {
+      enter_overlay("help");
+    }
   }
 
   function handle_keyup(ev) {
@@ -96,18 +94,27 @@
   }
 
   function handle_window_resize() {
-  const header = document.querySelector("#header");
-  console.log(header);
+    const header = document.querySelector("#header");
+    console.log(header);
     if (header != null) {
       const headerHeight = header.offsetHeight;
-      document.getElementById("main_content").style.marginTop = headerHeight + "px";
+
+      document.getElementById("main_content").style.marginTop =
+        headerHeight + "px";
     }
     return "";
   }
 
   onMount(() => {
-	handle_window_resize();
-	document.getElementById("main_content").scrollIntoView();
+    handle_window_resize();
+    window.setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
+  });
+
+  afterUpdate(() => {
+    handle_window_resize();
+    //document.getElementById("main_content").scrollIntoView();
   });
 </script>
 
@@ -115,7 +122,7 @@
 
 <div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
   {#if overlay != ""}
-    <div class="overlay" id="overlay" on:keyup={handle_keyup} tabindex=0>
+    <div class="overlay" id="overlay" on:keyup={handle_keyup} tabindex="0">
       <slot name="overlays" />
     </div>
   {/if}

@@ -52,6 +52,7 @@
   let move_and_goto = false;
   let highlight_node = false;
   let fetch_url_text = "";
+  let focus_time = Date.now();
   $: data.current_item = data?.flat[activeIndex]?.path;
 
   let help_entries = [
@@ -189,23 +190,23 @@
     let tags = "";
     for (let tag of in_tags) {
       tags +=
-        "<div class='tags " +
-        tag_class(tag.slice(1)) +
-        "'>" +
-        tag +
-        "</div>";
+        "<div class='tags " + tag_class(tag.slice(1)) + "'>" + tag + "</div>";
     }
-	if (tags) {
-		tags += "<br style='clear:both'>"
-	}
+    if (tags) {
+      tags += "<br style='clear:both'>";
+    }
 
     return tags;
   }
 
   async function get_rendered_node(path) {
     if (data.currently_edited[path] != undefined) {
-	  let tags = await invoke ("extract_tags", {text: data.currently_edited[path]});
-      return render_tags(tags) + await render_text(data.currently_edited[path]);
+      let tags = await invoke("extract_tags", {
+        text: data.currently_edited[path],
+      });
+      return (
+        render_tags(tags) + (await render_text(data.currently_edited[path]))
+      );
     }
     if (cache[path] === undefined) {
       let node = await invoke("get_node", { path: path + "" });
@@ -342,7 +343,7 @@
 
     data.flat = flattenObject(data.tree);
     data = data;
-    await appWindow.setFocus();
+    window.setTimeout(async () => await appWindow.setFocus(), 100);
   });
 
   const unliste_node_unchanged = listen("node-unchanged", async (event) => {
@@ -350,15 +351,19 @@
     //reload to refresh the currently edited thing?
     data.currently_edited[event.payload] = undefined;
     data = data;
-    await appWindow.setFocus();
+    window.setTimeout(async () => await appWindow.setFocus(), 100);
   });
 
   const unliste_node_temp_changed = listen(
     "node-temp-changed",
     async (event) => {
+      //	toast.push(event.payload[0] + '-' + data.current_item);
       if (event.payload[0] == data.current_item) {
-        data.currently_edited[data.current_item] = event.payload[1];
-        data = data;
+        //	    toast.push('ts')
+        if (event.payload[1] != data.currently_edited[data.current_item]) {
+          data.currently_edited[data.current_item] = event.payload[1];
+          data = data;
+        }
       }
     }
   );
@@ -737,10 +742,19 @@
   async function handle_tag(ev) {
     viewComponent.leave_overlay();
   }
+
+  function handle_window_focus() {
+    focus_time = Date.now();
+  }
 </script>
 
+<svelte:window on:focus={handle_window_focus} />
 <View
   on:keyup={dispatch_keyup(keys, () => {
+    if (Date.now() - focus_time < 1000) {
+      // toast.push("ignored keypress");
+      return true;
+    }
     return overlay != "";
   })}
   bind:this={viewComponent}

@@ -334,34 +334,40 @@ fn edit_file(
                 .read_events_blocking(&mut buffer)
                 .expect("Error while reading events");
 
+            println!("eventS!");
+
+            let mut do_send = false;
             for event in events {
                 dbg!(&event);
-                if event.mask.contains(EventMask::DELETE) {
-                    if let Some(event_filename) = event.name {
-                        if event_filename == tf_name_for_thread {
-                            break;
-                        };
-                    }
-                } else if event.mask.contains(EventMask::CLOSE_WRITE) {
-                    if let Some(event_filename) = event.name {
-                        if event_filename == tf_name_for_thread {
-                            let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-                            let content = std::fs::read_to_string(&tf_for_thread)
-                                .expect("could not read temp file");
-                            let content = parse_raw_content(&content);
-                            //println!("Telling viewer about changed temp file");
-                            lock.app_handle
-                                .emit_all(&msg_to_js, (&path_for_thread, content))
-                                .ok();
-                        }
+                /* if event.mask.contains(EventMask::DELETE) {
+                if let Some(event_filename) = event.name {
+                    if event_filename == tf_name_for_thread {
+                        break;
+                    };
+                } */
+                //if event.mask.contains(EventMask::CLOSE_WRITE) {
+                if let Some(event_filename) = event.name {
+                    if event_filename == tf_name_for_thread {
+                        do_send = true;
                     }
                 }
-                //dbg!(event);
-                //http://localhost:1420/#/node/T
-                //http://localhost:1420/#T
-                //dbg!(&tf_name_for_thread);
-                // Handle event
             }
+            if do_send {
+                let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                let content =
+                    std::fs::read_to_string(&tf_for_thread).expect("could not read temp file");
+                let content = parse_raw_content(&content);
+                //println!("Telling viewer about changed temp file");
+                lock.app_handle
+                    .emit_all(&msg_to_js, (&path_for_thread, content))
+                    .ok();
+            }
+            //}
+            //dbg!(event);
+            //http://localhost:1420/#/node/T
+            //http://localhost:1420/#T
+            //dbg!(&tf_name_for_thread);
+            // Handle event
         }
     });
     runtime_state.open_editors.push(OpenEditor {
@@ -1023,10 +1029,14 @@ fn main() -> Result<()> {
     let data_path = if args.len() > 1 {
         PathBuf::from(args[1].to_string())
     } else {
-        xdg::BaseDirectories::with_prefix("florg")
-            .expect("failed to xdg::BaseDirectories")
-            .create_state_directory("")
-            .expect("Failed to create state directory in xdg state path")
+        std::env::var("FLORG_DATAPATH")
+            .map(|x| PathBuf::from(x))
+            .unwrap_or_else(|_| {
+                xdg::BaseDirectories::with_prefix("florg")
+                    .expect("failed to xdg::BaseDirectories")
+                    .create_state_directory("")
+                    .expect("Failed to create state directory in xdg state path")
+            })
     };
     let git_binary = find_git_binary()?;
 

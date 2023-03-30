@@ -8,86 +8,34 @@ body {
          html, body {
               margin: 0;
               padding: 0;
-          padding-left:5px;,
+			  padding-left:5px;,
          }
 
-         .wrapper {
-           display: grid;
-           /* Header and footer span the entire width, sidebars and content are fixed, with empty space on sides */
-           grid-template-areas:
-             "header"
-             "content"
-             "footer";
-           /* Only expand middle section vertically (content and sidebars) */
-           grid-template-rows: 0fr 1fr 0fr;
-           /* 100% width, but static widths for content and sidebars */
-           grid-template-columns: 1fr;
-           /* Force grid to be at least the height of the screen */
-           min-height: 100vh;
-         }
-         .header {
-           grid-area: header;
+		.header{
+			
+			border: 1px solid red;
+			position:fixed;
+			top:0px;
+			left:0px;
+			width:100%;
+			background-color:#eee;
+		}
 
-           /* Stick header to top of grid */
-           position: sticky;
-           top: 0;
-           /* Ensure header appears on top of content/sidebars */
-           z-index: 1;
-
-           /* General appearance */
-           padding: 0;
-      padding-top:5px;
-      width:100%;
-         }
-         /* Save header height to properly set `padding-top` and `margin-top` for sticky content */
-         :root {
-           --header-height: calc(1rem * 1.5 + 1rem * 2);
-         }
+		.overlay  {
+			position:fixed;
+			background-color:#eee;
+			width:99%;
+			padding:.25em;
+			bottom:0px;
+			margin-top:0;
+				
+		}
+		.main_content {
+		}
 
 
-         .main_content {
-           grid-area: content;
-		  width:100%;
-		  min-width:50%;
 
-           /* General appearance */
-         }
-         .footer {
-           grid-area: footer;
 
-           /* Stick footer to bottom of grid */
-           position: sticky;
-           bottom: 0;
-
-           /* General appearance */
-           padding: 0;
-		   background-color: #f6f6f6;
-         }
-         /* Save footer height to properly set `bottom` and `min-height` for sticky content */
-         :root {
-           --footer-height: calc(.8rem * 1.5 + .5rem * 2);
-         }
-
-         .sticky-spacer {
-           flex-grow: 1;
-         }
-         .sticky-content {
-           position: sticky;
-           bottom: var(--footer-height);
-           height: calc(100vh - var(--footer-height) - var(--header-height));
-           box-sizing: border-box;
-
-           --padding: 0px;
-           padding:
-             calc(var(--header-height) + var(--padding))
-             var(--padding)
-             var(--padding);
-           margin-top: calc(0px - var(--header-height));
-         }
-
-		 .main_div {
-           height: calc(100vh - var(--footer-height) - var(--header-height));
-		 }
 
     .error {
       color:red;
@@ -101,7 +49,6 @@ body {
   font-weight: 400;
 
   color: #0f0f0f;
-  background-color: #f6f6f6;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -176,7 +123,7 @@ input,
 button {
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
+  padding: 0.25em .25em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;

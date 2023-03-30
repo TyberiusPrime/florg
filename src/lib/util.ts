@@ -78,7 +78,7 @@ export async function get_node(path: string) {
 export function isElementInViewport(el): boolean {
   var rect = el.getBoundingClientRect();
   let header_height = document.getElementById("header").offsetHeight;
-  let footer_height = document.getElementById("footer").offsetHeight;
+  let footer_height = 0;//document.getElementById("footer").offsetHeight;
 
   return (
     rect.top >= header_height &&

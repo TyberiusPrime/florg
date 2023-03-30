@@ -5,10 +5,10 @@
   const dispatch = createEventDispatcher();
   import { Fzf, byLengthAsc } from "fzf";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
-  import { set_temp_history, get_temp_history } from "../lib/mode_stack.ts";
   import { no_text_inputs_focused, focus_first_in_node } from "../lib/util.ts";
 
   import View from "./View.svelte";
+  import Help from "./Help.svelte";
   import { isElementInViewport } from "../lib/util.ts";
 
   export let elements = [];
@@ -19,6 +19,7 @@
   let last_text = "";
   let test_text = "shu";
   let downstream_elements = [];
+  let help_entries = [{ key: "Esc", text: "Go back" }];
 
   function handle_key_down(ev) {
     if (
@@ -163,12 +164,6 @@
 
   let previousState = null;
 
-  function popStateChanged(event) {
-    set_temp_history(event.state);
-  }
-  // This is removed in the destroy() invocation below
-  window.addEventListener("popstate", popStateChanged);
-
   function update_elements_from_dom() {
     elements = [];
     for (let el of document.querySelector("#pick_table").children) {
@@ -181,22 +176,14 @@
     console.log("picker onmount");
     focused = 0;
     window.setTimeout(() => {
-      let state = get_temp_history();
-      if (state != null && state.input_text != undefined) {
-        input_text = state.input_text;
-        handle_text_change();
-        focused = state.focused;
-      }
-
-    focus_first_in_node(document.getElementById("pickerdiv"));
+      focus_first_in_node(document.getElementById("pickerdiv"));
+      document.getElementById("pickerdiv").scrollIntoView();
 
       update_chosen(false);
     }, 100);
   });
 
-  onDestroy(async () => {
-    window.removeEventListener("popstate", popStateChanged);
-  });
+  onDestroy(async () => {});
 
   let last_url = null;
   beforeUpdate(() => {});
@@ -215,32 +202,15 @@
 </script>
 
 <div on:keyup={handle_text_change} on:keydown={handle_key_down} id="pickerdiv">
-  <View>
-    <div slot="header">
-      <slot name="message" />
-      {#if enable_filter}
-        filter: <input id="typebox" autofocus bind:value={input_text} />
-      {/if}
-    </div>
-    <div slot="content" tabIndex="0">
-      <div id="the_content">
-        <table
-          id="pick_table"
-          on:click={focus_node}
-          on:dblclick={handle_double_click}
-		  tabIndex=0
-        >
-          <slot name="entries" />
-        </table>
-      </div>
-    </div>
-    <div slot="footer">
-      <slot name="footer">
-        Press <span class="hotkey">Esc</span> to abort.
-      </slot>
-    </div>
-  </View>
-  {update_chosen()}
+  <table
+    id="pick_table"
+    on:click={focus_node}
+    on:dblclick={handle_double_click}
+    tabIndex="0"
+  >
+    <slot name="entries" />
+    {update_chosen()}
+  </table>
 </div>
 
 <style>

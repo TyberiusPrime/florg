@@ -24,7 +24,7 @@ export async function parse_path(path: string) {
 export async function goto_node(path: string) {
   let [mode, ppath] = await parse_path(path);
   if (mode == "node") {
-    goto("/node/" + ppath);
+    goto("/tree/" + ppath);
   } else if (mode == "mail") {
 	  goto("/mail/query/" + encodeURIComponent(ppath));
   } else if (mode == "date") {

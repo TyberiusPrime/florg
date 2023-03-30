@@ -17,6 +17,7 @@
   } from "$lib/../routes/node/[[path]]/funcs";
   import {
     patch_tree,
+    patch_tags,
     flattenObject,
     expand_path,
     delete_from_tree,
@@ -34,7 +35,6 @@
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
-  import SveltyPicker from "svelty-picker";
 
   import readabilityLib from "@mozilla/readability";
   export let data;
@@ -138,7 +138,6 @@
       viewComponent.enter_overlay("goto");
     },
     "#": () => {
-      toast.push("#");
       viewComponent.enter_overlay("date_pick");
       date_pick_mode = "goto";
       date_pick_prefix = data.current_item;
@@ -394,6 +393,7 @@
     //patch_tree_content(data.tree, event.payload, new_node.node.raw);
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
+	patch_tags(data.tree, event.payload, new_node.tags);
     let p = data.current_item;
     if (p.length <= 1) {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
@@ -930,7 +930,7 @@
       text = text + "\n" + tag;
     }
 	await invoke("change_node_text", {path, text});
-    toast.push(text);
+	//await goto_node(path);
   }
 
   function handle_window_focus() {
@@ -938,7 +938,6 @@
   }
 
   function search_mode_leave(ev) {
-    toast.push("search mode leave");
     viewComponent.leave_overlay();
   }
 

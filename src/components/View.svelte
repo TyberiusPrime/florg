@@ -37,21 +37,19 @@
   }
 
   export function enter_overlay(ov) {
-    document.getElementById("footer").tabIndex = 0;
     last_focused = document.activeElement;
     overlay = ov;
     toggleElementAndChildren(document.getElementById("main_content"), true);
     window.setTimeout(() => {
-      focus_first_in_node(document.getElementById("footer"));
+      focus_first_in_node(document.getElementById("overlay"));
     }, 10);
   }
 
   export function leave_overlay() {
-    document.getElementById("footer").removeAttribute("tabIndex");
     overlay = "";
     toggleElementAndChildren(document.getElementById("main_content"), false);
     window.setTimeout(() => {
-	  last_focused.focus({preventScroll: true});
+      last_focused.focus({ preventScroll: true });
     }, 10);
   }
 
@@ -96,30 +94,42 @@
       ev.stopPropagation();
     }
   }
+
+  function handle_window_resize() {
+  const header = document.querySelector("#header");
+  console.log(header);
+    if (header != null) {
+      const headerHeight = header.offsetHeight;
+      document.getElementById("main_content").style.marginTop = headerHeight + "px";
+    }
+    return "";
+  }
+
+  onMount(() => {
+	handle_window_resize();
+	document.getElementById("main_content").scrollIntoView();
+  });
 </script>
 
+<svelte:window on:resize={handle_window_resize} />
+
 <div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
+  {#if overlay != ""}
+    <div class="overlay" id="overlay" on:keyup={handle_keyup} tabindex=0>
+      <slot name="overlays" />
+    </div>
+  {/if}
   <div class="header" id="header">
+    <div on:click={show_help}>
+      <slot name="no_overlay">
+        Press <span class="hotkey">h</span> for help.
+      </slot>
+    </div>
     <slot name="header" />
   </div>
+
   <div class="main_content" id="main_content">
-    <div class="sticky-spacer" />
-    <div class="sticky-content" id="sticky-content">
-      <slot name="content" />
-    </div>
-  </div>
-  <div class="footer" id="footer" on:keyup={handle_keyup}>
-    <slot name="footer">
-      {#if overlay != ""}
-        <slot name="overlays" />
-      {:else}
-        <div on:click={show_help}>
-          <slot name="no_overlay">
-            Press <span class="hotkey">h</span> for help.
-          </slot>
-        </div>
-      {/if}
-    </slot>
+    <slot name="content" />
   </div>
 </div>
 

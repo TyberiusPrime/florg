@@ -63,6 +63,20 @@ export function patch_tree(tree, path, new_children) {
   }
   return false;
 }
+export function patch_tags(tree, path, new_tags) {
+  if (tree.path == path) {
+    tree.tags = new_tags;
+    return true;
+  } else {
+    for (let ii = 0; ii < tree.children.length; ii++) {
+      let child = tree.children[ii];
+      if (patch_tags(child, path, new_tags)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 export function delete_from_tree(tree, path) {
   for (let ii = 0; ii < tree.children.length; ii++) {
@@ -80,18 +94,13 @@ export function delete_from_tree(tree, path) {
 
 export async function expand_path(tree, path: string, maxDepth: int = 2) {
   console.log("expand_path", path);
-  if (path != "") {
-    for (let ii = 0; ii < path.length; ii++) {
-      let p = path.slice(0, ii + 1);
-      console.log("fetch tree", p);
-      let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
-      console.log(node);
-      patch_tree(tree, p, node.children);
-      console.log(tree);
-    }
-  } else {
-    let node = await invoke("get_tree", { path: "", maxDepth: maxDepth });
+  for (let ii = 0; ii < path.length; ii++) {
+    let p = path.slice(0, ii + 1);
+    console.log("fetch tree", p);
+    let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
+    console.log(node);
     patch_tree(tree, p, node.children);
+    console.log(tree);
   }
 }
 

@@ -8,6 +8,7 @@
   import Overlay from "$lib/../components/Overlay.svelte";
   import QuickPick from "$lib/../components/QuickPick.svelte";
   import Search from "$lib/../components/Search.svelte";
+  import DateInput from "$lib/../components/DateInput.svelte";
   import { invoke } from "@tauri-apps/api/tauri";
   import { goto, invalidateAll } from "$app/navigation";
   import {
@@ -85,6 +86,13 @@
     { key: "p", text: "node folder path", target_path: "path" },
     { key: "r", text: "rendered_content", target_path: "rendered_content" },
   ];
+  let palette_entries = [
+    { key: "t", text: "Open terminal", target_path: "terminal" },
+    { key: "s", text: "edit settings", target_path: "settings" },
+    { key: "d", text: "create_date_nodes", target_path: "create_date_nodes" },
+    { key: "x", text: "exit the app", target_path: "exit" },
+    { key: "r", text: "reload data", target_path: "reload" },
+  ];
 
   function map_tags(tags) {
     if (tags !== undefined) {
@@ -129,6 +137,15 @@
     g: () => {
       viewComponent.enter_overlay("goto");
     },
+    "#": () => {
+      toast.push("#");
+      viewComponent.enter_overlay("date_pick");
+      date_pick_mode = "goto";
+      date_pick_prefix = data.current_item;
+      date_pick_value = iso_date(Date.now());
+      start_nav();
+      return;
+    },
     s: () => {
       viewComponent.enter_overlay("search");
       return true;
@@ -156,6 +173,10 @@
     d: () => {
       viewComponent.enter_overlay("delete");
     },
+    p: () => {
+      viewComponent.enter_overlay("palette");
+    },
+
     x: async () => {
       fetch_url_text = await read_clipboard();
       if (!fetch_url_text.startsWith("http")) {
@@ -481,12 +502,17 @@
   async function handle_nav_change(ev) {
     if (ev.key == "Escape") {
       leave_nav(ev);
+
+      ev.stopPropagation();
+      ev.preventDefault();
       return;
     } else if (ev.key == " ") {
       if (nav_mode == "nav") {
-        toast.push("space");
         viewComponent.leave_overlay();
         data = data;
+        ev.stopPropagation();
+        ev.preventDefault();
+        return;
       }
     }
     nav_path = nav_path.toUpperCase();
@@ -572,6 +598,7 @@
       viewComponent.enter_overlay("date_pick");
       date_pick_mode = "goto";
       date_pick_prefix = path.slice(5);
+      date_pick_value = iso_date(Date.now() - 24 * 60 * 60 * 1000);
       start_nav();
       return;
     } else if (path.startsWith("search:")) {
@@ -617,6 +644,7 @@
       viewComponent.enter_overlay("date_pick");
       start_nav();
       date_pick_prefix = path.slice(5);
+      date_pick_value = iso_date(Date.now() - 24 * 60 * 60 * 1000);
       date_pick_mode = "move";
       return;
     } else if (ppath.startsWith("mail:")) {
@@ -699,6 +727,64 @@
       //delete_from_tree(data.tree, data.current_item);
       //console.log(data.tree);
       //data.flat = flattenObject(data.tree);
+    }
+  }
+
+  async function create_date_nodes() {
+    let last_path = data.current_item;
+    let node = await invoke("get_node", { path: last_path });
+    console.log(node);
+    if (node.children.length > 0) {
+      toast.push(
+        "<span class='error'>Can not create date nodes on an node that already has children</span>"
+      );
+    } else {
+      let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(
+        new Date()
+      );
+      let year = window.prompt(
+        "Please enter the year to create a calendar for",
+        ye
+      );
+      if (year != null) {
+        console.log(year);
+        let year_parsed = parseInt(year);
+        console.log(year_parsed);
+        if (!isNaN(year_parsed)) {
+          toast.push("Created calendar");
+          await invoke("create_calendar", {
+            parentPath: last_path,
+            year: year_parsed,
+          });
+          await invoke("reload_data", {});
+          await goto_node(last_path);
+        }
+      }
+    }
+  }
+  async function handle_palette(ev) {
+    viewComponent.leave_overlay();
+    let cmd = ev.detail;
+    if (cmd == "reload") {
+      await invoke("reload_data", {});
+      console.log("reloaded");
+      invalidateAll();
+    } else if (cmd == "exit") {
+      await exit(1);
+    } else if (cmd == "create_date_nodes") {
+      await create_date_nodes();
+    } else if (cmd == "settings") {
+      return await invoke("edit_settings", {});
+    } else if (cmd == "terminal") {
+      await invoke("start_terminal", {
+        folder: await invoke("get_node_folder_path", {
+          path: data.current_item,
+        }),
+      });
+      //} else if (cmd == "download_awesome_chatpgt_prompts") {
+      //await download_awesome_chatpgt_prompts();
+    } else {
+      tosta.push("unhandled command", cmd);
     }
   }
 
@@ -864,24 +950,35 @@
   async function handle_date_pick_change(ev) {
     await update_date_pick_choice();
   }
-  async function handle_date_pick_keyup(ev) {
-    if (ev.key == "Enter") {
-      viewComponent.leave_overlay();
-      if (date_pick_mode == "move") {
-        let date_suffix = await invoke("date_to_path", {
-          dateStr: date_pick_value,
-        });
-        let path = date_pick_prefix + date_suffix;
 
-        await move_by_nav(path);
-		if (!move_and_goto) {
-			goto_node(nav_start_path);
-		}
-      }
-    } else if (ev.key == "Escape") {
-      leave_nav(ev);
-      return;
+  async function handle_date_space_action() {
+    if (date_pick_mode == "goto") {
+      viewComponent.leave_overlay();
     }
+  }
+  async function handle_date_leave() {
+	leave_nav();
+  }
+
+  async function handle_date_changed(ev) {
+	await update_date_pick_choice();
+  }
+
+  async function handle_date_action() {
+    viewComponent.leave_overlay();
+    if (date_pick_mode == "move") {
+      let date_suffix = await invoke("date_to_path", {
+        dateStr: date_pick_value,
+      });
+      let path = date_pick_prefix + date_suffix;
+
+      await move_by_nav(path);
+      if (!move_and_goto) {
+        goto_node(nav_start_path);
+      }
+	} else {
+		edit_current_node();
+	}
   }
 </script>
 
@@ -986,6 +1083,8 @@
       />
     {:else if overlay == "delete"}
       <QuickPick bind:entries={delete_entries} on:action={handle_delete} />
+    {:else if overlay == "palette"}
+      <QuickPick bind:entries={palette_entries} on:action={handle_palette} />
     {:else if overlay == "copying"}
       <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
     {:else if overlay == "tag"}
@@ -999,12 +1098,16 @@
         on:leave={search_mode_leave}
       />
     {:else if overlay == "date_pick"}
-      <div on:keyup={handle_date_pick_keyup}>
-	  {date_pick_mode} 
-        <SveltyPicker
+      <div>
+        {date_pick_mode}
+        <DateInput
           bind:value={date_pick_value}
-          on:change={handle_date_pick_change}
-        /> <span id="date_pick_target">...</span>
+          on:space_action={handle_date_space_action}
+          on:action={handle_date_action}
+		  on:leave={handle_date_leave}
+		  on:change={handle_date_changed}
+        />
+        <span id="date_pick_target">...</span>
       </div>
       {#await update_date_pick_choice()}{/await}
     {:else if overlay == "fetch_url"}

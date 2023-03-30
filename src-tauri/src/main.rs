@@ -476,42 +476,45 @@ fn chrono_date_month_to_path(date: chrono::NaiveDate) -> &'static str {
 }
 
 fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
-    let path_month = chrono_date_month_to_path(date);
-    let path_day = match date.day() {
-        1 => "A",
-        2 => "B",
-        3 => "C",
-        4 => "D",
-        5 => "E",
-        6 => "F",
-        7 => "G",
-        8 => "H",
-        9 => "I",
-        10 => "J",
-        11 => "K",
-        12 => "L",
-        13 => "M",
-        14 => "N",
-        15 => "O",
-        16 => "P",
-        17 => "Q",
-        18 => "R",
-        19 => "S",
-        20 => "T",
-        21 => "U",
-        22 => "V",
-        23 => "W",
-        24 => "X",
-        25 => "Y",
-        26 => "ZA",
-        27 => "ZB",
-        28 => "ZC",
-        29 => "ZD",
-        30 => "ZE",
-        31 => "ZF",
+    let mut kw = date.iso_week().week0();
+    //range is 0..52
+    let quarter = kw / 13;
+    kw = kw % 13;
+    let mut path = match quarter {
+        0 => "A",
+        1 => "B",
+        2 => "C",
+        3 => "D",
         _ => unreachable!(),
-    };
-    format!("{}{}", path_month, path_day)
+    }
+    .to_string();
+    path.push(match kw {
+        0 => 'A',
+        1 => 'B',
+        2 => 'C',
+        3 => 'D',
+        4 => 'E',
+        5 => 'F',
+        6 => 'G',
+        7 => 'H',
+        8 => 'I',
+        9 => 'J',
+        10 => 'K',
+        11 => 'L',
+        12 => 'M',
+        _ => unreachable!(),
+    });
+    let weekday = date.weekday();
+    path.push(match weekday {
+        chrono::Weekday::Mon => 'A',
+        chrono::Weekday::Tue => 'B',
+        chrono::Weekday::Wed => 'C',
+        chrono::Weekday::Thu => 'D',
+        chrono::Weekday::Fri => 'E',
+        chrono::Weekday::Sat => 'F',
+        chrono::Weekday::Sun => 'G',
+    });
+    return path;
 }
 
 #[tauri::command]
@@ -522,7 +525,7 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
             "Node had children - not filling in calendar nodes"
         )));
     }
-    for month in 1..13 {
+    /* for month in 1..13 {
         let date = chrono::NaiveDate::from_ymd_opt(year as i32, month, 1).unwrap();
         let path = format!("{parent_path}{}", chrono_date_month_to_path(date));
         let text = date.format("%b %Y\n").to_string();
@@ -530,11 +533,37 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
         let node = Node::new(&path, &text);
         ss.replace_node(node, false);
     }
-    println!("added months");
+    println!("added months"); */
+    for q in 1..5 {
+        let path = format!(
+            "{parent_path}{}",
+            match q {
+                1 => "A",
+                2 => "B",
+                3 => "C",
+                4 => "D",
+                _ => unreachable!(),
+            }
+        );
+        let text = format!("Q{q}/{year}");
+        let node = Node::new(&path, &text);
+        ss.replace_node(node, false);
+    }
+    let mut last_kw = 500;
     let start = chrono::NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
     for date in start.iter_days().take_while(|x| x.year() == year) {
+        let kw = date.iso_week().week();
+        if kw != last_kw {
+            let mut pp = chrono_date_to_path(date);
+            pp.pop();
+            let path = format!("{parent_path}{}", pp);
+            let text = format!("KW {kw}\n");
+            let node = Node::new(&path, &text);
+            ss.replace_node(node, false);
+            last_kw = kw;
+        }
         let path = format!("{parent_path}{}", chrono_date_to_path(date));
-        let text = date.format("%Y-%m-%d (%a KW %V)\n").to_string();
+        let text = date.format("%Y-%m-%d %a\n").to_string();
         let node = Node::new(&path, &text);
         ss.replace_node(node, false);
     }
@@ -586,7 +615,10 @@ fn ripgrep_below_node(
 ) -> Option<Vec<RipgrepResult>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     let search_path = Node::dirname_from_path(&ss.data_path, query_path);
-    println!("searching in {search_path:?}, only_matching: {:?}", only_matching);
+    println!(
+        "searching in {search_path:?}, only_matching: {:?}",
+        only_matching
+    );
     let mut cmd = std::process::Command::new("rg");
     cmd.arg("--type-add")
         .arg("adoc:*.adoc")

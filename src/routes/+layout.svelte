@@ -56,8 +56,8 @@
       }
     } else if (e.key == "o" && no_text_inputs_focused()) {
       goto("/chatgpt");
-    } else if (e.key == "p" && no_text_inputs_focused()) {
-      goto("/palette");
+    //} else if (e.key == "p" && no_text_inputs_focused()) {
+      //goto("/palette");
     } else if (e.key == "F5") {
       window.location.reload();
     } else if (e.key == "Enter") {

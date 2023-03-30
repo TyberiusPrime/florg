@@ -354,13 +354,15 @@ fn edit_file(
             }
             if do_send {
                 let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-                let content =
-                    std::fs::read_to_string(&tf_for_thread).expect("could not read temp file");
-                let content = parse_raw_content(&content);
-                //println!("Telling viewer about changed temp file");
-                lock.app_handle
-                    .emit_all(&msg_to_js, (&path_for_thread, content))
-                    .ok();
+                let content = std::fs::read_to_string(&tf_for_thread);
+                if let Ok(content) = content {
+                    //we now also get an event when the temp file get's finally removed.
+                    let content = parse_raw_content(&content);
+                    //println!("Telling viewer about changed temp file");
+                    lock.app_handle
+                        .emit_all(&msg_to_js, (&path_for_thread, content))
+                        .ok();
+                }
             }
             //}
             //dbg!(event);
@@ -1172,6 +1174,7 @@ fn main() -> Result<()> {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+    signal_handle.close();
     signal_handle.close();
     println!("tauri ended");
     jt.join().ok();

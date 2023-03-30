@@ -395,11 +395,13 @@
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
     let p = data.current_item;
-    if (p == "") {
+    if (p.length <= 1) {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
     } else {
-      goto_node(event.payload);
-      goto_node(p);
+	  can_expand(event.payload, false);
+	  if (event.payload != p) {
+		  goto_node(p);
+		  }
     }
 
     data.flat = flattenObject(data.tree);
@@ -914,6 +916,21 @@
 
   async function handle_tag(ev) {
     viewComponent.leave_overlay();
+    let tag = ev.detail;
+    let path = data.current_item;
+    if (data.currently_edited[path] != undefined) {
+      toast.push("Cant toggle tags on currently edited nodes");
+      return;
+    }
+    let node = await invoke("get_node", { path: path + "" });
+    let text = node?.node?.raw;
+    if (text.indexOf(tag) != -1) {
+      text = text.replace(tag, "").trim();
+    } else {
+      text = text + "\n" + tag;
+    }
+	await invoke("change_node_text", {path, text});
+    toast.push(text);
   }
 
   function handle_window_focus() {
@@ -957,11 +974,11 @@
     }
   }
   async function handle_date_leave() {
-	leave_nav();
+    leave_nav();
   }
 
   async function handle_date_changed(ev) {
-	await update_date_pick_choice();
+    await update_date_pick_choice();
   }
 
   async function handle_date_action() {
@@ -976,9 +993,9 @@
       if (!move_and_goto) {
         goto_node(nav_start_path);
       }
-	} else {
-		edit_current_node();
-	}
+    } else {
+      edit_current_node();
+    }
   }
 </script>
 
@@ -994,9 +1011,7 @@
   bind:this={viewComponent}
   bind:overlay
 >
-  <div slot="header">
-    {window.location}
-  </div>
+  <div slot="header" />
   <svelte:fragment slot="content">
     <div class="smallcolumn main_div" id="tree_parent">
       <Focusable
@@ -1104,8 +1119,8 @@
           bind:value={date_pick_value}
           on:space_action={handle_date_space_action}
           on:action={handle_date_action}
-		  on:leave={handle_date_leave}
-		  on:change={handle_date_changed}
+          on:leave={handle_date_leave}
+          on:change={handle_date_changed}
         />
         <span id="date_pick_target">...</span>
       </div>

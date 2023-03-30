@@ -17,7 +17,7 @@ export function flattenObject(
     more_text: obj.more_text,
     has_children: obj.has_children,
     children_shown: obj.has_children && (obj.children.length > 0),
-	tags: obj.tags,
+    tags: obj.tags,
   });
 
   const len = obj.children ? obj.children.length : 0;
@@ -80,12 +80,18 @@ export function delete_from_tree(tree, path) {
 
 export async function expand_path(tree, path: string, maxDepth: int = 2) {
   console.log("expand_path", path);
-  for (let ii = 0; ii < path.length; ii++) {
-    let p = path.slice(0, ii + 1);
-    console.log("fetch tree", p);
-    let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
+  if (path != "") {
+    for (let ii = 0; ii < path.length; ii++) {
+      let p = path.slice(0, ii + 1);
+      console.log("fetch tree", p);
+      let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
+      console.log(node);
+      patch_tree(tree, p, node.children);
+      console.log(tree);
+    }
+  } else {
+    let node = await invoke("get_tree", { path: "", maxDepth: maxDepth });
     patch_tree(tree, p, node.children);
-    console.log(tree);
   }
 }
 
@@ -98,9 +104,9 @@ export function find_siblings(flat, index) {
   while (new_index > 0) {
     if (flat[new_index].path.length == path.length) {
       if (flat[new_index].path.startsWith(parent)) {
-        prev = flat[new_index ].path;
+        prev = flat[new_index].path;
         break;
-      } else if (flat[new_index ].path.length < path.length) {
+      } else if (flat[new_index].path.length < path.length) {
         break;
       }
     }
@@ -108,14 +114,14 @@ export function find_siblings(flat, index) {
   }
   new_index = index + 1;
   while (new_index < flat.length) {
-    if (flat[new_index ].path.length == path.length) {
+    if (flat[new_index].path.length == path.length) {
       if (
-        flat[new_index ].path.startsWith(parent)
+        flat[new_index].path.startsWith(parent)
       ) {
-        next = flat[new_index ].path;
+        next = flat[new_index].path;
         break;
       }
-    } else if (flat[new_index ].path.length < path.length) {
+    } else if (flat[new_index].path.length < path.length) {
       break;
     }
     new_index += 1;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { toast } from "@zerodevx/svelte-toast";
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from "svelte";
   import {
     focus_first_in_node,
@@ -60,19 +61,27 @@
   }
 
   afterUpdate(() => {
-    window.setTimeout(focus_first_in_content, 10);
+	/*
+    if (no_text_inputs_focused()) {
+      window.setTimeout(focus_first_in_content, 10);
+    }
+	*/
+	
   });
 
   function focus(ev) {
+  /*
     let sel = window.getSelection();
     if (sel.isCollapsed && no_text_inputs_focused()) {
       console.log("was collapsed");
       let wrapper = document.getElementById("wrapper");
       let f = find_first_focusable(wrapper);
       if (f != document.activeElement) {
+	  toast.push('focus');
         f.focus();
       }
     }
+	*/
   }
   function show_help() {
     enter_overlay("help");

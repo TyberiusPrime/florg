@@ -188,6 +188,8 @@
         focused = state.focused;
       }
 
+    focus_first_in_node(document.getElementById("pickerdiv"));
+
       update_chosen(false);
     }, 100);
   });
@@ -208,7 +210,7 @@
     await tick();
 
     update_chosen();
-    focus_first_in_node(document.getElementById("pickerdiv"));
+    //focus_first_in_node(document.getElementById("pickerdiv"));
   });
 </script>
 
@@ -226,6 +228,7 @@
           id="pick_table"
           on:click={focus_node}
           on:dblclick={handle_double_click}
+		  tabIndex=0
         >
           <slot name="entries" />
         </table>

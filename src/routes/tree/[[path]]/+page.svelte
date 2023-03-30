@@ -108,8 +108,12 @@
     h: () => {
       viewComponent.enter_overlay("help");
     },
-    c: () => {
-      viewComponent.enter_overlay("copying");
+    c: (ev) => {
+      if (!ev.ctrlKey) {
+        viewComponent.enter_overlay("copying");
+      } else {
+        return false;
+      }
     },
     t: () => {
       viewComponent.enter_overlay("tag");
@@ -126,7 +130,7 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
       } else {
-      viewComponent.enter_overlay("search");
+        viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
     },
@@ -134,7 +138,7 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
       } else {
-      viewComponent.enter_overlay("search");
+        viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
     },
@@ -529,31 +533,46 @@
     //key is a..z
   }
 
-  async function parse_path(path) {
-    if (path.startsWith("!")) {
-      let prefix = path.slice(1);
+  let handle_goto = async (path) => {
+    viewComponent.leave_overlay();
+    if (path.startsWith("today:")) {
+      let prefix = path.slice(6);
       let date_suffix = await invoke("date_to_path", {
         dateStr: iso_date(new Date()),
       });
       path = prefix + date_suffix;
-    } else if (path.startsWith("#")) {
+    } else if (path.startsWith("date:")) {
+      toast.push("todo");
+      return;
+    } else if (path.startsWith("search:")) {
+      let search_term = path.slice(7);
+      goto("/node_search/" + encodeURIComponent(search_term));
+      return;
+    } else if (path.startsWith("agenda:")) {
+      let days = path.slice(7);
+      days = parseInt(days);
+      if (isNaN(days)) {
+        days = 30;
+      }
+	  //start date is beginning of today
+	  let start_date = new Date();
+	  start_date = start_date.setUTCHours(0,0,0,0);
+	  let stop_date = start_date + days * 24 * 60 * 60 * 1000;
+	  //date in ms since epoch
+      goto("/agenda/" + start_date + "/" + stop_date); 
+      return;
     }
-    return path;
-  }
 
-  let handle_goto = async (path) => {
-    let ppath = await parse_path(path);
-    if (ppath.startsWith("mail:")) {
-      goto("/mail/query/" + ppath.slice(5));
+    if (path.startsWith("mail:")) {
+      goto("/mail/query/" + path.slice(5));
       return;
     }
     try {
-      await goto_node(ppath);
+      await goto_node(path);
     } catch (e) {
       toast.push("Could not go to node" + e);
     }
 
-    viewComponent.leave_overlay();
     await tick();
     window.setTimeout(() => {
       focus_first_in_node(document.getElementById("tree_parent"));
@@ -776,9 +795,8 @@
   }
 
   function search_mode_leave(ev) {
-	toast.push("search mode leave");
-	viewComponent.leave_overlay();
-	
+    toast.push("search mode leave");
+    viewComponent.leave_overlay();
   }
 </script>
 
@@ -889,7 +907,12 @@
       tag
       <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
     {:else if overlay == "search"}
-	  <Search bind:overlay bind:in_page_search_term bind:search_mode on:leave={search_mode_leave} />
+      <Search
+        bind:overlay
+        bind:in_page_search_term
+        bind:search_mode
+        on:leave={search_mode_leave}
+      />
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input

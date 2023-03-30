@@ -69,9 +69,9 @@
         path = get_last_path();
       }
       console.log("path", path);
-      goto("/node_search/" + search_term + "/" + path);
+      goto("/node_search/" + encodeURIComponent(search_term) + "/" + path);
     } else if (search_mode == "mail") {
-      goto("/mail/query/" + search_term);
+      goto("/mail/query/" + encodeURIComponent(search_term));
     } else {
       toast.push("Unknown search_mode: " + search_mode);
     }

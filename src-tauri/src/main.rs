@@ -579,21 +579,28 @@ struct RipgrepResult {
 }
 
 #[tauri::command]
-fn ripgrep_below_node(query_path: &str, search_term: &str) -> Option<Vec<RipgrepResult>> {
+fn ripgrep_below_node(
+    query_path: &str,
+    search_term: &str,
+    only_matching: Option<bool>,
+) -> Option<Vec<RipgrepResult>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     let search_path = Node::dirname_from_path(&ss.data_path, query_path);
-    //println!("searching in {search_path:?}");
-    let ok = &std::process::Command::new("rg")
-        .arg("--type-add")
+    println!("searching in {search_path:?}, only_matching: {:?}", only_matching);
+    let mut cmd = std::process::Command::new("rg");
+    cmd.arg("--type-add")
         .arg("adoc:*.adoc")
         .arg("-t")
         .arg("adoc")
         .arg("-i")
         .arg("--line-number")
         .arg("--heading")
-        .arg(search_term)
-        .current_dir(search_path)
-        .output();
+        .arg(search_term);
+    if let Some(true) = only_matching {
+        cmd.arg("--only-matching");
+    }
+
+    let ok = cmd.current_dir(search_path).output();
     match ok {
         Ok(output) => {
             let stdout = std::str::from_utf8(&output.stdout).unwrap();

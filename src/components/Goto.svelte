@@ -15,29 +15,47 @@
   async function get_entries() {
     let entries = [];
     let nav = await invoke("get_nav", {});
-	if (nav == null) {
-		toast.push("Could not read [nav] from settings. Please check your settings.toml");
-		overlay = "";
-		return;
-	}
-    for (let key in nav) {
+
+    if (nav == null) {
+      toast.push(
+        "Could not read [nav] from settings. Please check your settings.toml"
+      );
+      overlay = "";
+      return;
+    }
+
+    const ordered = Object.keys(nav)
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+      .reduce((obj, key) => {
+        obj[key] = nav[key];
+        return obj;
+      }, {});
+    for (let key in ordered) {
       let target_path = nav[key];
-	  if (!filter(target_path)) {
-		continue;
-	  }
+      if (!filter(target_path)) {
+        continue;
+      }
       let query_path = target_path;
       if (query_path.startsWith("#") || query_path.startsWith("!")) {
         query_path = query_path.slice(1);
       }
-	  let text = target_path ;
-	  if (!query_path.startsWith("mail")) {
-		  let node = await get_node(query_path);
-		  if (node.node != null) {
-			text += " " + node.node.header.title;
-		  } else {
-			text += " (empty node)";
-		  }
-	  }
+      let text = target_path;
+      if (
+        query_path.startsWith("date:") ||
+        query_path.startsWith("today:") ||
+        query_path.indexOf(":") == -1
+      ) {
+        let qp = query_path;
+        if (query_path.indexOf(":") != -1) {
+          qp = query_path.split(":")[1];
+        }
+        let node = await get_node(qp);
+        if (node.node != null) {
+          text += " " + node.node.header.title;
+        } else {
+          text += " (empty node)";
+        }
+      }
       entries.push({
         key: key,
         target_path: target_path,
@@ -58,9 +76,8 @@
     if (action != null) {
       action(path);
     } else {
-	  overlay = "";
+      overlay = "";
       goto_node(path);
-
     }
   }
 </script>

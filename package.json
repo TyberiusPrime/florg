@@ -50,6 +50,7 @@
 		"svelte-loading-animation": "^0.0.1",
 		"svelte-select": "^5.5.2",
 		"svelte-tooltip": "^1.2.0",
+		"svelty-picker": "^3.4.6",
 		"tabbable": "^6.1.1"
 	}
 }

@@ -33,6 +33,7 @@
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
+  import SveltyPicker from "svelty-picker";
 
   import readabilityLib from "@mozilla/readability";
   export let data;
@@ -56,6 +57,9 @@
   let focus_time = Date.now() - 1000;
   let search_mode;
   let in_page_search_term = "";
+  let date_pick_mode = "goto";
+  let date_pick_prefix = "";
+  let date_pick_value = iso_date(Date.now() - 24 * 60 * 60 * 1000);
 
   $: data.current_item = data?.flat[activeIndex]?.path;
 
@@ -94,15 +98,18 @@
     }
   }
 
+  function start_nav() {
+    nav_path = data.flat[activeIndex].path;
+    nav_start_path = nav_path;
+    nav_start_index = activeIndex;
+    nav_start_tree = structuredClone(data.tree);
+  }
+
   let tag_entries = map_tags(data.tags);
   let keys = {
     " ": () => {
       nav_text = "nav";
       nav_mode = "nav";
-      nav_path = data.flat[activeIndex].path;
-      nav_start_path = nav_path;
-      nav_start_index = activeIndex;
-      nav_start_tree = structuredClone(data.tree);
       viewComponent.enter_overlay("nav");
     },
     h: () => {
@@ -166,7 +173,7 @@
         nav_start_tree = structuredClone(data.tree);
         viewComponent.enter_overlay("nav");
       } else {
-        highlight_node = false;
+        highlight_node = true;
         move_and_goto = false;
         viewComponent.enter_overlay("move");
       }
@@ -429,7 +436,9 @@
   async function handle_key_up_content(ev) {
     if (ev.key == "ArrowLeft") {
       focus_first_in_node(document.getElementById("tree_parent"));
-      document.querySelector(".chosen").scrollIntoView();
+      document
+        .querySelector(".chosen")
+        .scrollIntoView({ behaviour: "smooth", block: "center" });
     }
   }
   function show_help() {
@@ -456,17 +465,21 @@
     return found;
   }
 
+  function leave_nav(ev) {
+    activeIndex = nav_start_index;
+    data.path = nav_start_path;
+    data.tree = nav_start_tree;
+    data.flat = flattenObject(data.tree);
+    viewComponent.leave_overlay();
+    data = data;
+    focus_first_in_node(document.getElementById("tree_parent"));
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+
   async function handle_nav_change(ev) {
     if (ev.key == "Escape") {
-      activeIndex = nav_start_index;
-      data.path = nav_start_path;
-      data.tree = nav_start_tree;
-      data.flat = flattenObject(data.tree);
-      viewComponent.leave_overlay();
-      data = data;
-      focus_first_in_node(document.getElementById("tree_parent"));
-      ev.stopPropagation();
-      ev.preventDefault();
+      leave_nav(ev);
       return;
     } else if (ev.key == " ") {
       if (nav_mode == "nav") {
@@ -496,41 +509,54 @@
           edit_node(nav_path);
         }
       } else if (nav_mode == "move") {
-        let new_path;
-        if (found) {
-          new_path = await invoke("find_next_empty_child", {
-            path: nav_path,
-          });
-        } else {
-          new_path = nav_path;
-        }
-        let res = await invoke("move_node", {
-          orgPath: nav_start_path,
-          newPath: new_path,
-        });
-        if (res !== null) {
-          toast.push(res);
-        } else {
-          let parent = data.current_item.substring(
-            0,
-            data.current_item.length - 1
-          );
-          let new_parent = new_path.substring(0, new_path.length - 1);
-          await toggle_node(new_parent, true);
-          await toggle_node(new_parent, false);
-
-          await goto_node(new_path);
-          await toggle_node(parent, true);
-          await toggle_node(parent, false);
-          await goto_node(new_path);
-          scroll_to_active();
-          highlight_node = new_path;
-        }
+        await move_by_nav(nav_path);
       }
     }
 
     ev.stopPropagation();
     //key is a..z
+  }
+
+  async function move_by_nav(nav_path) {
+    let found = await goto_node(nav_path);
+    let new_path;
+    if (found) {
+      new_path = await invoke("find_next_empty_child", {
+        path: nav_path,
+      });
+    } else {
+      new_path = nav_path;
+    }
+    let res = await invoke("move_node", {
+      orgPath: nav_start_path,
+      newPath: new_path,
+    });
+    if (res !== null) {
+      toast.push(res);
+    } else {
+      let parent = data.current_item.substring(0, data.current_item.length - 1);
+      let new_parent = new_path.substring(0, new_path.length - 1);
+      await toggle_node(new_parent, true);
+      await toggle_node(new_parent, false);
+
+      await goto_node(new_path);
+      await toggle_node(parent, true);
+      await toggle_node(parent, false);
+      await goto_node(new_path);
+      scroll_to_active();
+      highlight_node = new_path;
+    }
+  }
+
+  async function parse_path(path) {
+    if (path.startsWith("today:")) {
+      let prefix = path.slice(6);
+      let date_suffix = await invoke("date_to_path", {
+        dateStr: iso_date(new Date()),
+      });
+      path = prefix + date_suffix;
+    }
+    return path;
   }
 
   let handle_goto = async (path) => {
@@ -542,7 +568,10 @@
       });
       path = prefix + date_suffix;
     } else if (path.startsWith("date:")) {
-      toast.push("todo");
+      viewComponent.enter_overlay("date_pick");
+      date_pick_mode = "goto";
+      date_pick_prefix = path.slice(5);
+      start_nav();
       return;
     } else if (path.startsWith("search:")) {
       let search_term = path.slice(7);
@@ -554,12 +583,12 @@
       if (isNaN(days)) {
         days = 30;
       }
-	  //start date is beginning of today
-	  let start_date = new Date();
-	  start_date = start_date.setUTCHours(0,0,0,0);
-	  let stop_date = start_date + days * 24 * 60 * 60 * 1000;
-	  //date in ms since epoch
-      goto("/agenda/" + start_date + "/" + stop_date); 
+      //start date is beginning of today
+      let start_date = new Date();
+      start_date = start_date.setUTCHours(0, 0, 0, 0);
+      let stop_date = start_date + days * 24 * 60 * 60 * 1000;
+      //date in ms since epoch
+      goto("/agenda/" + start_date + "/" + stop_date);
       return;
     }
 
@@ -583,7 +612,13 @@
   let handle_move = async (path) => {
     viewComponent.leave_overlay();
     let ppath = await parse_path(path);
-    if (ppath.startsWith("mail:")) {
+    if (ppath.startsWith("date:")) {
+      viewComponent.enter_overlay("date_pick");
+      start_nav();
+      date_pick_prefix = path.slice(5);
+      date_pick_mode = "move";
+      return;
+    } else if (ppath.startsWith("mail:")) {
       toast.push("can't goto mail");
       return;
     }
@@ -667,7 +702,11 @@
   }
 
   let filter_goto_for_move = (target_path) => {
-    return !target_path.startsWith("mail:");
+    return (
+      target_path.indexOf(":") == -1 ||
+      target_path.startsWith("date:") ||
+      target_path.startsWith("today:")
+    );
   };
 
   let handle_shift_up = async () => {
@@ -798,6 +837,51 @@
     toast.push("search mode leave");
     viewComponent.leave_overlay();
   }
+
+  async function update_date_pick_choice() {
+    let date_suffix = await invoke("date_to_path", {
+      dateStr: date_pick_value,
+    });
+    let path = date_pick_prefix + date_suffix;
+    let found = await goto_node(path);
+    let el = document.getElementById("date_pick_target");
+    let text = "";
+    if (!found) {
+      el.classList.add("notfound");
+      text = "(not found)";
+    } else {
+      el.classList.remove("notfound");
+      text = data.flat[activeIndex].title;
+    }
+    await tick();
+    document
+      .querySelector(".chosen")
+      .scrollIntoView({ behaviour: "smooth", block: "center" });
+    el.innerText = path + " " + text;
+    return "";
+  }
+  async function handle_date_pick_change(ev) {
+    await update_date_pick_choice();
+  }
+  async function handle_date_pick_keyup(ev) {
+    if (ev.key == "Enter") {
+      viewComponent.leave_overlay();
+      if (date_pick_mode == "move") {
+        let date_suffix = await invoke("date_to_path", {
+          dateStr: date_pick_value,
+        });
+        let path = date_pick_prefix + date_suffix;
+
+        await move_by_nav(path);
+		if (!move_and_goto) {
+			goto_node(nav_start_path);
+		}
+      }
+    } else if (ev.key == "Escape") {
+      leave_nav(ev);
+      return;
+    }
+  }
 </script>
 
 <svelte:window on:focus={handle_window_focus} />
@@ -913,6 +997,15 @@
         bind:search_mode
         on:leave={search_mode_leave}
       />
+    {:else if overlay == "date_pick"}
+      <div on:keyup={handle_date_pick_keyup}>
+	  {date_pick_mode} 
+        <SveltyPicker
+          bind:value={date_pick_value}
+          on:change={handle_date_pick_change}
+        /> <span id="date_pick_target">...</span>
+      </div>
+      {#await update_date_pick_choice()}{/await}
     {:else if overlay == "fetch_url"}
       Fetch url<br />
       <input

@@ -32,9 +32,21 @@
 <div on:keyup={handle_key_up} tabIndex=0>
   {text}
   {#each entries as entry}
-    <div>
+    <div class="qp_entry">
       <span class="hotkey">{entry.key}</span>
       {entry.text}
     </div>
   {/each}
 </div>
+
+<style>
+.qp_entry{
+font-family:monospace;
+padding-top:.25em;
+padding-bottom:.25em;
+}
+
+.qp_entry:nth-child(even){
+	background-color: #ddd;
+}
+</style>

@@ -56,6 +56,7 @@ WebKit inertia scrolling is being added here for any present/future devices that
 }
 /*  Left and Right are set sizes while the Middle is set to flex one so it occupies all remaining space. This could be set as a width too if prefereable, perhaps using calc.*/
 .Left {
+	max-width:50%;
  /* width: 12.5rem;
   background-color: indigo;
 */
@@ -72,6 +73,7 @@ WebKit inertia scrolling is being added here for any present/future devices that
 .overlay {
   position: fixed;
   background-color: #eee;
+  z-index:5000;
   width: 99%;
   padding: 0.25em;
   bottom: 0px;

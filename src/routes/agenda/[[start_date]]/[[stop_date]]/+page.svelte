@@ -4,7 +4,7 @@
   import { goto, invalidateAll } from "$app/navigation";
   import View from "$lib/../components/View.svelte";
   import Help from "$lib/../components/Help.svelte";
-  import { iso_date, render_tags } from "$lib/util";
+  import { iso_date, render_tags, get_iso_week } from "$lib/util";
   export let data;
   let viewComponent;
   let overlay;
@@ -27,6 +27,16 @@
 
   async function handle_keys() {
   }
+
+  function extract_kw(str_date) {
+	let date = new Date(Date.parse(str_date));	
+	return get_iso_week(date);
+  }
+
+  function is_today(str_date) {
+	let today = iso_date(new Date());		
+	return str_date.indexOf(today) != -1;
+  }
 </script>
 
 <View bind:this={viewComponent} bind:overlay>
@@ -39,9 +49,20 @@
 
   <Picker on:action={handle_action} >
     <svelte:fragment slot="entries">
-      {#each data.hits as hit}
+      {#each data.hits as hit, index}
+	   {#if index === 0 || extract_kw(hit.str_date) !== extract_kw(data.hits[index - 1].str_date)}
+      <tr data-skip="true">
+        <td colspan="3">KW {extract_kw(hit.str_date)}</td>
+      </tr>
+    {/if}
         <tr data-cmd={hit.rg.path}>
-          <td class="shrink">{hit.str_date}</td>
+          <td class="shrink">
+		  {#if is_today(hit.str_date)}
+		  <b>{hit.str_date}</b>
+		  {:else}
+		  {hit.str_date}
+		  {/if}
+		  </td>
           <td class="shrink">{hit.rg.path}</td>
 		  <td><div style="float:left">{hit.rg.title.replace(/<\d{4}-\d{1,2}-\d{1,2}>/, "")}</div>
 		  {@html render_tags(hit.rg.tags)}</td>

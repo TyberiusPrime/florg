@@ -83,8 +83,6 @@ export function delete_from_tree(tree, path) {
     let child = tree.children[ii];
     if (child.path == path) {
       tree.children.splice(ii, 1);
-      console.log("found and deleted", path);
-      console.log(tree.children);
       return true;
     } else if (path.startsWith(child.path)) {
       delete_from_tree(child, path);
@@ -95,11 +93,8 @@ export function delete_from_tree(tree, path) {
 export async function expand_path(tree, path: string, maxDepth: int = 2) {
   for (let ii = 0; ii < path.length; ii++) {
     let p = path.slice(0, ii + 1);
-    console.log("fetch tree", p);
     let node = await invoke("get_tree", { path: p, maxDepth: maxDepth });
-    console.log(node);
     patch_tree(tree, p, node.children);
-    console.log(tree);
   }
 }
 

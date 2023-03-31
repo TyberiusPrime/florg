@@ -111,8 +111,12 @@
   function update_chosen() {
     let table = document.getElementById("pick_table");
     if (table != null) {
+	let actual_index = 0;
       for (let ii = 0; ii < table.children.length; ii++) {
-        if (focused == ii) {
+	    if (table.children[ii].dataset.skip == "true") {
+			continue;
+		}
+        if (focused == actual_index) {
           for (let yy = 0; yy < table.children[ii].children.length; yy++) {
             table.children[ii].children[yy].classList.add("chosen");
             if (!isElementInViewport(table.children[ii].children[yy])) {
@@ -127,6 +131,8 @@
             table.children[ii].children[yy].classList.remove("chosen");
           }
         }
+		actual_index += 1;
+
       }
     }
     window.history.replaceState(
@@ -167,7 +173,9 @@
   function update_elements_from_dom() {
     elements = [];
     for (let el of document.querySelector("#pick_table").children) {
-      elements.push(el);
+	 if (el.dataset.skip != "true") {
+		  elements.push(el);
+	  }
     }
     downstream_elements = elements;
   }

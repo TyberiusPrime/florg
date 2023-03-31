@@ -219,6 +219,9 @@
       move_and_goto = true;
       viewComponent.enter_overlay("move");
     },
+	u: (ev) => {
+		goto("/undo");
+	}
   };
 
   async function add_node() {

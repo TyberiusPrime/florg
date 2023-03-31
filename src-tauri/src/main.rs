@@ -649,9 +649,9 @@ fn ripgrep_below_node(
                     None => continue,
                 };
                 let path = format!("{query_path}{path}");
-                let node = ss
-                    .get_node(&path);
-                let title = node                    .map(|x| x.header.title.clone())
+                let node = ss.get_node(&path);
+                let title = node
+                    .map(|x| x.header.title.clone())
                     .unwrap_or_else(|| "(empty node)".to_string());
                 let mut parent_titles = Vec::new();
                 let mut cpath = path.clone();
@@ -878,6 +878,7 @@ fn chatgpt_get_api_key() -> Option<String> {
     }
 }
 
+//these are 'string' histories for search and so on
 #[tauri::command]
 fn history_get(name: &str) -> Vec<String> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
@@ -902,6 +903,29 @@ fn start_terminal(folder: String) -> bool {
 #[tauri::command]
 fn extract_tags(text: &str) -> Vec<String> {
     Node::extract_tags(text).into_iter().collect()
+}
+
+#[tauri::command]
+fn get_git_history(limit: Option<u32>) -> Vec<storage::GitHistoryEntry> {
+    let actual_limit = limit.unwrap_or(100);
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    let res = ss.get_git_history(actual_limit);
+    match res {
+        Ok(x) => x,
+        Err(err) => {
+            dbg!(err);
+            Vec::new()
+        }
+    }
+}
+
+#[tauri::command]
+fn git_undo(hash: &str) -> Option<String> {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    match ss.git_undo(hash) {
+        Ok(_) => None,
+        Err(err) => Some(err.to_string()),
+    }
 }
 
 fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
@@ -1212,7 +1236,9 @@ fn main() -> Result<()> {
             history_get,
             history_store,
             start_terminal,
-            extract_tags
+            extract_tags,
+            get_git_history,
+            git_undo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

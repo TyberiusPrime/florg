@@ -44,6 +44,13 @@ pub struct MailAccount {
     pub addresses: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GitHistoryEntry {
+    hash: String,
+    date: String,
+    message: String,
+}
+
 pub const FLORG_FILENAME: &'static str = "node.adoc";
 pub const FLORG_CACHE_FILENAME: &'static str = "node.cache";
 pub const FLORG_SUFFIX: &'static str = ".adoc";
@@ -233,7 +240,7 @@ impl Storage {
         self.move_node("!", &path, false)
             .context("failed to move tempmove into next")?;
         self.make_nodes_sorted();
-        self.add_and_commit(&format!("Swapped nodes down: {} and {}", path, next));
+        self.add_and_commit(&format!("Swapped nodes down: {} and {}", path, next))?;
         Ok(())
     }
 
@@ -430,20 +437,62 @@ impl Storage {
         //copilot: unlink  filename
     }
 
-    pub fn add_and_commit(&self, msg: &str) {
+    pub fn add_and_commit(&self, msg: &str) -> Result<()> {
         std::process::Command::new(&self.git_binary)
             .arg("add")
             .arg(".")
             .current_dir(&self.data_path)
             .status()
-            .expect("git add failed");
+            .context("git add failed")?;
         std::process::Command::new(&self.git_binary)
             .arg("commit")
             .arg("-m")
             .arg(msg)
             .current_dir(&self.data_path)
             .status()
-            .expect("git add failed");
+            .context("git add failed")?;
+        Ok(())
+    }
+
+    pub fn get_git_history(&self, limit: u32) -> Result<Vec<GitHistoryEntry>> {
+        let raw = std::process::Command::new(&self.git_binary)
+            .arg("log")
+            .arg("--date=iso")
+            .arg("--pretty=%ah%n%H%n%s%n")
+            .current_dir(&self.data_path)
+            .output()
+            .context("git log failed")?
+            .stdout;
+        let raw = String::from_utf8(raw).context("git log output not utf8")?;
+        let mut res: Vec<GitHistoryEntry> = Vec::new();
+        //every line is valid json, but it's not a json array...
+        for block in raw.split("\n\n") {
+            let block = block.trim();
+            if !block.is_empty() {
+                let lines: Vec<_> = block.split("\n").collect();
+                let parsed: GitHistoryEntry = GitHistoryEntry {
+                    hash: lines[1].to_string(),
+                    date: lines[0].to_string(),
+                    message: lines[2].to_string(),
+                };
+                res.push(parsed)
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn git_undo(&mut self, hash: &str) -> Result<()> {
+        std::process::Command::new(&self.git_binary)
+            .arg("checkout")
+            .arg(hash)
+            .arg("--")
+            .arg(".")
+            .current_dir(&self.data_path)
+            .status()
+            .context("git checkout hash failed")?;
+        self.add_and_commit(&format!("Undo to state of {}", hash))?;
+        self.reload();
+        Ok(())
     }
 
     pub(crate) fn set_cached_node(&mut self, path: &str, raw: &str, to_cache: &str) -> Result<()> {

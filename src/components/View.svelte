@@ -8,7 +8,7 @@
   } from "../lib/util.ts";
 
   export let overlay = "";
-  export let single_column = true;
+  export let single_column = "true";
   let last_focused = null;
 
   function toggleElementAndChildren(element, isDisabled) {
@@ -144,7 +144,7 @@
       </div>
       <slot name="header" />
     </div>
-    {#if single_column==true}
+    {#if single_column=="true"}
       <div id="main_content">
         <slot name="content" />
       </div>

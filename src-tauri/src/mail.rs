@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Context;
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use notmuch;
 use serde::Serialize;
 
@@ -14,7 +14,7 @@ pub struct Message {
     from: Option<String>,
     to: Option<String>,
     subject: Option<String>,
-    date: Option<NaiveDateTime>,
+    date: Option<DateTime<chrono::Utc>>,
     tags: Vec<String>,
 }
 
@@ -77,7 +77,10 @@ impl MailStore {
                         .header("subject")
                         .unwrap_or(None)
                         .map(|x| x.to_string()),
-                    date: NaiveDateTime::from_timestamp_opt(message.date(), 0),
+                    date: {
+                        let naive = chrono::NaiveDateTime::from_timestamp_opt(message.date(), 0);
+                        naive.map(|x| DateTime::<chrono::Utc>::from_utc(x, chrono::Utc))
+                    },
                     tags: message.tags().collect(),
                 });
                 count += 1;

@@ -234,9 +234,21 @@
   function handle_goto_action(ev) {
     goto_node(ev.detail);
   }
+
+  function handle_search_leave() {
+	viewComponent.leave_overlay();
+  }
+
+  afterUpdate(() => {
+  if (overlay == "") {
+  window.setTimeout(() => {
+  document.getElementById("pick_table").focus();
+  }, 100);
+  }
+  });
 </script>
 
-<View bind:this={viewComponent} bind:overlay>
+<View bind:this={viewComponent} bind:overlay single_column="false">
   <div slot="header" class="header">
     <h1>Mail result</h1>
     Query: {data.query}
@@ -246,7 +258,8 @@
 	  </div>
     {/if}
   </div>
-  <div slot="content" on:keyup={handle_keys}>
+  <svelte:fragment slot="content">
+  <div on:keyup={handle_keys} class="Middle main_div">
     <Picker on:action={handle_action} bind:focused>
       <svelte:fragment slot="entries">
         {#each data.messages as el, index}
@@ -284,7 +297,7 @@
             </tr>
           {:else if data.mode == "messages"}
             <tr data-cmd={"message:" + el.id} class="msg_entry" data-id={el.id}>
-              <td class="date">{@html format_date(Date.parse(el.date))}</td>
+			  <td class="date">{@html format_date(Date.parse(el.date))}</td>
               <td>
                 <div class="fromsubject">
                   <div class="subject {is_unread(el) > 0 ? 'new' : ''}">
@@ -304,6 +317,7 @@
       </svelte:fragment>
     </Picker>
   </div>
+  </svelte:fragment>
 
   <svelte:fragment slot="overlays">
     {#if overlay == "help"}
@@ -320,7 +334,7 @@
         bind:in_page_search_term
         bind:default_search_term={data.query}
         bind:search_mode
-        on:leave
+		on:leave={handle_search_leave}
       />
     {:else if overlay == ""}
       Press <span class="hotkey">h</span> for help.

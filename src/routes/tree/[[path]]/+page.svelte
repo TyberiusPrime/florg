@@ -37,7 +37,7 @@
     iso_date,
     iso_date_and_time,
     count_lines,
-	render_tags,
+    render_tags,
   } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -234,8 +234,6 @@
       windowTitle: appWindow.label,
     });
   }
-
-  
 
   async function get_rendered_node(path) {
     if (data.currently_edited[path] != undefined) {
@@ -439,11 +437,11 @@
 
     let tags = document.querySelectorAll(".tags");
     for (let ii = 0; ii < tags.length; ii++) {
-	const handle_click = (ev) => {
-	  goto("/node_search/" + encodeURIComponent(ev.target.innerText));
-	  }
-	  tags[ii].removeEventListener('click', handle_click);
-      tags[ii].addEventListener('click', handle_click);
+      const handle_click = (ev) => {
+        goto("/node_search/" + encodeURIComponent(ev.target.innerText));
+      };
+      tags[ii].removeEventListener("click", handle_click);
+      tags[ii].addEventListener("click", handle_click);
     }
   }
 
@@ -1220,27 +1218,34 @@
 			  {ii == activeIndex ? 'chosen' : ''}
 			  "
           >
-            <td
-              class="mono
-			"
-            >
+            <td>
+              <div class="node">
+                <div class="node-path">
+                  {@html node.indention}{node.path}{#if node.has_children && !node.children_shown}<span
+                      class="more">+</span
+                    >{/if}
+                </div>
+                <div class="node-title">{node.title}</div>
+              </div>
+
+              <!-- <div style="display:inline-block;" class="mono">
               {@html node.indention}{node.path}{#if node.has_children && !node.children_shown}<span
                   class="more">+</span
                 >
-              {/if}
-            </td>
-            <td
-              ><div
-                style="float:left"
+				{:else}
+				<span>&nbsp;</span>
+              {/if}&nbsp;
+			  </div>
+            <div
+                style="display:inline-block;"
                 class={node.path === highlight_node ? "highlight_in_tree" : ""}
               >
-                {node.title}
-              </div>
-              {#each filter_tags(node.tags) as tag}
+                {node.title} -->
+              <!-- {#each filter_tags(node.tags) as tag}
                 <div class="tags {tag_class(tag.substring(1))}">
                   {tag}
                 </div>
-              {/each}
+              {/each} -->
             </td>
           </tr>
         {/each}
@@ -1348,7 +1353,7 @@
   }
 
   .more {
-    color: #3636ff;
+    color: #6a6aff;
   }
 
   td {
@@ -1380,5 +1385,24 @@
 
   :global(.notfound) {
     color: red;
+  }
+
+  .node {
+    clear: both;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .node-path {
+    font-family: monospace;
+    margin-right: 5px;
+    word-wrap: nowrap;
+    color: #aaa;
+  }
+
+  .node-title {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: 80%;
   }
 </style>

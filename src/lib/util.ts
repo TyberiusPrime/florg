@@ -12,11 +12,12 @@ export function format_date(date: any, br = false) {
     pdate = new Date();
     pdate.setTime(Date.parse(date));
   } else if (typeof date == "number") {
-    pdate = new Date();
-    pdate.setTime(date);
+    pdate = new Date(date);
+    //pdate.setTime(date);
   } else {
     pdate = date;
   }
+  console.log(pdate)
   /* let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
   let mo = pdate.getMonth().padStart(2,'0'); //new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
   let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);
@@ -24,7 +25,7 @@ export function format_date(date: any, br = false) {
   let mm = new Intl.DateTimeFormat("en", { minute: "2-digit" }).format(date); */
   let ye = pdate.getFullYear();
   let mo = String(pdate.getMonth() + 1).padStart(2, "0");
-  let da = String(pdate.getDay()).padStart(2, "0");
+  let da = String(pdate.getDate()).padStart(2, "0");
   let hh = String(pdate.getHours()).padStart(2, "0");
   let mm = String(pdate.getMinutes()).padStart(2, "0");
 

@@ -87,7 +87,7 @@ export async function get_node(path: string) {
 
 export function isElementInViewport(el): boolean {
   var rect = el.getBoundingClientRect();
-  let header_height = document.getElementById("header").offsetHeight;
+  let header_height = document.getElementsByClassName("Top").offsetHeight;
   let footer_height = 0; //document.getElementById("footer").offsetHeight;
 
   return (
@@ -172,4 +172,9 @@ export function find_first_focusable(node) {
   } else {
     return f;
   }
+}
+
+export function count_lines(s: string) {
+	return (s.match(/\n/g) || '').length + 1
+  //return s.split(/\r\n|\r|\n/).length;
 }

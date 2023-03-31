@@ -300,8 +300,8 @@
     set_last_path(data.path);
   });
 
-  function handle_delete(ev) {
-    invoke("delete_node", { path: data.path })
+  async function handle_delete(ev) {
+    await invoke("delete_node", { path: data.path })
       .then(() => {
         toast.push("node deleted");
         goto("/node/" + data.path.slice(0, -1));

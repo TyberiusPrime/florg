@@ -237,11 +237,13 @@
 </script>
 
 <View bind:this={viewComponent} bind:overlay>
-  <div slot="header">
+  <div slot="header" class="header">
     <h1>Mail result</h1>
     Query: {data.query}
     {#if data.more_mail}
-      <br />(More mail available. refine your search)
+	<div style="float:right">
+      (More mail available. refine your search)
+	  </div>
     {/if}
   </div>
   <div slot="content" on:keyup={handle_keys}>

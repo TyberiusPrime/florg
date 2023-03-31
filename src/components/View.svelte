@@ -8,10 +8,14 @@
   } from "../lib/util.ts";
 
   export let overlay = "";
+  export let single_column = true;
   let last_focused = null;
 
   function toggleElementAndChildren(element, isDisabled) {
     // Add wrapper functions to event handlers the first time this function is called on this element
+	if (element == null) {
+	console.log("Warn: toggleElementAndChildren called with null element");
+	}
 
     // Set disabled/enabled state of the element
     element.disabled = isDisabled;
@@ -39,15 +43,16 @@
   export function enter_overlay(ov) {
     last_focused = document.activeElement;
     overlay = ov;
-    toggleElementAndChildren(document.getElementById("main_content"), true);
+    toggleElementAndChildren(document.getElementById("wrapper"), true);
     window.setTimeout(() => {
-      focus_first_in_node(document.getElementById("overlay"));
+	let el = document.getElementById("overlay");
+      focus_first_in_node(el);
     }, 10);
   }
 
   export function leave_overlay() {
     overlay = "";
-    toggleElementAndChildren(document.getElementById("main_content"), false);
+    toggleElementAndChildren(document.getElementById("wrapper"), false);
     window.setTimeout(() => {
       if (last_focused != null) {
         last_focused.focus({ preventScroll: true });
@@ -59,7 +64,8 @@
     let wrapper = document.getElementById("main_content");
     if (wrapper != null) {
       focus_first_in_node(wrapper);
-    }
+	} else {
+	}
   }
 
   function focus(ev) {
@@ -93,40 +99,24 @@
     }
   }
 
-  function handle_window_resize() {
-    const header = document.querySelector("#header");
-    console.log(header);
-    if (header != null) {
-      const headerHeight = header.offsetHeight;
-
-      document.getElementById("main_content").style.marginTop =
-        headerHeight + "px";
-    }
-    return "";
-  }
-
   onMount(() => {
-    handle_window_resize();
     window.setTimeout(() => {
       window.scrollTo(0, 0);
     }, 100);
   });
 
   afterUpdate(() => {
-    handle_window_resize();
     //document.getElementById("main_content").scrollIntoView();
   });
 </script>
 
-<svelte:window on:resize={handle_window_resize} />
-
-<div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
+<!-- <div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
   {#if overlay != ""}
     <div class="overlay" id="overlay" on:keyup={handle_keyup} tabindex="0">
       <slot name="overlays" />
     </div>
   {/if}
-  <div class="header" id="header">
+  <div class="Top" id="header">
     <div on:click={show_help}>
       <slot name="no_overlay">
         Press <span class="hotkey">h</span> for help.
@@ -135,8 +125,34 @@
     <slot name="header" />
   </div>
 
-  <div class="main_content" id="main_content">
+  <div class="Container" id="main_content">
     <slot name="content" />
+  </div>
+</div> -->
+{#if overlay != ""}
+  <div class="overlay" id="overlay" on:keyup={handle_keyup} tabindex="0">
+	<slot name="overlays" />
+  </div>
+{/if}
+<div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
+  <div class="wrapper">
+    <div class="Top">
+      <div on:click={show_help}>
+        <slot name="no_overlay">
+		  Press <span class="hotkey">h</span> for help.<br />
+        </slot>
+      </div>
+      <slot name="header" />
+    </div>
+    {#if single_column==true}
+      <div id="main_content">
+        <slot name="content" />
+      </div>
+    {:else}
+      <div class="Container" id="main_content">
+        <slot name="content" />
+      </div>
+    {/if}
   </div>
 </div>
 

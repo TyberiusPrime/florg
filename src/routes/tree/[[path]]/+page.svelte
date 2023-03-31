@@ -36,10 +36,12 @@
     dispatch_keyup,
     iso_date,
     iso_date_and_time,
+    count_lines,
   } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
+  import asciidoctor from "asciidoctor";
 
   import readabilityLib from "@mozilla/readability";
   export let data;
@@ -82,7 +84,11 @@
     { key: "n", text: "search: (next hit)" },
     { key: "N", text: "search: (prev hit)" },
   ];
-  let delete_entries = [{ key: "d", text: "delete node & children" }];
+  let delete_entries = [
+    { key: "d", text: "delete node & children", target_path: "delete" },
+    { key: "m", text: "merge into text of parent", target_path: "merge" },
+    { key: "p", text: "promote one level", target_path: "promote" },
+  ];
 
   let copy_entries = [
     { key: "c", text: "link", target_path: "link" },
@@ -99,10 +105,13 @@
     { key: "r", text: "reload data", target_path: "reload" },
   ];
 
+  let sub_section_entries = [
+    { key: "x", text: "extract into subnode", target_path: "extract_subnode" },
+  ];
+
   function map_tags(tags) {
     if (tags !== undefined) {
       let res = [];
-      console.log(tags);
       for (let key in tags) {
         let tag = tags[key];
         res.push({ key: key, text: tag, target_path: tag });
@@ -212,33 +221,6 @@
     },
   };
 
-  //todo: refactor
-  function toggleElementAndChildren(element, isDisabled) {
-    // Add wrapper functions to event handlers the first time this function is called on this element
-
-    // Set disabled/enabled state of the element
-    element.disabled = isDisabled;
-
-    // Unset/re-set the tabIndex attribute on the element
-    if (isDisabled) {
-      //element.orgiginalTabIndex = element.tabIndex;
-      //element.removeAttribute("tabIndex");
-      element.classList.add("disabled");
-    } else {
-      //element.tabIndex = element.originalTabIndex;
-      element.classList.remove("disabled");
-    }
-
-    // Disable/enable all children of the element
-    var childNodes = element.childNodes;
-    for (var i = 0; i < childNodes.length; i++) {
-      var child = childNodes[i];
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        toggleElementAndChildren(child, isDisabled);
-      }
-    }
-  }
-
   async function add_node() {
     let new_path = await invoke("find_next_empty_child", {
       path: data.current_item,
@@ -285,6 +267,7 @@
     }
     return cache[path];
   }
+
   async function itemChanged(ev) {
     let path = ev.detail.path;
     if (path !== undefined) {
@@ -443,12 +426,39 @@
     }
   });
 
+  let clicked_section = null;
+
+  function add_content_actions(mutationList, observer) {
+    //console.log(mutationList);
+    //toast.push("content change");
+    //find all h2 in #node_content and add a button to the right
+    let h2s = document.querySelectorAll(
+      "#node_content h2, #node_content h3, #node_content h4, #node_content h5, #node_content h6"
+    );
+    for (let ii = 0; ii < h2s.length; ii++) {
+      let h2 = h2s[ii];
+      let btn = document.createElement("button");
+      btn.innerHTML = "&#x2630;";
+      btn.classList.add("small-button");
+      btn.onclick = (ev) => {
+        clicked_section = h2;
+        viewComponent.enter_overlay("subsection-menu");
+      };
+      h2.appendChild(btn);
+    }
+  }
+
+  const content_observer = new MutationObserver(add_content_actions);
   onMount(async () => {
     await goto_node(data.flat[data.start_item].path);
+    content_observer.observe(document.getElementById("node_content"), {
+      attributes: false,
+      childList: true,
+      subtree: false,
+    });
   });
   beforeUpdate(async () => {
     if (data.current_item != "" && activeIndex == undefined) {
-      console.log("setting active index", data.current_item);
       for (let ii = 0; ii < data.flat.length; ii++) {
         if (data.flat[ii].path == data.current_item) {
           activeIndex = ii;
@@ -463,6 +473,7 @@
     (await unliste_node_unchanged)();
     (await unliste_node_temp_changed)();
     (await unlisten_message)();
+    content_observer.disconnect();
   });
 
   async function handle_key_up_content(ev) {
@@ -711,9 +722,71 @@
     }
   };
 
-  function handle_delete(ev) {
+  async function handle_delete(ev) {
+    let mode = ev.detail;
+    console.log(ev);
+    viewComponent.leave_overlay();
+    if (mode == "delete") {
+      await delete_current_node();
+    } else if (mode == "merge") {
+      await merge_current_node_with_parent();
+    } else if (mode == "promote") {
+      await move_node_to_parents_parent();
+    } else {
+      toast.push("Unknown delete mode " + mode);
+    }
+  }
+
+  async function move_node_to_parents_parent() {
+    let parent = data.current_item.substring(0, data.current_item.length - 1);
+    let grandparent = parent.substring(0, parent.length - 1);
+    if (grandparent == "") {
+    } else {
+      let new_path = await invoke("find_next_empty_child", {
+        path: grandparent,
+      });
+      try {
+        await invoke("move_node", {
+          orgPath: data.current_item,
+          newPath: new_path,
+        });
+        await toggle_node(grandparent, true);
+        await toggle_node(grandparent, false);
+
+		highlight_node = new_path;
+        await goto_node(new_path);
+
+      } catch (e) {
+        toast.push("failed to promoto " + e);
+      }
+    }
+  }
+
+  async function merge_current_node_with_parent() {
+    if (data.current_item == "") {
+      toast.push("Can't merge root");
+      return;
+    }
+    let node = await invoke("get_node", { path: data.current_item });
+    let parent_path = data.current_item.substring(
+      0,
+      data.current_item.length - 1
+    );
+    let parent = await invoke("get_node", {
+      path: parent_path,
+    });
+    let text = node.node.raw.replace(/([=]+)/g, "$1=");
+    while (!text.startsWith("==")) {
+      text = "=" + text;
+    }
+    text = parent.node.raw.trim() + "\n\n" + text;
+    await invoke("change_node_text", { path: parent_path, text });
+    await delete_current_node();
+  }
+
+  async function delete_current_node() {
     if (data.current_item != "") {
-      invoke("delete_node", { path: data.current_item })
+      await invoke("delete_node", { path: data.current_item })
         .then(async () => {
           toast.push("node deleted: " + data.current_item);
           let prefix = data.current_item.substring(
@@ -733,13 +806,11 @@
         .catch((e) => {
           toast.push(`Error ${e}`);
         });
-      viewComponent.leave_overlay();
       //delete_from_tree(data.tree, data.current_item);
       //console.log(data.tree);
       //data.flat = flattenObject(data.tree);
     }
   }
-
   async function create_date_nodes() {
     let last_path = data.current_item;
     let node = await invoke("get_node", { path: last_path });
@@ -1048,10 +1119,76 @@
     await invoke("change_node_text", { path, text });
     focus_first_in_node(document.getElementById("tree_parent"));
   }
+
+  async function handle_sub_section_action(ev) {
+    viewComponent.leave_overlay();
+    let mode = ev.detail;
+    switch (mode) {
+      case "extract_subnode":
+        {
+          const Asciidoctor = asciidoctor();
+          let node = await invoke("get_node", { path: data.current_item + "" });
+          const document = Asciidoctor.load(node.node.raw, { sourcemap: true });
+          const subsection = document.findBy({
+            context: "section",
+          });
+          let hit = null;
+          let hit_level = null;
+          let next = null;
+          let query = clicked_section.innerText.replace("☰", "");
+          for (let ii = 0; ii < subsection.length; ii++) {
+            if (hit == null) {
+              if (subsection[ii].getTitle() == query) {
+                hit = subsection[ii].getSourceLocation().getLineNumber() - 1;
+                hit_level = subsection[ii].getLevel();
+              }
+            } else {
+              if (subsection[ii].getLevel() <= hit_level) {
+                next = subsection[ii].getSourceLocation().getLineNumber() - 1;
+                break;
+              }
+            }
+          }
+          if (next == null) {
+            next = count_lines(node.node.raw);
+          }
+          if (hit == null) {
+            toast.push("failed to find subsection");
+            return;
+          }
+          let lines = node.node.raw.split("\n");
+          let len = next - hit;
+          let extracted = lines.slice(hit, next).join("\n");
+          extracted = extracted.replace(/=+/g, (match) => {
+            return "=".repeat(match.length - 1);
+          });
+          lines.splice(hit, len);
+          let removed = lines.join("\n");
+          //data.currently_edited[data.current_item] = lines.join("\n");
+          let new_path = await invoke("find_next_empty_child", {
+            path: data.current_item,
+          });
+          await invoke("change_node_text", {
+            path: new_path,
+            text: extracted.slice(1), //cut off first =
+          });
+          await invoke("change_node_text", {
+            path: data.current_item,
+            text: removed,
+          });
+          //goto_node(data.current_item);
+        }
+        break;
+      default: {
+        tosta.push("unknown sub section action " + mode);
+      }
+    }
+  }
 </script>
 
 <svelte:window on:focus={handle_window_focus} />
 <View
+  single_column="false"
   on:keyup={dispatch_keyup(keys, () => {
     if (Date.now() - focus_time < 500) {
       // toast.push("ignored keypress");
@@ -1064,7 +1201,7 @@
 >
   <div slot="header" />
   <svelte:fragment slot="content">
-    <div class="smallcolumn main_div" id="tree_parent">
+    <div class="Left main_div" id="tree_parent">
       <Focusable
         on:itemChanged={itemChanged}
         on:itemExpand={item_toggle_children}
@@ -1112,7 +1249,7 @@
       </Focusable>
     </div>
     <div
-      class="main_div column {data.currently_edited[data.current_item] !==
+      class="main_div Middle {data.currently_edited[data.current_item] !==
       undefined
         ? 'edited'
         : ''}"
@@ -1153,6 +1290,11 @@
       <QuickPick bind:entries={palette_entries} on:action={handle_palette} />
     {:else if overlay == "copying"}
       <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+    {:else if overlay == "subsection-menu"}
+      <QuickPick
+        bind:entries={sub_section_entries}
+        on:action={handle_sub_section_action}
+      />
     {:else if overlay == "tag"}
       tag
       <QuickPick bind:entries={tag_entries} on:action={handle_tag} />
@@ -1196,7 +1338,7 @@
         style="width:98%;"
       />
     {:else}
-      Unknown overlay {overlay}
+      Unknown overlay: &quot;{overlay}&quot;
     {/if}
   </svelte:fragment>
 </View>
@@ -1221,6 +1363,7 @@
     padding-left: 0.5em;
     border-left: 3px dashed grey;
   }
+
   .smallcolumn {
     float: left;
     max-width: 49%;

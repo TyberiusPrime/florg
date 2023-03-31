@@ -93,7 +93,6 @@ export function delete_from_tree(tree, path) {
 }
 
 export async function expand_path(tree, path: string, maxDepth: int = 2) {
-  console.log("expand_path", path);
   for (let ii = 0; ii < path.length; ii++) {
     let p = path.slice(0, ii + 1);
     console.log("fetch tree", p);

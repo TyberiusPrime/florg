@@ -1,45 +1,88 @@
+* {
+    box-sizing: border-box;
+}
 body {
-            font-family: monospace;
-           height:100%;
-		   overflow-y: scroll;
-          }
+  overflow-x: hidden;
+}
+/*Just removing default browser padding/margin*/
+html,
+body {
+  padding: 0;
+  margin: 0;
+  color: #ebebeb;
+}
+/*Flexbox gives us the flexiness we need. The top just stays put as there is no scrolling on the body due to the page never exceeding viewport height*/
+.Top {
+  display: flex;
+  flex-direction:column;
+  align-items: left;
+  justify-content: left;
+  position: relative;
+  z-index: 10;
+  padding: .25em;
+  background-color:#eee;
+  /*height: 100px;
+   */
+}
+/*This is our main wrapping element, it's made 100vh high to ensure it is always the correct size and then moved into place and padded with negative margin and padding*/
+.Container {
+  display: flex;
+  flex-direction:row;
+  overflow: hidden;
+  height: 100vh;
+   height: calc(100vh - 100px);
+  position: relative;
+  width: 100%;
+  backface-visibility: hidden;
+  will-change: overflow;
+}
+/*All the scrollable sections should overflow and be whatever height they need to be. As they are flex-items (due to being inside a flex container) they could be made to stretch full height at all times if needed.
+WebKit inertia scrolling is being added here for any present/future devices that are able to make use of it.
+*/
+.Left,
+.Middle,
+.Right {
+  overflow: auto;
+  height: auto;
+  padding: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+}
+/*Entirely optional – just wanted to remove the scrollbar on WebKit browsers as I find them ugly*/
+.Left::-webkit-scrollbar,
+.Middle::-webkit-scrollbar,
+.Right::-webkit-scrollbar {
+  display: none;
+}
+/*  Left and Right are set sizes while the Middle is set to flex one so it occupies all remaining space. This could be set as a width too if prefereable, perhaps using calc.*/
+.Left {
+ /* width: 12.5rem;
+  background-color: indigo;
+*/
+}
 
-          /* Remove unnecessary margins/padding */
-         html, body {
-              margin: 0;
-              padding: 0;
-			  padding-left:5px;,
-         }
+.Middle {
+  flex: 1;
+}
 
-		.header{
-			
-			position:fixed;
-			top:0px;
-			left:0px;
-			width:100%;
-			background-color:#eee;
-			padding-left:.25em;
-		}
+.Right {
+  width: 12.5rem;
+  background-color: violet;
+}
+.overlay {
+  position: fixed;
+  background-color: #eee;
+  width: 99%;
+  padding: 0.25em;
+  bottom: 0px;
+  margin-top: 0;
+}
+.main_content {
+}
 
-		.overlay  {
-			position:fixed;
-			background-color:#eee;
-			width:99%;
-			padding:.25em;
-			bottom:0px;
-			margin-top:0;
-				
-		}
-		.main_content {
-		}
-
-
-
-
-
-    .error {
-      color:red;
-     }
+.error {
+  color: red;
+}
 
 :root {
   /*font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
@@ -100,11 +143,12 @@ h1 {
   text-decoration-style: double;
   text-decoration-color: darkgrey;
   margin-top: 0px;
-  font-size:1.5em;
-  padding-left:0px;
-  margin-left:0px;
+  font-size: 1.5em;
+  padding-left: 0px;
+  margin-left: 0px;
 }
-h2, h3 {
+h2,
+h3 {
   line-height: 1em;
   text-align: left;
   margin-left: 1em;
@@ -112,18 +156,18 @@ h2, h3 {
   text-decoration-style: double;
   text-decoration-color: darkgrey;
   margin-top: 0px;
-  font-size:1.3em;
-  padding-left:0px;
-  margin-left:0px;
+  font-size: 1.3em;
+  padding-left: 0px;
+  margin-left: 0px;
 }
 h3 {
-  font-size:1.0em;
+  font-size: 1em;
 }
 input,
 button {
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.25em .25em;
+  padding: 0.25em 0.25em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
@@ -134,7 +178,6 @@ button {
 }
 
 input {
-
   padding: 0.25em 0.25em;
 }
 
@@ -190,10 +233,11 @@ code {
   border: 1px solid #cccccc;
   border-radius: 5px;
   line-height: 1.25em;
+  margin-top:.25em;
 }
 
 pre {
-	padding-left:1em;
+  padding-left: 1em;
 }
 
 pre .line {
@@ -214,29 +258,34 @@ li {
   margin-top: 0px;
   padding-top: 0;
 }
-li p{
-	padding-left:0;
-
+li p {
+  padding-left: 0;
 }
-li p:first-child{
-	margin-top:0;
-	margin-bottom:0;
-	padding-top:0;
-	padding-bottom:0;
+li p:first-child {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
-
 
 .copy-button {
   font-size: 1em;
   margin: 0px;
   padding: 0px;
-
   position: absolute;
   top: 5px;
   right: 5px;
 }
 
-.copy-button:active {
+.small-button {
+	font-size:.75em;
+	padding:.25em;
+	margin:.25em;
+}
+h2  {
+}
+
+.copy-button:active, .small-button:active { 
   background-color: blue;
 }
 
@@ -250,132 +299,123 @@ button:focus {
   border: 1px solid green;
 }
 
-
-h1  {
+h1 {
 }
 
 p {
-	padding-left:1em;
+  padding-left: 1em;
 }
 
-
-#content .paragraph:first-child  {
-	margin-top:0px;
+#content .paragraph:first-child {
+  margin-top: 0px;
 }
 
-#content .paragraph:first-child  p{
-	padding-top:0px;
-	margin-top:0px;
-
+#content .paragraph:first-child p {
+  padding-top: 0px;
+  margin-top: 0px;
 }
 
-pre 
-{
-	margin-left:1em;
-	padding-top:.25em;
-	padding-bottom:.25em;
+pre {
+  margin-left: 1em;
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
 }
 
 pre .hljs {
-	padding-top:0;
-	padding-bottom:0;
-	padding:0 !important;
-	background-color:#eeeeee;
-	margin:0;
-	border:0px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding: 0 !important;
+  background-color: #eeeeee;
+  margin: 0;
+  border: 0px;
 }
 
 .focused::before {
-	content: ">";
-	float:left;
-    background-color: #f8f8f8;
-	margin-top:.28em;
-  }
-
+  content: ">";
+  float: left;
+  background-color: #f8f8f8;
+  margin-top: 0.28em;
+}
 
 .copy-button {
-	display:none;
+  display: none;
 }
 .copy-button:hover {
-	display:block;
+  display: block;
 }
 
-p:hover + .copy-button, pre:hover + .copy-button  {
-	display:block;
+p:hover + .copy-button,
+pre:hover + .copy-button {
+  display: block;
 }
 
-.header, .footer {
-	background-color: #eeeeee;
-}
-
-.header {
-	padding-top:.25em;
-	padding-bottom:.25em;
-}
+.header,
 .footer {
-	padding-top:.25em;
-	padding-bottom:.25em;
+  background-color: #eeeeee;
+  line-height: 1.1em;
 }
 
+.footer {
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
+}
 
 .header h1 {
-	font-size:1.5em;
-	margin-bottom:.25em;
-	margin-top:0;
-	padding-top:0
+  font-size: 1.5em;
+  margin-bottom: 0.25em;
+  margin-top: 0;
+  padding-top: 0;
 }
 
-  .disabled {
-    color: #555;
-	pointer-events:none;
-  }
+.disabled {
+  color: #555;
+  pointer-events: none;
+}
 
 .tags {
-    display: inline-block;
-    margin-left: 5px !important;
-    padding: 3px 8px !important;
-    border-radius: 10px;
-    font-size: .8em;
-    font-weight: bold;
-    background-color: #3b9cff;
-    float: left;
-  }
+  display: inline-block;
+  margin-left: 5px !important;
+  padding: 3px 8px !important;
+  border-radius: 10px;
+  font-size: 0.8em;
+  font-weight: bold;
+  background-color: #3b9cff;
+  float: left;
+}
 
-  .tag_0 {
-    background-color: #b40812;
-    color: #eeeeee;
-  }
-  .tag_1 {
-    background-color: #d6421d;
-    color: #202020;
-  }
-  .tag_2 {
-    background-color: #fbc82f;
-    color: #202020;
-  }
-  .tag_3 {
-    background-color: #19D921;
-    color: #202020;
-  }
-  .tag_4 {
-    background-color: #0c6b71;
-    color: #eeeeee;
-  }
-  .tag_5 {
-    background-color: #257ad8;
-    color: #EEEEEE;
-  }
-  .tag_6 {
-    background-color: #0a57c8;
-    color: #eeeeee;
-  }
-  .tag_7 {
-    background-color: #552be4;
-    color: #eeeeee;
-  }
+.tag_0 {
+  background-color: #b40812;
+  color: #eeeeee;
+}
+.tag_1 {
+  background-color: #d6421d;
+  color: #202020;
+}
+.tag_2 {
+  background-color: #fbc82f;
+  color: #202020;
+}
+.tag_3 {
+  background-color: #19d921;
+  color: #202020;
+}
+.tag_4 {
+  background-color: #0c6b71;
+  color: #eeeeee;
+}
+.tag_5 {
+  background-color: #257ad8;
+  color: #eeeeee;
+}
+.tag_6 {
+  background-color: #0a57c8;
+  color: #eeeeee;
+}
+.tag_7 {
+  background-color: #552be4;
+  color: #eeeeee;
+}
 
-
-  p:focus {
-	  font-weight:bold;
-  }
-
+p:focus {
+  font-weight: bold;
+}

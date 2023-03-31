@@ -367,6 +367,10 @@
     }
     viewComponent.leave_overlay();
   }
+
+  onMount( () => {
+	//document.getElementById("the_mail").focus();
+	});
 </script>
 
 <View bind:this={viewComponent} bind:overlay>
@@ -421,7 +425,7 @@
     </table>
   </div>
 
-  <div slot="content" on:keyup={handle_keys}>
+  <div slot="content" on:keyup={handle_keys} tabindex=0 autofocus>
     {#if all_headers}
       <table>
         {#each data.headers as header}

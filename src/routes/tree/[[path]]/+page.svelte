@@ -219,9 +219,9 @@
       move_and_goto = true;
       viewComponent.enter_overlay("move");
     },
-	u: (ev) => {
-		goto("/undo");
-	}
+    u: (ev) => {
+      goto("/undo");
+    },
   };
 
   async function add_node() {
@@ -238,6 +238,7 @@
     if (in_tags === undefined) {
       return "";
     }
+    in_tags.sort();
     let tags = "";
     for (let tag of in_tags) {
       tags +=
@@ -448,6 +449,15 @@
         viewComponent.enter_overlay("subsection-menu");
       };
       h2.appendChild(btn);
+    }
+
+    let tags = document.querySelectorAll(".tags");
+    for (let ii = 0; ii < tags.length; ii++) {
+	const handle_click = (ev) => {
+	  goto("/node_search/" + encodeURIComponent(ev.target.innerText));
+	  }
+	  tags[ii].removeEventListener('click', handle_click);
+      tags[ii].addEventListener('click', handle_click);
     }
   }
 
@@ -756,9 +766,8 @@
         await toggle_node(grandparent, true);
         await toggle_node(grandparent, false);
 
-		highlight_node = new_path;
+        highlight_node = new_path;
         await goto_node(new_path);
-
       } catch (e) {
         toast.push("failed to promoto " + e);
       }

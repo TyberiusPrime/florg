@@ -639,6 +639,9 @@ fn ripgrep_below_node(
             let stdout = std::str::from_utf8(&output.stdout).unwrap();
             let mut result = Vec::new();
             for block in stdout.split("\n\n") {
+                if (block.trim().is_empty()) {
+                    continue;
+                }
                 let mut lines = block.split("\n");
                 let filename = lines.next();
                 let path = match filename {

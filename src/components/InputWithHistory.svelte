@@ -1,6 +1,7 @@
 <script>
   import { createPopper } from "@popperjs/core";
   import { createEventDispatcher } from "svelte";
+  import { toast } from "@zerodevx/svelte-toast";
   const dispatch = createEventDispatcher();
 
   export let input_value = "";
@@ -36,6 +37,7 @@
       } else {
         dispatch("leave", input_value);
       }
+    } else if (event.key === "Enter") {
     } else {
       showHistory = false;
     }
@@ -44,6 +46,7 @@
   function handle_key_up(ev) {
     event.stopPropagation();
     if (event.key === "Enter") {
+      console.log(showHistory, selectedIndex, history.length);
       if (showHistory && selectedIndex >= 0 && selectedIndex < history.length) {
         event.preventDefault();
         input_value = history[selectedIndex];

@@ -39,6 +39,7 @@ export async function load({ params }: { params: any }) {
     });
   }
   return {
+	  search_term: search_term,
     search_results: translated_results,
   };
 }

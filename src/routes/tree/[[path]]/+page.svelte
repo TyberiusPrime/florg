@@ -185,6 +185,9 @@
     a: () => {
       add_node();
     },
+    A: () => {
+      add_node_same_level();
+    },
     d: () => {
       viewComponent.enter_overlay("delete");
     },
@@ -228,6 +231,17 @@
   async function add_node() {
     let new_path = await invoke("find_next_empty_child", {
       path: data.current_item,
+    });
+    await invoke("edit_node", {
+      path: new_path,
+      windowTitle: appWindow.label,
+    });
+  }
+
+  async function add_node_same_level() {
+    let parent = data.current_item.substring(0, data.current_item.length - 1);
+    let new_path = await invoke("find_next_empty_child", {
+      path: parent,
     });
     await invoke("edit_node", {
       path: new_path,
@@ -1155,6 +1169,7 @@
           let lines = node.node.raw.split("\n");
           let len = next - hit;
           let extracted = lines.slice(hit, next).join("\n");
+		  toast.push(extracted);
           extracted = extracted.replace(/=+/g, (match) => {
             return "=".repeat(match.length - 1);
           });
@@ -1166,7 +1181,7 @@
           });
           await invoke("change_node_text", {
             path: new_path,
-            text: extracted.slice(1), //cut off first =
+            text: extracted,
           });
           await invoke("change_node_text", {
             path: data.current_item,

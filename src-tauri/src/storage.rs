@@ -483,13 +483,19 @@ impl Storage {
 
     pub fn git_undo(&mut self, hash: &str) -> Result<()> {
         std::process::Command::new(&self.git_binary)
-            .arg("checkout")
+            .arg("reset")
+            .arg("--hard")
             .arg(hash)
-            .arg("--")
-            .arg(".")
             .current_dir(&self.data_path)
             .status()
-            .context("git checkout hash failed")?;
+            .context("git reset hard hash failed")?;
+        std::process::Command::new(&self.git_binary)
+            .arg("reset")
+            .arg("HEAD@{1}")
+            .current_dir(&self.data_path)
+            .status()
+            .context("git reset to head failed")?;
+
         self.add_and_commit(&format!("Undo to state of {}", hash))?;
         self.reload();
         Ok(())

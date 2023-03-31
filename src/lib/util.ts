@@ -1,6 +1,7 @@
 import { readText, writeText } from "@tauri-apps/api/clipboard";
 import { invoke } from "@tauri-apps/api/tauri";
 import { toast } from "@zerodevx/svelte-toast";
+  import { tag_class } from "$lib/colors.ts";
 import { tabbable } from "tabbable";
 
 export function format_date(date: any, br = false) {
@@ -178,3 +179,20 @@ export function count_lines(s: string) {
 	return (s.match(/\n/g) || '').length + 1
   //return s.split(/\r\n|\r|\n/).length;
 }
+
+export function render_tags(in_tags) {
+    if (in_tags === undefined) {
+      return "";
+    }
+    in_tags.sort();
+    let tags = "";
+    for (let tag of in_tags) {
+      tags +=
+        "<div class='tags " + tag_class(tag.slice(1)) + "'>" + tag + "</div>";
+    }
+    if (tags) {
+      tags += "<br style='clear:both'>";
+    }
+
+    return tags;
+  }

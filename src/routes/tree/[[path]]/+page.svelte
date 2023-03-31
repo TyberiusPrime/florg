@@ -37,6 +37,7 @@
     iso_date,
     iso_date_and_time,
     count_lines,
+	render_tags,
   } from "$lib/util.ts";
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
@@ -234,22 +235,7 @@
     });
   }
 
-  function render_tags(in_tags) {
-    if (in_tags === undefined) {
-      return "";
-    }
-    in_tags.sort();
-    let tags = "";
-    for (let tag of in_tags) {
-      tags +=
-        "<div class='tags " + tag_class(tag.slice(1)) + "'>" + tag + "</div>";
-    }
-    if (tags) {
-      tags += "<br style='clear:both'>";
-    }
-
-    return tags;
-  }
+  
 
   async function get_rendered_node(path) {
     if (data.currently_edited[path] != undefined) {

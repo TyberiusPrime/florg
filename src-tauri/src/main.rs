@@ -643,6 +643,9 @@ fn ripgrep_below_node(
                 let filename = lines.next();
                 let path = match filename {
                     Some(filename) => {
+                        if filename.contains(".temp.") {
+                            continue;
+                        }
                         let filename = filename.trim_end_matches(storage::FLORG_FILENAME);
                         filename.replace("/", "")
                     }
@@ -988,9 +991,9 @@ fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
 fn init_data_path_gitignore(data_path: &PathBuf) -> Result<()> {
     Ok(std::fs::write(
         data_path.join(".gitignore"),
-        "
-                   *.temp.adoc
-                   ",
+        "*.temp.adoc
+*.cache
+",
     )?)
 }
 

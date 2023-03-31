@@ -6,7 +6,7 @@ export async function load({ params }: { params: any }) {
 
   let rg_results = await invoke("ripgrep_below_node", {
     queryPath: "",
-    searchTerm: "<\\d{4}-\\d{1,2}-\\d{1,2}>",
+    searchTerm: "<\\d{4}-\\d{1,2}-\\d{1,2}( \\d{2}:\\d{2})?>",
     onlyMatching: true,
   });
 

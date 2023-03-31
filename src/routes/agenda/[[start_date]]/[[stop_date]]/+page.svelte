@@ -3,13 +3,15 @@
   import Picker from "$lib/../components/Picker.svelte";
   import { goto, invalidateAll } from "$app/navigation";
   import View from "$lib/../components/View.svelte";
-  import { iso_date } from "$lib/util";
+  import Help from "$lib/../components/Help.svelte";
+  import { iso_date, render_tags } from "$lib/util";
   export let data;
   let viewComponent;
   let overlay;
-  let enable_filter = false;
   let start_date = iso_date(data.start_date);
   let stop_date = iso_date(data.stop_date);
+
+  let help_entries = [{ key: "Esc", text: "Go back" }];
 
   function handle_action(ev) {
   goto("/tree/" + ev.detail.cmd);
@@ -22,26 +24,38 @@
       replaceState: true,
     });
   }
+
+  async function handle_keys() {
+  }
 </script>
 
-<div>
-  <Picker on:action={handle_action} bind:enable_filter>
-    <div slot="message">
+<View bind:this={viewComponent} bind:overlay>
+  <div slot="header" class="header">
       <h1>Agenda</h1>
       <input type="date" on:change={handle_change} bind:value={start_date} />
       <input type="date" on:change={handle_change} bind:value={stop_date} />
     </div>
+  <div slot="content" on:keyup={handle_keys}>
+
+  <Picker on:action={handle_action} >
     <svelte:fragment slot="entries">
       {#each data.hits as hit}
         <tr data-cmd={hit.rg.path}>
           <td class="shrink">{hit.str_date}</td>
           <td class="shrink">{hit.rg.path}</td>
-          <td>{hit.rg.title.replace(/<\d{4}-\d{1,2}-\d{1,2}>/, "")}</td>
+		  <td><div style="float:left">{hit.rg.title.replace(/<\d{4}-\d{1,2}-\d{1,2}>/, "")}</div>
+		  {@html render_tags(hit.rg.tags)}</td>
         </tr>
       {/each}
     </svelte:fragment>
   </Picker>
-</div>
+  </div>
+  <svelte:fragment slot="overlays">
+    {#if overlay == "help"}
+      <Help bind:entries={help_entries} />
+    {/if}
+  </svelte:fragment>
+  </View>
 
 <style>
   .shrink {

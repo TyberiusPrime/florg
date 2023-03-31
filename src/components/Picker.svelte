@@ -156,7 +156,7 @@
 
   function handle_double_click(ev) {
     let el = find_parent_tr(ev.target);
-    let cmd = el.cmd;
+    let cmd = el.dataset.cmd;
     dispatch("action", {
       cmd: cmd,
     });

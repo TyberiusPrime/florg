@@ -593,14 +593,22 @@ impl Node {
     }
 
     fn extract_header(contents: &str) -> Header {
-        let title = match contents.split_once("\n") {
-            Some((first_line, _)) => first_line.trim_start_matches("= "),
-            _ => contents,
+        let (title, untrimmed_title) = match contents.split_once("\n") {
+            Some((first_line, _)) => (first_line.trim_start_matches("= "), first_line),
+            _ => (contents, contents),
         };
         let (first_para, has_more) = match contents.split_once("\n\n") {
             Some((first_para, _)) => (
                 if first_para.contains('\n') {
-                    first_para.strip_prefix(title).unwrap().trim()
+                    let p = first_para.strip_prefix(untrimmed_title);
+                    match p {
+                        Some(p) => p.trim(),
+                        None => {
+                            dbg!(&contents);
+                            dbg!(&title);
+                            panic!("Well this shouldn't happen now that we use the untrimmed title..");
+                        }
+                    }
                 } else {
                     let mut it = contents.split("\n\n");
                     it.next();

@@ -1206,7 +1206,8 @@
 
   async function extract_sections() {
     const Asciidoctor = asciidoctor();
-    let node = await invoke("get_node", { path: data.current_item + "" });
+    let node_path = data.current_item;
+    let node = await invoke("get_node", { path: node_path });
     const document = Asciidoctor.load(node.node.raw, { sourcemap: true });
     const subsections = document.findBy({ context: "section" });
 
@@ -1217,11 +1218,18 @@
       level
     ) {
       let nextIndex = startIndex + 1;
+      let minLine = Number.MAX_SAFE_INTEGER;
+      let maxLine = Number.MIN_SAFE_INTEGER;
+
       while (
         nextIndex < sections.length &&
         sections[nextIndex].getLevel() > level
       ) {
         if (sections[nextIndex].getLevel() === level + 1) {
+          minLine = Math.min(
+            minLine,
+            sections[nextIndex].getSourceLocation().getLineNumber()
+          );
           const newPath = await invoke("find_next_empty_child", {
             path: parentPath,
           });
@@ -1236,19 +1244,22 @@
             commit: false,
           });
 
-          nextIndex = await createNestedSubnodes(
+          const result = await createNestedSubnodes(
             newPath,
             sections,
             nextIndex,
             level + 1
           );
+          nextIndex = result.nextIndex;
+          minLine = Math.min(minLine, result.minLine);
+          maxLine = Math.max(maxLine, result.maxLine);
         } else {
           nextIndex++;
         }
       }
-      return nextIndex;
-    }
 
+      return { nextIndex, minLine, maxLine };
+    }
     async function extractSection(raw, sections, index) {
       const start = sections[index].getSourceLocation().getLineNumber() - 1;
       const level = sections[index].getLevel();
@@ -1270,18 +1281,28 @@
       return extracted;
     }
 
-    let currentIndex = 0;
-    while (currentIndex < subsections.length) {
-      currentIndex = await createNestedSubnodes(
-        data.current_item,
-        subsections,
-        currentIndex,
-        0
-      );
-    }
-    await invoke("commit", {
-      text: `extracted ${data.current_item} into subnodes`,
+    const result = await createNestedSubnodes(
+      data.current_item,
+      subsections,
+      0,
+      0
+    );
+	console.log("result", result);
+    const lines = node.node.raw.split("\n");
+    const removed = lines
+      .slice(0, result.minLine - 1)
+      //.concat(lines.slice(result.maxLine))
+      .join("\n");
+    await invoke("change_node_text", {
+      path: node_path,
+      text: removed,
+	  commit: false,
     });
+    await invoke("commit", {
+      text: `extracted ${node_path} into subnodes`,
+    });
+	can_expand(node_path, true);
+	goto_node(node_path);
   }
 </script>
 

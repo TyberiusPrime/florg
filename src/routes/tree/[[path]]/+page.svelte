@@ -105,6 +105,11 @@
     { key: "d", text: "create_date_nodes", target_path: "create_date_nodes" },
     { key: "x", text: "exit the app", target_path: "exit" },
     { key: "r", text: "reload data", target_path: "reload" },
+    {
+      key: "a",
+      text: "extract all sections into nodes",
+      target_path: "extract_sections",
+    },
   ];
 
   let sub_section_entries = [
@@ -865,6 +870,8 @@
       await exit(0);
     } else if (cmd == "create_date_nodes") {
       await create_date_nodes();
+    } else if (cmd == "extract_sections") {
+      await extract_sections();
     } else if (cmd == "settings") {
       return await invoke("edit_settings", {});
     } else if (cmd == "terminal") {
@@ -876,7 +883,7 @@
       //} else if (cmd == "download_awesome_chatpgt_prompts") {
       //await download_awesome_chatpgt_prompts();
     } else {
-      tosta.push("unhandled command", cmd);
+      toast.push("unhandled command", cmd);
     }
   }
 
@@ -1195,6 +1202,86 @@
         tosta.push("unknown sub section action " + mode);
       }
     }
+  }
+
+  async function extract_sections() {
+    const Asciidoctor = asciidoctor();
+    let node = await invoke("get_node", { path: data.current_item + "" });
+    const document = Asciidoctor.load(node.node.raw, { sourcemap: true });
+    const subsections = document.findBy({ context: "section" });
+
+    async function createNestedSubnodes(
+      parentPath,
+      sections,
+      startIndex,
+      level
+    ) {
+      let nextIndex = startIndex + 1;
+      while (
+        nextIndex < sections.length &&
+        sections[nextIndex].getLevel() > level
+      ) {
+        if (sections[nextIndex].getLevel() === level + 1) {
+          const newPath = await invoke("find_next_empty_child", {
+            path: parentPath,
+          });
+          const extracted = await extractSection(
+            node.node.raw,
+            sections,
+            nextIndex
+          );
+          await invoke("change_node_text", {
+            path: newPath,
+            text: extracted,
+            commit: false,
+          });
+
+          nextIndex = await createNestedSubnodes(
+            newPath,
+            sections,
+            nextIndex,
+            level + 1
+          );
+        } else {
+          nextIndex++;
+        }
+      }
+      return nextIndex;
+    }
+
+    async function extractSection(raw, sections, index) {
+      const start = sections[index].getSourceLocation().getLineNumber() - 1;
+      const level = sections[index].getLevel();
+      let end = raw.split("\n").length;
+
+      for (let i = index + 1; i < sections.length; i++) {
+        if (sections[i].getLevel() <= level) {
+          end = sections[i].getSourceLocation().getLineNumber() - 1;
+          break;
+        }
+      }
+
+      let lines = raw.split("\n");
+      let extracted = lines.slice(start, end).join("\n");
+      extracted = extracted.replace(/=+/g, (match) => {
+        return "=".repeat(match.length - 1);
+      });
+
+      return extracted;
+    }
+
+    let currentIndex = 0;
+    while (currentIndex < subsections.length) {
+      currentIndex = await createNestedSubnodes(
+        data.current_item,
+        subsections,
+        currentIndex,
+        0
+      );
+    }
+    await invoke("commit", {
+      text: `extracted ${data.current_item} into subnodes`,
+    });
   }
 </script>
 

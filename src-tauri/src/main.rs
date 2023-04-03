@@ -210,14 +210,21 @@ fn swap_node_with_next(path: &str) -> Option<String> {
 }
 
 #[tauri::command]
-fn change_node_text(path: &str, text: &str) ->TauriResult<()> {
+fn change_node_text(path: &str, text: &str, commit: Option<bool>) ->TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
-    ss.replace_node(node, true)?;
+
+    ss.replace_node(node, commit.unwrap_or(false))?;
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     lock.app_handle.emit_all("node-changed", path).ok();
     TauriResult::Ok(())
 }
+#[tauri::command]
+fn commit( text: &str) ->TauriResult<()> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    TauriResult::Ok(ss.add_and_commit(text)?)
+}
+
 #[tauri::command]
 fn get_node_folder_path(path: &str) -> String {
     let ss = STORAGE.get().unwrap().lock().unwrap();
@@ -1192,6 +1199,7 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             edit_node,
             change_node_text,
+            commit,
             get_node,
             get_node_title,
             get_node_folder_path,

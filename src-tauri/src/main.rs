@@ -54,11 +54,8 @@ impl RuntimeState {
 #[derive(Debug)]
 struct TauriError(anyhow::Error);
 
-#[derive(Debug, Serialize)]
-enum TauriResult<T> {
-    Ok(T),
-    Err(TauriError),
-}
+//#[derive(Debug, Serialize)]
+type TauriResult<T>  = Result<T, TauriError>;
 
 impl serde::Serialize for TauriError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -77,6 +74,13 @@ impl serde::Serialize for TauriError {
             //backtrace: self.0.backtrace().to_string(),
         }
         .serialize(serializer)
+    }
+}
+
+//implement from<anyhow::Error> for tauri error
+impl From<anyhow::Error> for TauriError {
+    fn from(value: anyhow::Error) -> Self {
+        TauriError(value)
     }
 }
 
@@ -206,12 +210,13 @@ fn swap_node_with_next(path: &str) -> Option<String> {
 }
 
 #[tauri::command]
-fn change_node_text(path: &str, text: &str) {
+fn change_node_text(path: &str, text: &str) ->TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
-    ss.replace_node(node, true);
+    ss.replace_node(node, true)?;
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     lock.app_handle.emit_all("node-changed", path).ok();
+    TauriResult::Ok(())
 }
 #[tauri::command]
 fn get_node_folder_path(path: &str) -> String {
@@ -222,14 +227,14 @@ fn get_node_folder_path(path: &str) -> String {
 }
 
 #[tauri::command]
-fn delete_node(path: &str) -> Result<(), String> {
+fn delete_node(path: &str) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
     s.delete_node(path)?;
-    Ok(())
+    TauriResult::Ok(())
 }
 
 #[tauri::command]
-fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> bool {
+fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriResult<bool> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
     if runtime_state
@@ -280,7 +285,7 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> bool {
 
             if let None = node {
                 let place_holder = Node::new(path, "(placeholder)");
-                ss.replace_node(place_holder, false);
+                ss.replace_node(place_holder, false)?;
             }
             edit_file(
                 tf,
@@ -294,9 +299,9 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> bool {
             );
         }
 
-        true
+        TauriResult::Ok(true)
     } else {
-        false
+        TauriResult::Ok(false)
     }
 }
 fn edit_file(
@@ -457,24 +462,6 @@ fn date_to_path(date_str: &str) -> Option<String> {
     Some(chrono_date_to_path(date))
 }
 
-fn chrono_date_month_to_path(date: chrono::NaiveDate) -> &'static str {
-    match date.month() {
-        1 => "A",
-        2 => "B",
-        3 => "C",
-        4 => "D",
-        5 => "E",
-        6 => "F",
-        7 => "G",
-        8 => "H",
-        9 => "I",
-        10 => "J",
-        11 => "K",
-        12 => "L",
-        _ => unreachable!(),
-    }
-}
-
 fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
     let mut kw = date.iso_week().week0();
     //range is 0..52
@@ -521,7 +508,7 @@ fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
 fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     if !ss.children_for(parent_path).is_empty() {
-        TauriResult::<()>::Err(TauriError(anyhow!(
+        return TauriResult::<()>::Err(TauriError(anyhow!(
             "Node had children - not filling in calendar nodes"
         )));
     }
@@ -547,7 +534,7 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
         );
         let text = format!("Q{q}/{year}");
         let node = Node::new(&path, &text);
-        ss.replace_node(node, false);
+        ss.replace_node(node, false)?;
     }
     let mut last_kw = 500;
     let start = chrono::NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
@@ -559,16 +546,16 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
             let path = format!("{parent_path}{}", pp);
             let text = format!("KW {kw}\n");
             let node = Node::new(&path, &text);
-            ss.replace_node(node, false);
+            ss.replace_node(node, false)?;
             last_kw = kw;
         }
         let path = format!("{parent_path}{}", chrono_date_to_path(date));
         let text = date.format("%Y-%m-%d %a\n").to_string();
         let node = Node::new(&path, &text);
-        ss.replace_node(node, false);
+        ss.replace_node(node, false)?;
     }
     println!("added days");
-    ss.add_and_commit(&format!("Added date notes below {parent_path}"));
+    ss.add_and_commit(&format!("Added date notes below {parent_path}"))?;
     TauriResult::Ok(())
 }
 #[tauri::command]
@@ -639,7 +626,7 @@ fn ripgrep_below_node(
             let stdout = std::str::from_utf8(&output.stdout).unwrap();
             let mut result = Vec::new();
             for block in stdout.split("\n\n") {
-                if (block.trim().is_empty()) {
+                if block.trim().is_empty() {
                     continue;
                 }
                 let mut lines = block.split("\n");
@@ -864,15 +851,16 @@ fn chatgpt_get_conversation(filename: &str) -> Option<openai::Conversation> {
 }
 
 #[tauri::command]
-fn chatgpt_save_conversation(filename: &str, conversation: openai::Conversation) {
+fn chatgpt_save_conversation(filename: &str, conversation: openai::Conversation) -> TauriResult<()> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     if let Some(gpt) = &ss.chatgpt {
         gpt.save_conversation(filename, &conversation).unwrap();
         ss.add_and_commit(&format!(
             "saved chatgpt conversation {}",
             &conversation.title.unwrap_or("".to_string())
-        ));
+        ))?;
     }
+    Ok(())
 }
 #[tauri::command]
 fn chatgpt_get_api_key() -> Option<String> {
@@ -1043,7 +1031,7 @@ fn editor_ended() {
         match result {
             Some(raw) => {
                 println!("Received {path}. nvim exit was success, content was there");
-                update_from_edited_file(&path, raw, &window_title)
+                update_from_edited_file(&path, raw, &window_title).unwrap();
             }
             None => {
                 let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -1055,7 +1043,7 @@ fn editor_ended() {
     }
 }
 
-fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str) {
+fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str) ->TauriResult<()>{
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
 
@@ -1088,7 +1076,7 @@ fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str)
         println!("parsed contents");
 
         let node = storage::Node::new(path, content);
-        ss.replace_node(node, true);
+        ss.replace_node(node, true)?;
         println!("Replaced node");
 
         lock.app_handle
@@ -1096,6 +1084,7 @@ fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str)
             .ok();
         println!("Told editor");
     }
+    TauriResult::Ok(())
 }
 
 fn main() -> Result<()> {

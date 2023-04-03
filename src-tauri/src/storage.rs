@@ -181,11 +181,11 @@ impl Storage {
         self.nodes.iter_mut().filter(|n| n.path == path).next()
     }
 
-    pub(crate) fn delete_node(&mut self, path: &str) -> Result<(), String> {
-        let node = self.get_node(path).ok_or("node not found")?;
+    pub(crate) fn delete_node(&mut self, path: &str) -> Result<()> {
+        let node = self.get_node(path).context("node not found")?;
         let file_path = node.dirname(&self.data_path);
-        std::fs::remove_dir_all(file_path).map_err(|e| e.to_string())?;
-        self.add_and_commit(&format!("Deleted node {path} and children"));
+        std::fs::remove_dir_all(file_path).context("failed to remove_dir_all")?;
+        self.add_and_commit(&format!("Deleted node {path} and children"))?;
         self.nodes.retain(|n| !n.path.starts_with(path));
         Ok(())
     }
@@ -201,7 +201,7 @@ impl Storage {
         std::fs::rename(file_path, new_file_path)?;
         self.rename_all_children(org_path, new_path);
         if commit {
-            self.add_and_commit(&format!("moved node {org_path} to {new_path}"));
+            self.add_and_commit(&format!("moved node {org_path} to {new_path}"))?;
         }
         Ok(())
     }
@@ -221,7 +221,7 @@ impl Storage {
         self.move_node("!", &path, false)
             .context("failed to move tempmove into prev")?;
         self.make_nodes_sorted();
-        self.add_and_commit(&format!("Swapped nodes up: {} and {}", path, prev));
+        self.add_and_commit(&format!("Swapped nodes up: {} and {}", path, prev))?;
         Ok(())
     }
 
@@ -379,7 +379,7 @@ impl Storage {
         }
     }
 
-    pub(crate) fn replace_node(&mut self, node: Node, commit: bool) {
+    pub(crate) fn replace_node(&mut self, node: Node, commit: bool) -> Result<()> {
         self.nodes.retain(|x| x.path != node.path);
 
         let mut filename = node.dirname(&self.data_path);
@@ -396,9 +396,10 @@ impl Storage {
 
         std::fs::write(filename, node.raw.trim()).expect("Failed to write file");
         if commit {
-            self.add_and_commit(&msg);
+            self.add_and_commit(&msg)?;
         }
         self.nodes.push(node);
+        Ok(())
     }
 
     pub(crate) fn remove_placeholder(&mut self, path: &str) {
@@ -459,6 +460,7 @@ impl Storage {
             .arg("log")
             .arg("--date=iso")
             .arg("--pretty=%ah%n%H%n%s%n")
+            .arg(format!("-n{limit}"))
             .current_dir(&self.data_path)
             .output()
             .context("git log failed")?
@@ -543,6 +545,7 @@ impl Storage {
     }
 
     pub fn get_mail_accounts(&self) -> Vec<MailAccount> {
+        /*
         let inner = || -> Option<Vec<MailAccount>> {
             let accounts = Vec::new();
             for acc in (&self.settings).get("mail.accounts")?.as_table()?.iter() {
@@ -556,6 +559,8 @@ impl Storage {
         };
         let res = inner();
         res.unwrap_or_else(|| Vec::new())
+        */
+        todo!();
     }
 }
 

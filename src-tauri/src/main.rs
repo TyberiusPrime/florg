@@ -214,7 +214,7 @@ fn change_node_text(path: &str, text: &str, commit: Option<bool>) ->TauriResult<
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
 
-    ss.replace_node(node, commit.unwrap_or(false))?;
+    ss.replace_node(node, commit.unwrap_or(true))?;
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
     lock.app_handle.emit_all("node-changed", path).ok();
     TauriResult::Ok(())
@@ -234,9 +234,9 @@ fn get_node_folder_path(path: &str) -> String {
 }
 
 #[tauri::command]
-fn delete_node(path: &str) -> TauriResult<()> {
+fn delete_node(path: &str, commit: Option<bool>) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    s.delete_node(path)?;
+    s.delete_node(path, commit.unwrap_or(true))?;
     TauriResult::Ok(())
 }
 

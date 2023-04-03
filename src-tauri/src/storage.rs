@@ -181,11 +181,13 @@ impl Storage {
         self.nodes.iter_mut().filter(|n| n.path == path).next()
     }
 
-    pub(crate) fn delete_node(&mut self, path: &str) -> Result<()> {
+    pub(crate) fn delete_node(&mut self, path: &str, commit: bool) -> Result<()> {
         let node = self.get_node(path).context("node not found")?;
         let file_path = node.dirname(&self.data_path);
         std::fs::remove_dir_all(file_path).context("failed to remove_dir_all")?;
-        self.add_and_commit(&format!("Deleted node {path} and children"))?;
+        if commit {
+            self.add_and_commit(&format!("Deleted node {path} and children"))?;
+        }
         self.nodes.retain(|n| !n.path.starts_with(path));
         Ok(())
     }
@@ -598,24 +600,26 @@ impl Node {
             _ => (contents, contents),
         };
         let (first_para, has_more) = match contents.split_once("\n\n") {
-            Some((first_para, _)) => (
-                if first_para.contains('\n') {
-                    let p = first_para.strip_prefix(untrimmed_title);
-                    match p {
-                        Some(p) => p.trim(),
-                        None => {
-                            dbg!(&contents);
-                            dbg!(&title);
-                            panic!("Well this shouldn't happen now that we use the untrimmed title..");
+            Some((first_para, _)) => {
+                (
+                    if first_para.contains('\n') {
+                        let p = first_para.strip_prefix(untrimmed_title);
+                        match p {
+                            Some(p) => p.trim(),
+                            None => {
+                                dbg!(&contents);
+                                dbg!(&title);
+                                panic!("Well this shouldn't happen now that we use the untrimmed title..");
+                            }
                         }
-                    }
-                } else {
-                    let mut it = contents.split("\n\n");
-                    it.next();
-                    it.next().unwrap().trim()
-                },
-                false,
-            ),
+                    } else {
+                        let mut it = contents.split("\n\n");
+                        it.next();
+                        it.next().unwrap().trim()
+                    },
+                    false,
+                )
+            }
             _ => (contents, true),
         };
         Header {

@@ -103,12 +103,17 @@
     { key: "t", text: "Open terminal", target_path: "terminal" },
     { key: "s", text: "edit ettings", target_path: "settings" },
     { key: "d", text: "create_date_nodes", target_path: "create_date_nodes" },
-    { key: "x", text: "exit the app", target_path: "exit" },
+    { key: "q", text: "exit the app", target_path: "exit" },
     { key: "r", text: "reload data", target_path: "reload" },
     {
-      key: "a",
+      key: "x",
       text: "extract all sections into nodes",
       target_path: "extract_sections",
+    },
+    {
+      key: "m",
+      text: "merge all children into parent",
+      target_path: "merge_all_children_with_parent",
     },
   ];
 
@@ -872,6 +877,8 @@
       await create_date_nodes();
     } else if (cmd == "extract_sections") {
       await extract_sections();
+    } else if (cmd == "merge_all_children_with_parent") {
+      await merge_all_children_with_parent();
     } else if (cmd == "settings") {
       return await invoke("edit_settings", {});
     } else if (cmd == "terminal") {
@@ -1287,7 +1294,7 @@
       0,
       0
     );
-	console.log("result", result);
+    console.log("result", result);
     const lines = node.node.raw.split("\n");
     const removed = lines
       .slice(0, result.minLine - 1)
@@ -1296,13 +1303,55 @@
     await invoke("change_node_text", {
       path: node_path,
       text: removed,
-	  commit: false,
+      commit: false,
     });
     await invoke("commit", {
       text: `extracted ${node_path} into subnodes`,
     });
-	can_expand(node_path, true);
-	goto_node(node_path);
+    can_expand(node_path, true);
+    goto_node(node_path);
+  }
+
+  async function merge_all_children_with_parent() {
+    if (data.current_item === "") {
+      toast.push("Can't merge root");
+      return;
+    }
+
+    async function mergeChildrenRecursively(parentPath) {
+      const parent = await invoke("get_node", { path: parentPath });
+      let mergedText = parent.node.raw.trim();
+
+      for (const child of parent.children) {
+        const childNode = await invoke("get_node", { path: child.path });
+        let text = childNode.node.raw.replace(/([=]+)/g, "$1=");
+
+        while (!text.startsWith("==")) {
+          text = "=" + text;
+        }
+
+        mergedText += "\n\n" + text;
+
+        if (childNode.node.children && childNode.node.children.length > 0) {
+          await mergeChildrenRecursively(child.path);
+        }
+
+        await invoke("delete_node", { path: child.path , commit:false});
+      }
+
+      await invoke("change_node_text", {
+        path: parentPath,
+        text: mergedText,
+        commit: false,
+      });
+      await invoke("commit", { text: "merged children of " + parentPath });
+    }
+
+    const parentPath = data.current_item;
+    await mergeChildrenRecursively(parentPath);
+
+    can_contract(parentPath.slice(0,-1), true);
+    goto_node(parentPath);
   }
 </script>
 

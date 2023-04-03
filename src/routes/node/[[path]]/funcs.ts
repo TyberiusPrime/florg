@@ -1,6 +1,6 @@
 import { replaceAsync } from "$lib/util";
 import { invoke } from "@tauri-apps/api/tauri";
-import asciidoctor from "asciidoctor";
+import asciidoctor from "@asciidoctor/core";
 
 export async function render_text(text: string) {
   const Asciidoctor = asciidoctor();

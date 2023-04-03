@@ -36,7 +36,7 @@
     { key: "r", text: "refresh mails" },
   ];
   let copy_entries = [{ key: "c", text: "link", target_path: "link" }];
-  let tag_entries = Object.keys(data.tags).map((key) => {
+  let tag_entries = Object.keys(data.tags ?? []).map((key) => {
     return { key: key, text: data.tags[key], target_path: data.tags[key] };
   });
 

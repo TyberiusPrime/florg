@@ -27,6 +27,7 @@
   import { tag_class } from "$lib/colors.ts";
   import { onMount, onDestroy, beforeUpdate, afterUpdate, tick } from "svelte";
   import { appWindow } from "@tauri-apps/api/window";
+  import { exit } from "@tauri-apps/api/process";
   import {
     readText as read_clipboard,
     writeText as copy_to_clipboard,
@@ -42,7 +43,7 @@
   import { focus_first_in_node } from "$lib/util.ts";
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
-  import asciidoctor from "asciidoctor";
+  import asciidoctor from "@asciidoctor/core";
 
   import readabilityLib from "@mozilla/readability";
   export let data;
@@ -861,7 +862,7 @@
       console.log("reloaded");
       invalidateAll();
     } else if (cmd == "exit") {
-      await exit(1);
+      await exit(0);
     } else if (cmd == "create_date_nodes") {
       await create_date_nodes();
     } else if (cmd == "settings") {
@@ -1169,7 +1170,7 @@
           let lines = node.node.raw.split("\n");
           let len = next - hit;
           let extracted = lines.slice(hit, next).join("\n");
-		  toast.push(extracted);
+          toast.push(extracted);
           extracted = extracted.replace(/=+/g, (match) => {
             return "=".repeat(match.length - 1);
           });

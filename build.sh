@@ -5,3 +5,4 @@ rm deb-unpack -rf | true
 mkdir deb-unpack -p
 dpkg-deb -x $deb deb-unpack
 cp deb-unpack/usr/bin/florg ./florg
+echo "copied to ./florg"

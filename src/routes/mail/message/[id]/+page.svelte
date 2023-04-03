@@ -30,7 +30,7 @@
   export let data;
   let viewComponent;
 
-  let tag_entries = Object.keys(data.available_tags).map((key) => {
+  let tag_entries = Object.keys(data.available_tags ?? []).map((key) => {
     return {
       key: key,
       text: data.available_tags[key],

@@ -33,6 +33,7 @@
 	"dependencies": {
 		"@mozilla/readability": "^0.4.3",
 		"@popperjs/core": "^2.11.6",
+		"@sveltejs/adapter-static": "^2.0.1",
 		"@tauri-apps/api": "^1.2.0",
 		"@zerodevx/svelte-toast": "^0.9.2",
 		"asciidoctor": "3.0.0-alpha.4",

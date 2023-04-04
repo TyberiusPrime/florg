@@ -20,7 +20,7 @@ use std::{
     sync::{Mutex, MutexGuard},
     thread::{self},
 };
-use storage::{Node, Storage};
+use storage::{Node, Storage, TreePath};
 use tauri::Manager;
 
 static STORAGE: OnceCell<Mutex<Storage>> = OnceCell::new();
@@ -104,32 +104,55 @@ fn parse_raw_content(raw_content: &str) -> &str {
     }
 }
 
+
+#[derive(Debug, Clone, Serialize)]
+pub (crate) struct NodeForJSInner {
+    pub path: String,
+    pub header: storage::Header,
+    pub raw: String,
+    pub tags: Vec<String>,  
+    //children: Vec<Node>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct NodeForJS {
-    pub node: Option<Node>,
+    pub node: Option<NodeForJSInner>,
     pub levels: Vec<(String, String)>,
-    pub children: Vec<Node>,
+    pub children: Vec<NodeForJSInner>,
     pub tags: Vec<String>,
 }
 
-#[tauri::command]
-fn get_node(path: &str) -> NodeForJS {
-    let s = STORAGE.get().unwrap().lock().unwrap();
-    let node = s.get_node(path).map(|x| x.clone());
-    let children = s.children_for(path).iter().map(|x| (*x).clone()).collect();
-    let tags = node.as_ref().map_or_else(|| Vec::new(), |x| x.get_tags());
-    NodeForJS {
-        node,
-        levels: s.levels(path),
-        children,
-        tags: tags,
+
+impl From<&Node> for NodeForJSInner {
+    fn from(node: &Node) -> Self {
+        NodeForJSInner {
+            path: node.path.to_human(),
+            header: node.header.clone(),
+            raw: node.raw.clone(),
+            tags: node.get_tags(),
+        }
     }
+}
+#[tauri::command]
+fn get_node(path: &str) -> TauriResult<NodeForJS> {
+    let s = STORAGE.get().unwrap().lock().unwrap();
+    let path = TreePath::from_human(path)?;
+    let node: Option<NodeForJSInner> = s.get_node(&path).map(|x| x.into());
+    let children: Vec<NodeForJSInner>= s.children_for(&path).iter().map(|x| (*x).into()).collect();
+    let tags = node.as_ref().map_or_else(|| Vec::new(), |x| x.tags.clone());
+    Ok(NodeForJS {
+        node,
+        levels: s.levels(&path),
+        children,
+        tags,
+    })
 }
 
 #[tauri::command]
 fn get_node_title(path: &str) -> Option<String> {
     let s = STORAGE.get().unwrap().lock().unwrap();
-    s.get_node(path).map(|x| x.header.title.clone())
+    let path = TreePath::from_human(path).ok()?;
+    s.get_node(&path).map(|x| x.header.title.clone())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -143,13 +166,17 @@ pub(crate) struct TreeForJS {
     pub tags: Vec<String>,
 }
 
-fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> Option<TreeForJS> {
-    let node = storage.get_node(path);
+fn descend(
+    path: &TreePath,
+    storage: &MutexGuard<Storage>,
+    remaining_depth: i32,
+) -> Option<TreeForJS> {
+    let node = storage.get_node(&path);
     {
-        let children = storage.children_paths_for(path);
+        let children = storage.children_paths_for(&path);
         let has_children = !children.is_empty();
         Some(TreeForJS {
-            path: path.to_string(),
+            path: path.to_human(),
             title: node.map_or_else(|| "(empty node)".to_string(), |x| x.header.title.clone()),
             first_paragraph: node
                 .map_or_else(|| "".to_string(), |x| x.header.first_paragraph.clone()),
@@ -171,13 +198,24 @@ fn descend(path: &str, storage: &MutexGuard<Storage>, remaining_depth: i32) -> O
 #[tauri::command]
 fn get_tree(path: &str, max_depth: i32) -> Option<TreeForJS> {
     let s = STORAGE.get().unwrap().lock().unwrap();
-    descend(path, &s, max_depth)
+    let path = TreePath::from_human(path).ok()?;
+    descend(&path, &s, max_depth)
+}
+
+#[tauri::command]
+fn get_parent(path: &str) -> TauriResult<String> {
+    let tp = TreePath::from_human(path)?;
+    Ok(tp.parent().to_human())
 }
 
 #[tauri::command]
 fn move_node(org_path: &str, new_path: &str) -> Option<String> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    match s.move_node(org_path, new_path, true) {
+    match s.move_node(
+        &TreePath::from_human(org_path).ok()?,
+        &TreePath::from_human(new_path).ok()?,
+        true,
+    ) {
         Ok(_) => None,
         Err(e) => {
             println!("{:?}", &e);
@@ -189,7 +227,8 @@ fn move_node(org_path: &str, new_path: &str) -> Option<String> {
 #[tauri::command]
 fn swap_node_with_previous(path: &str) -> Option<String> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    match s.swap_node_with_previous(path) {
+    let path = TreePath::from_human(path).ok()?;
+    match s.swap_node_with_previous(&path) {
         Ok(_) => None,
         Err(e) => {
             println!("{:?}", &e);
@@ -200,7 +239,8 @@ fn swap_node_with_previous(path: &str) -> Option<String> {
 #[tauri::command]
 fn swap_node_with_next(path: &str) -> Option<String> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    match s.swap_node_with_next(path) {
+    let path = TreePath::from_human(path).ok()?;
+    match s.swap_node_with_next(&path) {
         Ok(_) => None,
         Err(e) => {
             println!("{:?}", &e);
@@ -212,7 +252,8 @@ fn swap_node_with_next(path: &str) -> Option<String> {
 #[tauri::command]
 fn change_node_text(path: &str, text: &str, commit: Option<bool>) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-    let node = Node::new(path, text);
+    let tree_path = TreePath::from_human(path)?;
+    let node = Node::new(&tree_path, text);
 
     ss.replace_node(node, commit.unwrap_or(true))?;
     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
@@ -226,24 +267,27 @@ fn commit(text: &str) -> TauriResult<()> {
 }
 
 #[tauri::command]
-fn get_node_folder_path(path: &str) -> String {
+fn get_node_folder_path(path: &str) -> TauriResult<String> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
-    Node::dirname_from_path(&ss.data_path, path)
+    let path = TreePath::from_human(path)?;
+    Ok(Node::dirname_from_path(&ss.data_path, &path)
         .to_string_lossy()
-        .to_string()
+        .to_string())
 }
 
 #[tauri::command]
 fn delete_node(path: &str, commit: Option<bool>) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    s.delete_node(path, commit.unwrap_or(true))?;
+    let path = TreePath::from_human(path)?;
+    s.delete_node(&path, commit.unwrap_or(true))?;
     TauriResult::Ok(())
 }
 
 #[tauri::command]
 fn sort_children(path: &str) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
-    let e = s.sort_children(path);
+    let path = TreePath::from_human(path)?;
+    let e = s.sort_children(&path);
     dbg!(&e);
     e?;
     TauriResult::Ok(())
@@ -252,19 +296,22 @@ fn sort_children(path: &str) -> TauriResult<()> {
 #[tauri::command]
 fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriResult<bool> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    let path = TreePath::from_human(path)?;
+    dbg!("edit_node", &path);
     let mut runtime_state = RUNTIME_STATE.get().unwrap().lock().unwrap();
     if runtime_state
         .open_editors
         .iter()
-        .filter(|entry| entry.path == path)
+        .filter(|entry| entry.path == path.to_string())
         .next()
         .is_none()
     {
         {
-            let node_folder = Node::dirname_from_path(&ss.data_path, path);
+            let node_folder = Node::dirname_from_path(&ss.data_path, &path);
             let tf_folder = node_folder;
             std::fs::create_dir_all(&tf_folder).unwrap();
-            let tf = tf_folder.join(format!("{}.temp{}", path, storage::FLORG_SUFFIX));
+            let tf = tf_folder.join(format!("{}.temp{}", path.to_human().replace("/","_"), storage::FLORG_SUFFIX));
+            dbg!(&tf);
 
             let mut content = "".to_string();
             let mut skip_lines = 0;
@@ -272,9 +319,15 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriRes
                 content += "(root)\n";
                 skip_lines = 3;
             } else {
-                let mut so_far = "".to_string();
+                let mut so_far = TreePath::new();
 
-                for (ii, letter) in path.chars().enumerate() {
+                for (ii, path_component) in path.iter().enumerate() {
+                    //todo: humanize
+                    let letter = if *path_component <= 26 {
+                        (('A' as u8 + *path_component as u8) as char).to_string()
+                    } else {
+                        path_component.to_string()
+                    };
                     content += &format!(
                         "{} {}{}\n",
                         letter,
@@ -283,12 +336,12 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriRes
                             .map(|x| &x.header.title[..])
                             .unwrap_or("")
                     );
-                    so_far.push(letter);
+                    so_far.push(*path_component);
                     skip_lines = ii + 5;
                 }
             }
             content += "Content after the next line. First line = new title \n--\n\n";
-            let node = ss.get_node(path).map(|x| x.clone());
+            let node = ss.get_node(&path).map(|x| x.clone());
             match new_text {
                 Some(text) => {
                     content += text;
@@ -300,7 +353,7 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriRes
             std::fs::write(&tf, &content).expect("temp file write failure");
 
             if let None = node {
-                let place_holder = Node::new(path, "(placeholder)");
+                let place_holder = Node::new(&path, "(placeholder)");
                 ss.replace_node(place_holder, false)?;
             }
             edit_file(
@@ -308,7 +361,7 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriRes
                 content,
                 skip_lines,
                 "node-temp-changed",
-                path.to_string(),
+                path.to_human(),
                 window_title,
                 &mut runtime_state,
                 true,
@@ -330,6 +383,7 @@ fn edit_file(
     runtime_state: &mut MutexGuard<RuntimeState>,
     remove_after: bool,
 ) {
+    println!("path_for_js: {}", &path_for_js);
     let process = std::process::Command::new("kitty")
         .arg("--")
         .arg("nvim")
@@ -473,82 +527,59 @@ fn list_open_paths() -> Vec<String> {
 }
 
 #[tauri::command]
-fn date_to_path(date_str: &str) -> Option<String> {
+fn date_to_path(date_str: &str) -> Option<TreePath> {
     let date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()?;
     Some(chrono_date_to_path(date))
 }
 
-fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
+fn chrono_date_to_path(date: chrono::NaiveDate) -> TreePath {
     let mut kw = date.iso_week().week0();
     //range is 0..52
     let quarter = kw / 13;
     kw = kw % 13;
-    let mut path = match quarter {
-        0 => "A",
-        1 => "B",
-        2 => "C",
-        3 => "D",
-        4 => "D",
+    let mut path = vec![match quarter {
+        0 => 0,
+        1 => 1,
+        2 => 2,
+        3 => 3,
+        4 => 3,
         _ => unreachable!(),
-    }
-    .to_string();
+    }];
     path.push(match kw {
-        0 => 'A',
-        1 => 'B',
-        2 => 'C',
-        3 => 'D',
-        4 => 'E',
-        5 => 'F',
-        6 => 'G',
-        7 => 'H',
-        8 => 'I',
-        9 => 'J',
-        10 => 'K',
-        11 => 'L',
-        12 => 'M',
+        0..=12 => kw as u32,
         _ => unreachable!(),
     });
     let weekday = date.weekday();
     path.push(match weekday {
-        chrono::Weekday::Mon => 'A',
-        chrono::Weekday::Tue => 'B',
-        chrono::Weekday::Wed => 'C',
-        chrono::Weekday::Thu => 'D',
-        chrono::Weekday::Fri => 'E',
-        chrono::Weekday::Sat => 'F',
-        chrono::Weekday::Sun => 'G',
+        chrono::Weekday::Mon => 1,
+        chrono::Weekday::Tue => 2,
+        chrono::Weekday::Wed => 3,
+        chrono::Weekday::Thu => 4,
+        chrono::Weekday::Fri => 5,
+        chrono::Weekday::Sat => 6,
+        chrono::Weekday::Sun => 7,
     });
-    return path;
+
+    return TreePath::from(path);
 }
 
 #[tauri::command]
 fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-    if !ss.children_for(parent_path).is_empty() {
+    let parent_path = TreePath::from_human(parent_path)?;
+    if !ss.children_for(&parent_path).is_empty() {
         return TauriResult::<()>::Err(TauriError(anyhow!(
             "Node had children - not filling in calendar nodes"
         )));
     }
-    /* for month in 1..13 {
-        let date = chrono::NaiveDate::from_ymd_opt(year as i32, month, 1).unwrap();
-        let path = format!("{parent_path}{}", chrono_date_month_to_path(date));
-        let text = date.format("%b %Y\n").to_string();
-        println!("{path} {text}");
-        let node = Node::new(&path, &text);
-        ss.replace_node(node, false);
-    }
-    println!("added months"); */
     for q in 1..5 {
-        let path = format!(
-            "{parent_path}{}",
-            match q {
-                1 => "A",
-                2 => "B",
-                3 => "C",
-                4 => "D",
-                _ => unreachable!(),
-            }
-        );
+        let path = parent_path.append(match q {
+            1 => 1,
+            2 => 2,
+            3 => 3,
+            4 => 3,
+            _ => unreachable!(),
+        });
         let text = format!("Q{q}/{year}");
         let node = Node::new(&path, &text);
         ss.replace_node(node, false)?;
@@ -558,15 +589,14 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
     for date in start.iter_days().take_while(|x| x.year() == year) {
         let kw = date.iso_week().week();
         if kw != last_kw {
-            let mut pp = chrono_date_to_path(date);
-            pp.pop();
-            let path = format!("{parent_path}{}", pp);
+            let pp = chrono_date_to_path(date).parent();
+            let path = parent_path.concat(&pp);
             let text = format!("KW {kw}\n");
             let node = Node::new(&path, &text);
             ss.replace_node(node, false)?;
             last_kw = kw;
         }
-        let path = format!("{parent_path}{}", chrono_date_to_path(date));
+        let path = parent_path.concat(&chrono_date_to_path(date));
         let text = date.format("%Y-%m-%d %a\n").to_string();
         let node = Node::new(&path, &text);
         ss.replace_node(node, false)?;
@@ -608,9 +638,10 @@ fn get_mail_search_folders() -> Option<HashMap<String, String>> {
 }
 
 #[tauri::command]
-fn find_next_empty_child(path: &str) -> String {
+fn find_next_empty_child(path: &str) -> Result<String, TauriError> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
-    ss.find_next_empty_child(path)
+    let path = TreePath::from_human(path)?;
+    Ok(ss.find_next_empty_child(&path).to_human())
 }
 
 #[derive(Serialize, Debug)]
@@ -629,7 +660,8 @@ fn ripgrep_below_node(
     only_matching: Option<bool>,
 ) -> Option<Vec<RipgrepResult>> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
-    let search_path = Node::dirname_from_path(&ss.data_path, query_path);
+    let query_path = TreePath::from_human(query_path).ok()?;
+    let search_path = Node::dirname_from_path(&ss.data_path, &query_path);
     println!(
         "searching in {search_path:?}, only_matching: {:?}",
         only_matching
@@ -651,6 +683,7 @@ fn ripgrep_below_node(
     match ok {
         Ok(output) => {
             let stdout = std::str::from_utf8(&output.stdout).unwrap();
+            dbg!(stdout);
             let mut result = Vec::new();
             for block in stdout.split("\n\n") {
                 if block.trim().is_empty() {
@@ -664,11 +697,17 @@ fn ripgrep_below_node(
                             continue;
                         }
                         let filename = filename.trim_end_matches(storage::FLORG_FILENAME);
-                        filename.replace("/", "")
+                        match TreePath::from_file_path(filename) {
+                            Ok(path) => path,
+                            Err(e) => {
+                                println!("failed to parse file path: {} {}", filename, e);
+                                continue;
+                            }
+                        }
                     }
                     None => continue,
                 };
-                let path = format!("{query_path}{path}");
+                let path = query_path.concat(&path);
                 let node = ss.get_node(&path);
                 let title = node
                     .map(|x| x.header.title.clone())
@@ -693,7 +732,7 @@ fn ripgrep_below_node(
                     hits.push((line_no.parse::<u32>().unwrap_or(0), hit.to_string()));
                 }
                 result.push(RipgrepResult {
-                    path,
+                    path: path.to_human(),
                     title,
                     parent_titles,
                     lines: hits,
@@ -712,16 +751,15 @@ fn ripgrep_below_node(
 #[tauri::command]
 fn get_cached_node(path: &str) -> Option<String> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-    ss.get_cached_node(path)
+    let path = TreePath::from_human(path).ok()?;
+    ss.get_cached_node(&path)
 }
 
 #[tauri::command]
-fn set_cached_node(path: &str, raw: &str, rendered: &str) -> bool {
+fn set_cached_node(path: &str, raw: &str, rendered: &str) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-    match ss.set_cached_node(path, raw, rendered) {
-        Ok(_) => true,
-        Err(_) => false, //todo: error handling
-    }
+    let path = TreePath::from_human(path)?;
+    Ok(ss.set_cached_node(&path, raw, rendered)?)
 }
 
 #[tauri::command]
@@ -1005,7 +1043,7 @@ fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
         }
         current_path = current_path.parent().unwrap().to_path_buf();
     }
-    if (!has_git) {
+    if !has_git {
         std::process::Command::new(git_binary)
             .arg("init")
             .arg(".")
@@ -1086,10 +1124,12 @@ fn editor_ended() {
                 update_from_edited_file(&path, raw, &window_title).unwrap();
             }
             None => {
-                let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
-                let mut ss = STORAGE.get().unwrap().lock().unwrap();
-                ss.remove_placeholder(&path);
-                lock.app_handle.emit_all("node-unchanged", &path).ok();
+                if path != "settings.toml" {
+                    let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
+                    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+                    ss.remove_placeholder(&TreePath::from_human(&path).expect("Failed to parse path from open editors")); //todo
+                    lock.app_handle.emit_all("node-unchanged", &path).ok();
+            }
             }
         }
     }
@@ -1111,7 +1151,7 @@ fn update_from_edited_file(
             Ok(new_settings) => {
                 ss.settings = new_settings;
                 println!("Updated settings {:?}", &ss.settings);
-                ss.store_settings();
+                ss.store_settings()?;
                 lock.app_handle.emit_all("message", "Settings updated").ok();
             }
             Err(_) => {
@@ -1129,9 +1169,9 @@ fn update_from_edited_file(
         }
     } else {
         let content = parse_raw_content(&raw_contents);
-        println!("parsed contents");
+        println!("parsed contents {}", path);
 
-        let node = storage::Node::new(path, content);
+        let node = storage::Node::new(&TreePath::from_human(path).expect("Failed to parse treepath from open editor"), content);
         ss.replace_node(node, true)?;
         println!("Replaced node");
 
@@ -1253,6 +1293,7 @@ fn main() -> Result<()> {
             get_node_title,
             get_node_folder_path,
             get_tree,
+            get_parent,
             move_node,
             swap_node_with_previous,
             swap_node_with_next,

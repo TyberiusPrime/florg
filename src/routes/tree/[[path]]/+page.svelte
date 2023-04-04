@@ -654,6 +654,7 @@
     let found = false;
     let expanded = false;
     for (let ii = 0; ii < data.flat.length; ii++) {
+	console.log(path, data.flat[ii].path);
       if (path.startsWith(data.flat[ii].path)) {
         activeIndex = ii;
         if (path == data.flat[ii].path) {
@@ -661,7 +662,13 @@
           break;
         }
       } else if (data.flat[ii].path > path) {
-        break;
+	    //todo: omptimize this whole thing by using binary search
+		// problem: the naive string comparison is wrong, since we sort
+		//A26 after AZ
+		//also the recursive setting of activeIndex is nice when navigatiing interactivly.
+		//though technically, we only noeed to try path[..-1] recursivly iff not found.
+
+        //break;
       }
     }
     return found;
@@ -696,7 +703,7 @@
       }
     }
     nav_path = nav_path.toUpperCase();
-    nav_path = nav_path.replace(/[^A-Z0-9]/g, "");
+    nav_path = nav_path.replace(/[^A-Z0-9/]/g, "");
     let el = document.getElementById("nav_path_input");
     let found = await goto_node(nav_path);
     if (!found) {
@@ -1185,7 +1192,7 @@
   }
 
   function filter_tags(tags) {
-    return tags.filter((item) => Object.values(data.tags).includes(item));
+	return tags.filter((item) => Object.values(data.tags?? {}).includes(item));
   }
 
   async function handle_copy(ev) {
@@ -1544,6 +1551,13 @@
 
     const parentPath = data.current_item;
     await mergeChildrenRecursively(parentPath);
+
+	//I need to reload the parent!
+	let grandparent = await invoke("get_parent", {path: parentPath});
+	let subtree = await invoke("get_tree", { path: grandparent, maxDepth: 1 });
+	patch_tree(data.tree, grandparent, subtree.children);
+
+
 
     can_contract(parentPath.slice(0, -1), true);
     goto_node(parentPath);

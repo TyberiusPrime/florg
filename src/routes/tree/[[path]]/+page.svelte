@@ -17,7 +17,7 @@
   } from "$lib/../routes/node/[[path]]/funcs";
   import {
     patch_tree,
-    patch_tags,
+    patch_tags_and_title,
     flattenObject,
     expand_path,
     delete_from_tree,
@@ -70,6 +70,7 @@
   let date_pick_mode = "goto";
   let date_pick_prefix = "";
   let date_pick_value = iso_date(Date.now() - 24 * 60 * 60 * 1000);
+  let move_history_entries = [];
 
   $: data.current_item = data?.flat[activeIndex]?.path;
 
@@ -114,6 +115,11 @@
       key: "m",
       text: "merge all children into parent",
       target_path: "merge_all_children_with_parent",
+    },
+    {
+      key: "!",
+      text: "sort children alphabetically",
+      target_path: "sort_children",
     },
   ];
 
@@ -214,6 +220,14 @@
       viewComponent.enter_overlay("fetch_url");
     },
 
+    b: () => {
+      if (move_history_entries.length > 0) {
+        viewComponent.enter_overlay("move_history");
+      } else {
+        toast.push("no history yet");
+      }
+    },
+
     m: (ev) => {
       if (ev.ctrlKey) {
         nav_text = `move ${data.current_item} - ${data.flat[activeIndex].title} to`;
@@ -222,6 +236,7 @@
         nav_start_path = nav_path;
         nav_start_index = activeIndex;
         nav_start_tree = structuredClone(data.tree);
+        move_and_goto = false;
         viewComponent.enter_overlay("nav");
       } else {
         highlight_node = true;
@@ -237,7 +252,96 @@
     u: (ev) => {
       goto("/undo");
     },
+    1: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(1);
+      } else {
+        goto_bookmark(1);
+      }
+    },
+    2: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(2);
+      } else {
+        goto_bookmark(2);
+      }
+    },
+    //same for 3,4,5,6,7,8,9,0
+    3: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(3);
+      } else {
+        goto_bookmark(3);
+      }
+    },
+    4: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(4);
+      } else {
+        goto_bookmark(4);
+      }
+    },
+    5: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(5);
+      } else {
+        goto_bookmark(5);
+      }
+    },
+    6: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(6);
+      } else {
+        goto_bookmark(6);
+      }
+    },
+    7: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(7);
+      } else {
+        goto_bookmark(7);
+      }
+    },
+    8: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(8);
+      } else {
+        goto_bookmark(8);
+      }
+    },
+    9: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(9);
+      } else {
+        goto_bookmark(9);
+      }
+    },
+    0: (ev) => {
+      if (ev.ctrlKey) {
+        save_bookmark(0);
+      } else {
+        goto_bookmark(0);
+      }
+    },
   };
+
+  function goto_bookmark(num) {
+    let key = parseInt(num);
+    console.log(data.bookmarks);
+    if (data.bookmarks[key] != undefined) {
+      goto_node(data.bookmarks[key]);
+    } else {
+      toast.push(`Set bookmark with ctrl+${num} first`);
+    }
+  }
+
+  function save_bookmark(num) {
+    let key = parseInt(num);
+    data.bookmarks[key] = data.current_item;
+    data = data;
+    invoke("set_bookmarks", { bookmarks: data.bookmarks });
+    toast.push(`set bookmark ${num} to ${data.current_item}`);
+  }
 
   async function add_node() {
     let new_path = await invoke("find_next_empty_child", {
@@ -395,7 +499,12 @@
     //patch_tree_content(data.tree, event.payload, new_node.node.raw);
     //data.flat = flattenObject(data.tree);
     let prefix = event.payload.substr(0, event.payload.length - 1);
-    patch_tags(data.tree, event.payload, new_node.tags);
+    patch_tags_and_title(
+      data.tree,
+      event.payload,
+      new_node.tags,
+      new_node.node.header.title
+    );
     let p = data.current_item;
     if (p.length <= 1) {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
@@ -510,10 +619,34 @@
     viewComponent.enter_overlay("help");
   }
 
+  function push_into_move_history() {
+    //first filter all that match path
+    let path = data.current_item ?? "";
+    if (path == "") {
+      return;
+    }
+    move_history_entries = move_history_entries.filter((e) => {
+      return e.target_path != path;
+    });
+    move_history_entries.splice(0, 0, {
+      target_path: path,
+      text: path + " " + data.flat[activeIndex].title,
+    });
+
+    while (move_history_entries.length > 20) {
+      move_history_entries.shift();
+    }
+    for (let ii = 0; ii < move_history_entries.length; ii++) {
+      //letters starting from a
+      move_history_entries[ii].key = String.fromCharCode(97 + ii);
+    }
+  }
+
   async function goto_node(path) {
+    push_into_move_history();
     await expand_path(data.tree, path, 1);
     data.flat = flattenObject(data.tree);
-
+    //push current.
     let found = false;
     let expanded = false;
     for (let ii = 0; ii < data.flat.length; ii++) {
@@ -864,6 +997,17 @@
       }
     }
   }
+
+  async function sort_children() {
+	try{
+    await invoke("sort_children", { path: data.current_item });
+	} catch (e) {
+		toast.push("Failed to sort children: " + JSON.stringify(e));
+	}
+    can_contract(data.current_item);
+    await goto_node(data.current_item);
+  }
+
   async function handle_palette(ev) {
     viewComponent.leave_overlay();
     let cmd = ev.detail;
@@ -879,6 +1023,8 @@
       await extract_sections();
     } else if (cmd == "merge_all_children_with_parent") {
       await merge_all_children_with_parent();
+    } else if (cmd == "sort_children") {
+      await sort_children();
     } else if (cmd == "settings") {
       return await invoke("edit_settings", {});
     } else if (cmd == "terminal") {
@@ -987,6 +1133,10 @@
         toast.push("invalid url");
       }
     }
+  }
+
+  function strip_tags(text) {
+    return text.replace(/#[A-Za-z0-9]+\s*/g, "");
   }
 
   function filter_tags(tags) {
@@ -1336,7 +1486,7 @@
           await mergeChildrenRecursively(child.path);
         }
 
-        await invoke("delete_node", { path: child.path , commit:false});
+        await invoke("delete_node", { path: child.path, commit: false });
       }
 
       await invoke("change_node_text", {
@@ -1350,8 +1500,14 @@
     const parentPath = data.current_item;
     await mergeChildrenRecursively(parentPath);
 
-    can_contract(parentPath.slice(0,-1), true);
+    can_contract(parentPath.slice(0, -1), true);
     goto_node(parentPath);
+  }
+
+  async function handle_move_history(ev) {
+    viewComponent.leave_overlay();
+    let target_path = ev.detail;
+    goto_node(target_path);
   }
 </script>
 
@@ -1398,7 +1554,14 @@
                       class="more">+</span
                     >{/if}
                 </div>
-                <div class="node-title">{node.title}</div>
+                <div class="node-title">
+                  {strip_tags(node.title)}
+                  {#each filter_tags(node.tags) as tag}
+                    <div class="tags {tag_class(tag.substring(1))}">
+                      {tag}
+                    </div>
+                  {/each}
+                </div>
               </div>
 
               <!-- <div style="display:inline-block;" class="mono">
@@ -1414,11 +1577,6 @@
                 class={node.path === highlight_node ? "highlight_in_tree" : ""}
               >
                 {node.title} -->
-              <!-- {#each filter_tags(node.tags) as tag}
-                <div class="tags {tag_class(tag.substring(1))}">
-                  {tag}
-                </div>
-              {/each} -->
             </td>
           </tr>
         {/each}
@@ -1466,6 +1624,11 @@
       <QuickPick bind:entries={palette_entries} on:action={handle_palette} />
     {:else if overlay == "copying"}
       <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+    {:else if overlay == "move_history"}
+      <QuickPick
+        bind:entries={move_history_entries}
+        on:action={handle_move_history}
+      />
     {:else if overlay == "subsection-menu"}
       <QuickPick
         bind:entries={sub_section_entries}

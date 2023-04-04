@@ -21,6 +21,13 @@
   let downstream_elements = [];
   let help_entries = [{ key: "Esc", text: "Go back" }];
 
+  export let advance = () => {
+    if (focused < downstream_elements.length - 1) {
+      focused += 1;
+      update_chosen();
+    }
+  };
+
   function handle_key_down(ev) {
     if (
       ev.key == "ArrowUp" ||
@@ -63,10 +70,7 @@
         if (ev.key == "ArrowDown") {
           ev.stopPropagation();
           ev.preventDefault();
-          if (focused < downstream_elements.length - 1) {
-            focused += 1;
-            update_chosen();
-          }
+          advance();
         } else if (ev.key == "ArrowUp") {
           ev.stopPropagation();
           ev.preventDefault();
@@ -111,11 +115,11 @@
   function update_chosen() {
     let table = document.getElementById("pick_table");
     if (table != null) {
-	let actual_index = 0;
+      let actual_index = 0;
       for (let ii = 0; ii < table.children.length; ii++) {
-	    if (table.children[ii].dataset.skip == "true") {
-			continue;
-		}
+        if (table.children[ii].dataset.skip == "true") {
+          continue;
+        }
         if (focused == actual_index) {
           for (let yy = 0; yy < table.children[ii].children.length; yy++) {
             table.children[ii].children[yy].classList.add("chosen");
@@ -131,8 +135,7 @@
             table.children[ii].children[yy].classList.remove("chosen");
           }
         }
-		actual_index += 1;
-
+        actual_index += 1;
       }
     }
     window.history.replaceState(
@@ -173,9 +176,9 @@
   function update_elements_from_dom() {
     elements = [];
     for (let el of document.querySelector("#pick_table").children) {
-	 if (el.dataset.skip != "true") {
-		  elements.push(el);
-	  }
+      if (el.dataset.skip != "true") {
+        elements.push(el);
+      }
     }
     downstream_elements = elements;
   }
@@ -185,7 +188,7 @@
     focused = 0;
     window.setTimeout(() => {
       document.getElementById("pickerdiv").scrollIntoView();
-	  document.getElementById("pick_table").focus();
+      document.getElementById("pick_table").focus();
       update_chosen(false);
     }, 100);
   });

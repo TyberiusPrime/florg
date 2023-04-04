@@ -55,7 +55,7 @@ impl RuntimeState {
 struct TauriError(anyhow::Error);
 
 //#[derive(Debug, Serialize)]
-type TauriResult<T>  = Result<T, TauriError>;
+type TauriResult<T> = Result<T, TauriError>;
 
 impl serde::Serialize for TauriError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -210,7 +210,7 @@ fn swap_node_with_next(path: &str) -> Option<String> {
 }
 
 #[tauri::command]
-fn change_node_text(path: &str, text: &str, commit: Option<bool>) ->TauriResult<()> {
+fn change_node_text(path: &str, text: &str, commit: Option<bool>) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let node = Node::new(path, text);
 
@@ -220,7 +220,7 @@ fn change_node_text(path: &str, text: &str, commit: Option<bool>) ->TauriResult<
     TauriResult::Ok(())
 }
 #[tauri::command]
-fn commit( text: &str) ->TauriResult<()> {
+fn commit(text: &str) -> TauriResult<()> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     TauriResult::Ok(ss.add_and_commit(text)?)
 }
@@ -237,6 +237,15 @@ fn get_node_folder_path(path: &str) -> String {
 fn delete_node(path: &str, commit: Option<bool>) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
     s.delete_node(path, commit.unwrap_or(true))?;
+    TauriResult::Ok(())
+}
+
+#[tauri::command]
+fn sort_children(path: &str) -> TauriResult<()> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    let e = s.sort_children(path);
+    dbg!(&e);
+    e?;
     TauriResult::Ok(())
 }
 
@@ -479,6 +488,7 @@ fn chrono_date_to_path(date: chrono::NaiveDate) -> String {
         1 => "B",
         2 => "C",
         3 => "D",
+        4 => "D",
         _ => unreachable!(),
     }
     .to_string();
@@ -575,6 +585,16 @@ fn reload_data() {
 #[tauri::command]
 fn get_tags() -> Option<HashMap<String, String>> {
     get_from_settings_str_map("tags")
+}
+
+#[tauri::command]
+fn get_bookmarks() -> Option<HashMap<String, String>> {
+    get_from_settings_str_map("bookmarks")
+}
+#[tauri::command]
+fn set_bookmarks(bookmarks: HashMap<String, String>) -> TauriResult<()> {
+    save_to_settings_str_map("bookmarks", bookmarks)?;
+    TauriResult::Ok(())
 }
 
 #[tauri::command]
@@ -858,7 +878,10 @@ fn chatgpt_get_conversation(filename: &str) -> Option<openai::Conversation> {
 }
 
 #[tauri::command]
-fn chatgpt_save_conversation(filename: &str, conversation: openai::Conversation) -> TauriResult<()> {
+fn chatgpt_save_conversation(
+    filename: &str,
+    conversation: openai::Conversation,
+) -> TauriResult<()> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     if let Some(gpt) = &ss.chatgpt {
         gpt.save_conversation(filename, &conversation).unwrap();
@@ -940,6 +963,16 @@ fn get_from_settings_str_map(key: &str) -> Option<HashMap<String, String>> {
             .filter_map(|x| x)
             .collect(),
     )
+}
+
+fn save_to_settings_str_map(key: &str, map: HashMap<String, String>) -> Result<()> {
+    let mut ss = STORAGE.get().unwrap().lock().unwrap();
+    let mut table = toml_edit::Table::new();
+    for (k, v) in map {
+        table.insert(&k, toml_edit::Item::Value(v.into()));
+    }
+    ss.settings.insert(key, toml_edit::Item::Table(table));
+    ss.store_settings()
 }
 
 fn find_git_binary() -> Result<String> {
@@ -1050,7 +1083,11 @@ fn editor_ended() {
     }
 }
 
-fn update_from_edited_file(path: &str, raw_contents: String, window_title: &str) ->TauriResult<()>{
+fn update_from_edited_file(
+    path: &str,
+    raw_contents: String,
+    window_title: &str,
+) -> TauriResult<()> {
     let mut ss = STORAGE.get().unwrap().lock().unwrap();
     let mut lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
 
@@ -1208,12 +1245,15 @@ fn main() -> Result<()> {
             swap_node_with_previous,
             swap_node_with_next,
             delete_node,
+            sort_children,
             list_open_paths,
             date_to_path,
             create_calendar,
             reload_data,
             edit_settings,
             get_tags,
+            get_bookmarks,
+            set_bookmarks,
             get_nav,
             get_mail_search_folders,
             find_next_empty_child,

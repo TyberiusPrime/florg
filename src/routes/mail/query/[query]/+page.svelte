@@ -26,6 +26,8 @@
   let search_mode;
   let in_page_search_term;
 
+  let advance_picker;
+
   let help_entries = [
     { key: "Esc", text: "Go back" },
     { key: "t", text: "toggle tag" },
@@ -114,6 +116,10 @@
     g: () => {
       viewComponent.enter_overlay("goto");
     },
+    " ": () => {
+      toggle_tag({ detail: "unread" });
+      advance_picker();
+    },
   };
 
   function latest_date(entry) {
@@ -199,11 +205,13 @@
       if (thread.tags.indexOf(tag) > -1) {
         for (let msg of thread.messages) {
           await invoke("mail_message_remove_tags", { id: msg.id, tags: [tag] });
+          removeItemOnce(msg.tags, tag);
         }
-        removeItemOnce(thread.tags, tag);
+          removeItemOnce(thread.tags, tag);
       } else {
         for (let msg of thread.messages) {
           await invoke("mail_message_add_tags", { id: msg.id, tags: [tag] });
+		  msg.tags.push(tag);
         }
         thread.tags.push(tag);
       }
@@ -227,8 +235,7 @@
   });
 
   onDestroy(() => {
-    document
-      .getElementById("wrapper")
+    document.getElementById("wrapper");
   });
 
   function handle_goto_action(ev) {
@@ -236,15 +243,15 @@
   }
 
   function handle_search_leave() {
-	viewComponent.leave_overlay();
+    viewComponent.leave_overlay();
   }
 
   afterUpdate(() => {
-  if (overlay == "") {
-  window.setTimeout(() => {
-  document.getElementById("pick_table").focus();
-  }, 100);
-  }
+    if (overlay == "") {
+      window.setTimeout(() => {
+        document.getElementById("pick_table").focus();
+      }, 100);
+    }
   });
 </script>
 
@@ -253,70 +260,76 @@
     <h1>Mail result</h1>
     Query: {data.query}
     {#if data.more_mail}
-	<div style="float:right">
-      (More mail available. refine your search)
-	  </div>
+      <div style="float:right">(More mail available. refine your search)</div>
     {/if}
   </div>
   <svelte:fragment slot="content">
-  <div on:keyup={handle_keys} class="Middle main_div">
-    <Picker on:action={handle_action} bind:focused>
-      <svelte:fragment slot="entries">
-        {#each data.messages as el, index}
-          {#if data.mode == "threads"}
-            <tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
-              <td class="index"
-                >{index}
-                {#if el.tags.indexOf("flagged") > -1}
-                  <b class="flagged">★</b>
-                {/if}
-              </td>
-              <td class="unread_count">
-                {#if count_unread(el) > 0}
-                  <span class="new"
-                    >{count_unread(el)}/{el.messages.length}</span
-                  >
-                {:else}
-                  {count_unread(el)}/{el.messages.length}
-                {/if}
-              </td>
-              <td class="date">{@html format_date(latest_date(el))}</td>
-              <td>
-                <div class="fromsubject">
-                  <div class="subject {count_unread(el) > 0 ? 'new' : ''}">
-                    {el.subject}
+    <div on:keyup={handle_keys} class="Middle main_div">
+      <Picker
+        on:action={handle_action}
+        bind:focused
+        bind:advance={advance_picker}
+      >
+        <svelte:fragment slot="entries">
+          {#each data.messages as el, index}
+            {#if data.mode == "threads"}
+              <tr data-cmd={link(el)} class="msg_entry" data-thread={el.id}>
+                <td class="index"
+                  >{index}
+                  {#if el.tags.indexOf("flagged") > -1}
+                    <b class="flagged">★</b>
+                  {/if}
+                </td>
+                <td class="unread_count">
+                  {#if count_unread(el) > 0}
+                    <span class="new"
+                      >{count_unread(el)}/{el.messages.length}</span
+                    >
+                  {:else}
+                    {count_unread(el)}/{el.messages.length}
+                  {/if}
+                </td>
+                <td class="date">{@html format_date(latest_date(el))}</td>
+                <td>
+                  <div class="fromsubject">
+                    <div class="subject {count_unread(el) > 0 ? 'new' : ''}">
+                      {el.subject}
+                    </div>
+                    <div class="from">{el.authors}</div>
                   </div>
-                  <div class="from">{el.authors}</div>
-                </div>
-                {#each el.tags as tag}
-                  <div class="tags {tag_class(tag)}">
-                    {tag}
+                  {#each el.tags as tag}
+                    <div class="tags {tag_class(tag)}">
+                      {tag}
+                    </div>
+                  {/each}
+                </td>
+              </tr>
+            {:else if data.mode == "messages"}
+              <tr
+                data-cmd={"message:" + el.id}
+                class="msg_entry"
+                data-id={el.id}
+              >
+                <td class="date">{@html format_date(Date.parse(el.date))}</td>
+                <td>
+                  <div class="fromsubject">
+                    <div class="subject {is_unread(el) > 0 ? 'new' : ''}">
+                      {el.subject}
+                    </div>
+                    <div class="from">{el.from}</div>
                   </div>
-                {/each}
-              </td>
-            </tr>
-          {:else if data.mode == "messages"}
-            <tr data-cmd={"message:" + el.id} class="msg_entry" data-id={el.id}>
-			  <td class="date">{@html format_date(Date.parse(el.date))}</td>
-              <td>
-                <div class="fromsubject">
-                  <div class="subject {is_unread(el) > 0 ? 'new' : ''}">
-                    {el.subject}
-                  </div>
-                  <div class="from">{el.from}</div>
-                </div>
-                {#each el.tags as tag}
-                  <div class="tags {tag_class(tag)}">
-                    {tag}
-                  </div>
-                {/each}
-              </td></tr
-            >
-          {/if}
-        {/each}
-      </svelte:fragment>
-    </Picker>
-  </div>
+                  {#each el.tags as tag}
+                    <div class="tags {tag_class(tag)}">
+                      {tag}
+                    </div>
+                  {/each}
+                </td></tr
+              >
+            {/if}
+          {/each}
+        </svelte:fragment>
+      </Picker>
+    </div>
   </svelte:fragment>
 
   <svelte:fragment slot="overlays">
@@ -334,7 +347,7 @@
         bind:in_page_search_term
         bind:default_search_term={data.query}
         bind:search_mode
-		on:leave={handle_search_leave}
+        on:leave={handle_search_leave}
       />
     {:else if overlay == ""}
       Press <span class="hotkey">h</span> for help.

@@ -17,7 +17,6 @@ export function format_date(date: any, br = false) {
   } else {
     pdate = date;
   }
-  console.log(pdate)
   /* let ye = new Intl.DateTimeFormat("en", { year: "numeric" }).format(date);
   let mo = pdate.getMonth().padStart(2,'0'); //new Intl.DateTimeFormat("en", { month: "2-digit" }).format(date);
   let da = new Intl.DateTimeFormat("en", { day: "2-digit" }).format(date);

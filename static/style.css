@@ -234,8 +234,7 @@ code {
   background: #eeeeee;
   border: 1px solid #cccccc;
   border-radius: 5px;
-  line-height: 1.25em;
-  margin-top:.25em;
+
 }
 
 pre {
@@ -253,6 +252,7 @@ pre .line:first-line {
 
 pre {
   white-space: pre-wrap;
+  line-height:1em;
 }
 
 li {

@@ -63,14 +63,15 @@ export function patch_tree(tree, path, new_children) {
   }
   return false;
 }
-export function patch_tags(tree, path, new_tags) {
+export function patch_tags_and_title(tree, path, new_tags, new_title) {
   if (tree.path == path) {
     tree.tags = new_tags;
+	tree.title = new_title;
     return true;
   } else {
     for (let ii = 0; ii < tree.children.length; ii++) {
       let child = tree.children[ii];
-      if (patch_tags(child, path, new_tags)) {
+      if (patch_tags_and_title(child, path, new_tags, new_title)) {
         return true;
       }
     }

@@ -22,10 +22,10 @@ export async function load({ params }: { params: any }) {
 
   let start_item = 0;
   for (let ii = 0; ii < out.length; ii++) {
-	  if (out[ii].path == path) {
-		  start_item = ii;
-		  break;
-	  } 
+    if (out[ii].path == path) {
+      start_item = ii;
+      break;
+    }
   }
 
   return {
@@ -33,7 +33,8 @@ export async function load({ params }: { params: any }) {
     "flat": out,
     tree: tree,
     currently_edited: {},
-	start_item: start_item,
-	tags: await invoke("get_tags", {}),
+    start_item: start_item,
+    tags: await invoke("get_tags", {}),
+    bookmarks: await invoke("get_bookmarks", {}) ?? {},
   };
 }

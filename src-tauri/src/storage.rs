@@ -110,9 +110,9 @@ impl Storage {
         Ok(parsed)
     }
 
-    pub fn store_settings(&self) {
+    pub fn store_settings(&self) -> Result<()> {
         let out = self.settings.to_string();
-        std::fs::write(self.data_path.join("settings.toml"), out).expect("saving settings failed");
+        std::fs::write(self.data_path.join("settings.toml"), out).context("saving settings failed")
     }
 
     fn parse_path(
@@ -543,6 +543,48 @@ impl Storage {
         let filename = dir.join(format!("{name}.json"));
         let raw = serde_json::to_string(&entries)?;
         std::fs::write(&filename, raw)?;
+        Ok(())
+    }
+
+    pub fn sort_children(&mut self, path: &str) -> Result<()> {
+        let mut children = self.children_for(path);
+        children.retain(|x| !x.path.ends_with("Z"));
+        let mut children: Vec<_> = children
+            .iter()
+            .map(|x| (x.header.title.clone(), x.path.clone()))
+            .collect();
+        children.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+        let mut children: Vec<_> = children
+            .into_iter()
+            .enumerate()
+            .map(|(ii, (_title, old_path))| {
+                (
+                    old_path,
+                    format!("{path}{}", ('A' as u8 + ii as u8) as char),
+                )
+            })
+            .collect();
+        //I have a mapping old->new
+        //and I need to swap the old into the new positions,
+        //where the new position might already be occupied.
+        //I want to use only a single temp variable.
+
+        //parent = path minus last char
+        let mut parent = path.to_string();
+        let temp_root = format!("{parent}!");
+        let temp_dir = Node::dirname_from_path(&self.data_path, &temp_root);
+        std::fs::create_dir_all(&temp_dir)?;
+        for (old_path, _new_path) in children.iter() {
+            let temp_path = format!("{parent}!{}", old_path.chars().last().unwrap());
+            self.move_node(old_path, &temp_path, false)?;
+        }
+        for (old_path, new_path) in children.iter() {
+            let temp_path = format!("{parent}!{}", old_path.chars().last().unwrap());
+            self.move_node(&temp_path, &new_path, false)?;
+        }
+
+        self.make_nodes_sorted();
+        self.add_and_commit(&format!("Sorted children of {path}"));
         Ok(())
     }
 

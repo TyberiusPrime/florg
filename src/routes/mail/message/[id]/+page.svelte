@@ -25,7 +25,7 @@
   import Overlay from "$lib/../components/Overlay.svelte";
   import Help from "$lib/../components/Help.svelte";
   import Goto from "$lib/../components/Goto.svelte";
-  import linkifyStr from 'linkify-string';
+  import linkifyStr from "linkify-string";
 
   export let data;
   let viewComponent;
@@ -62,7 +62,7 @@
   let keys = {
     Escape: () => {
       if (overlay != "") {
-	  viewComponent.leave_overlay();
+        viewComponent.leave_overlay();
         return true;
       }
     },
@@ -132,7 +132,7 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
       } else {
-      viewComponent.enter_overlay("search");
+        viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
       return true;
@@ -141,7 +141,7 @@
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, True);
       } else {
-      viewComponent.enter_overlay("search");
+        viewComponent.enter_overlay("search");
         search_mode = "in_page";
       }
       return true;
@@ -161,7 +161,6 @@
   }
 
   onMount(async () => {
-
     focus_first_in_node(document.getElementById("wrapper"));
   });
 
@@ -267,7 +266,7 @@
     return lines.join("");
   }
 
-    let copy_entries = [
+  let copy_entries = [
     { key: "c", target_path: "link", text: "Copy link" },
     { key: "y", target_path: "text", text: "Copy text" },
     { key: "m", target_path: "html", text: "Copy extract text from html" },
@@ -368,10 +367,13 @@
     viewComponent.leave_overlay();
   }
 
-  onMount( () => {
-	//document.getElementById("the_mail").focus();
-	});
+ 
+  function onMessage(msg) {
+    toast.push(msg);
+  }
 </script>
+
+<svelte:window onMessage={on_message} />
 
 <View bind:this={viewComponent} bind:overlay>
   <div slot="header">
@@ -425,7 +427,7 @@
     </table>
   </div>
 
-  <div slot="content" on:keyup={handle_keys} tabindex=0 autofocus>
+  <div slot="content" on:keyup={handle_keys} tabindex="0" autofocus>
     {#if all_headers}
       <table>
         {#each data.headers as header}
@@ -441,8 +443,8 @@
     {#if show_html}
       <iframe
         srcdoc={csp(data.html)}
-        sandbox=""
-        style="width:95%; border: 3px solid purple;height:100vh;"
+        sandbox="allow-same-origin"
+        style="width:95%; border: 3px solid purple;height:100vh; font-size:18pt;"
         id="mail_content_iframe"
       />
     {:else if data.text == null}
@@ -455,7 +457,9 @@
     {:else}
       {#if data.html != null && data.html != ""}
         (html available){/if}
-      <pre class="my_pre">{@html wrap(linkifyStr((data.text), { defaultProtocol: 'https' } ))}</pre>
+      <pre class="my_pre">{@html wrap(
+          linkifyStr(data.text, { defaultProtocol: "https" })
+        )}</pre>
     {/if}
     <!-- <pre>
 	todo: replace mailto links!
@@ -464,32 +468,27 @@
   </div>
 
   <div slot="overlays">
-      {#if overlay == "help"}
-        <Help bind:entries={help_entries} />
-      {:else if overlay == "copying"}
-        Copy to clipboard:
-        <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
-      {:else if overlay == "tags"}
-        {#if tag_entries.length > 0}
-          Toggle Tag:
-          <QuickPick bind:entries={tag_entries} on:action={toggle_tag} />
-        {:else}
-          Fill out [mail_tags] in your settings
-        {/if}
-      {:else if overlay == "search"}
-        <Search
-          bind:overlay
-          bind:in_page_search_term
-          bind:search_mode
-          on:leave
-        />
-      {:else if overlay == "goto"}
-        <Goto />
-      {:else if overlay == "reply"}
-        <QuickPick bind:entries={reply_entries} on:action={handle_reply} />
-      {:else if overlay == ""}
-        Press <span class="hotkey">h</span> for help.
+    {#if overlay == "help"}
+      <Help bind:entries={help_entries} />
+    {:else if overlay == "copying"}
+      Copy to clipboard:
+      <QuickPick bind:entries={copy_entries} on:action={handle_copy} />
+    {:else if overlay == "tags"}
+      {#if tag_entries.length > 0}
+        Toggle Tag:
+        <QuickPick bind:entries={tag_entries} on:action={toggle_tag} />
+      {:else}
+        Fill out [mail_tags] in your settings
       {/if}
+    {:else if overlay == "search"}
+      <Search bind:overlay bind:in_page_search_term bind:search_mode on:leave />
+    {:else if overlay == "goto"}
+      <Goto />
+    {:else if overlay == "reply"}
+      <QuickPick bind:entries={reply_entries} on:action={handle_reply} />
+    {:else if overlay == ""}
+      Press <span class="hotkey">h</span> for help.
+    {/if}
   </div>
 </View>
 
@@ -501,9 +500,8 @@
   }
 
   .my_pre {
-
-	margin-left:.25em;
-   }
+    margin-left: 0.25em;
+  }
 
   /*todo: combine with MailContent*/
 </style>

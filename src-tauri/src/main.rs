@@ -995,12 +995,24 @@ fn init_data_path(data_path: &PathBuf) -> Result<()> {
 
 fn init_data_path_git(data_path: &PathBuf, git_binary: &str) -> Result<()> {
     dbg!(git_binary);
-    std::process::Command::new(git_binary)
-        .arg("init")
-        .arg(".")
-        .current_dir(data_path)
-        .status()
-        .context("Git init failed")?;
+    //check if it has a .git, or any parent path has
+    let mut has_git = false;
+    let mut current_path = data_path.clone();
+    while current_path != PathBuf::from("/") {
+        if current_path.join(".git").exists() {
+            has_git = true;
+            break;
+        }
+        current_path = current_path.parent().unwrap().to_path_buf();
+    }
+    if (!has_git) {
+        std::process::Command::new(git_binary)
+            .arg("init")
+            .arg(".")
+            .current_dir(data_path)
+            .status()
+            .context("Git init failed")?;
+    }
     std::process::Command::new(git_binary)
         .arg("add")
         .arg(".")

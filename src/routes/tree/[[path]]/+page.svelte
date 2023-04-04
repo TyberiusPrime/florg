@@ -61,6 +61,7 @@
   let nav_start_index = 0;
   let nav_start_path = "";
   let nav_start_tree = null;
+  let nav_siblings = null;
   let move_and_goto = false;
   let highlight_node = false;
   let fetch_url_text = "";
@@ -91,6 +92,7 @@
     { key: "d", text: "delete node & children", target_path: "delete" },
     { key: "m", text: "merge into text of parent", target_path: "merge" },
     { key: "p", text: "promote one level", target_path: "promote" },
+    { key: "P", text: "promote all chidren", target_path: "promote_children" },
   ];
 
   let copy_entries = [
@@ -144,6 +146,7 @@
     nav_start_path = nav_path;
     nav_start_index = activeIndex;
     nav_start_tree = structuredClone(data.tree);
+    nav_siblings = find_siblings(data.flat, activeIndex);
   }
 
   let tag_entries = map_tags(data.tags);
@@ -236,6 +239,7 @@
         nav_start_path = nav_path;
         nav_start_index = activeIndex;
         nav_start_tree = structuredClone(data.tree);
+		nav_siblings = find_siblings(data.flat, activeIndex);
         move_and_goto = false;
         viewComponent.enter_overlay("nav");
       } else {
@@ -746,6 +750,8 @@
       await toggle_node(parent, true);
       await toggle_node(parent, false);
       await goto_node(new_path);
+	  console.log("nav siblings", nav_siblings);
+      await handle_move_and_goto(nav_siblings);
       scroll_to_active();
       highlight_node = new_path;
     }
@@ -863,19 +869,25 @@
       await goto_node(new_path);
       await toggle_node(parent, true);
       await toggle_node(parent, false);
-      if (move_and_goto) {
-        await goto_node(new_path);
-      } else {
-        if (siblings[0] !== null) {
-          await goto_node(siblings[0]);
-        } else if (siblings[1] !== null) {
-          await goto_node(siblings[1]);
-        } else await goto_node(parent);
-      }
+      await handle_move_and_goto(siblings);
       scroll_to_active();
       highlight_node = new_path;
     }
   };
+
+  async function handle_move_and_goto(siblings) {
+    if (move_and_goto) {
+      await goto_node(new_path);
+    } else {
+      if (siblings[0] !== null) {
+        await goto_node(siblings[0]);
+      } else if (siblings[1] !== null) {
+        await goto_node(siblings[1]);
+      } else {
+        await goto_node(parent);
+      }
+    }
+  }
 
   async function handle_delete(ev) {
     let mode = ev.detail;
@@ -887,9 +899,38 @@
       await merge_current_node_with_parent();
     } else if (mode == "promote") {
       await move_node_to_parents_parent();
+    } else if (mode == "promote_children") {
+      await promote_all_children();
     } else {
       toast.push("Unknown delete mode " + mode);
     }
+  }
+
+  async function promote_all_children() {
+    if (!data.flat[activeIndex].has_children) {
+      toast.push("No children to promote");
+      return;
+    }
+    if (data.current_item == "") {
+      toast.push("Can't promote root");
+    }
+    let node = await invoke("get_node", { path: data.current_item });
+
+    let parent = data.current_item.substring(0, data.current_item.length - 1);
+    for (let ii = 0; ii < node.children.length; ii++) {
+      let child_path = node.children[ii].path;
+      let new_path = await invoke("find_next_empty_child", { path: parent });
+      await invoke("move_node", {
+        orgPath: child_path,
+        newPath: new_path,
+        commit: false,
+      });
+    }
+    await invoke("commit", {
+      text: `promoted children of ${data.current_item}`,
+    });
+
+    console.log(node);
   }
 
   async function move_node_to_parents_parent() {
@@ -948,7 +989,11 @@
             data.current_item.length - 1
           );
           if (prefix != "") {
+            let old_active = activeIndex;
             await goto_node(prefix);
+            if (old_active > 0) {
+              activeIndex = old_active - 1;
+            }
           } else {
             toggle_node("", true);
             let tree = await invoke("get_tree", { path: "", maxDepth: 2 });
@@ -958,7 +1003,7 @@
           }
         })
         .catch((e) => {
-          toast.push(`Error ${e}`);
+          toast.push(`Error ${JSON.stringify(e)}`);
         });
       //delete_from_tree(data.tree, data.current_item);
       //console.log(data.tree);
@@ -999,11 +1044,11 @@
   }
 
   async function sort_children() {
-	try{
-    await invoke("sort_children", { path: data.current_item });
-	} catch (e) {
-		toast.push("Failed to sort children: " + JSON.stringify(e));
-	}
+    try {
+      await invoke("sort_children", { path: data.current_item });
+    } catch (e) {
+      toast.push("Failed to sort children: " + JSON.stringify(e));
+    }
     can_contract(data.current_item);
     await goto_node(data.current_item);
   }

@@ -44,6 +44,7 @@
   import { emit, listen } from "@tauri-apps/api/event";
   import { fetch as tauri_fetch } from "@tauri-apps/api/http";
   import asciidoctor from "@asciidoctor/core";
+  import hljs from "highlight.js";
 
   import readabilityLib from "@mozilla/readability";
   export let data;
@@ -584,6 +585,7 @@
   }
 
   const content_observer = new MutationObserver(add_content_actions);
+
   onMount(async () => {
     await goto_node(data.flat[data.start_item].path);
     content_observer.observe(document.getElementById("node_content"), {
@@ -592,6 +594,7 @@
       subtree: false,
     });
   });
+
   beforeUpdate(async () => {
     if (data.current_item != "" && activeIndex == undefined) {
       for (let ii = 0; ii < data.flat.length; ii++) {
@@ -603,6 +606,14 @@
       }
     }
   });
+  afterUpdate(async () => {
+    window.setTimeout(() => {
+      document.querySelectorAll("code").forEach((el) => {
+        hljs.highlightElement(el);
+      });
+    }, 10);
+  });
+
   onDestroy(async () => {
     (await unlisten_node_changed)();
     (await unliste_node_unchanged)();
@@ -625,9 +636,9 @@
 
   function push_into_move_history() {
     //first filter all that match path
-	if (data.flat[activeIndex] == undefined) {
-	return;
-	}
+    if (data.flat[activeIndex] == undefined) {
+      return;
+    }
     let path = data.current_item ?? "";
     if (path == "") {
       return;
@@ -1744,6 +1755,7 @@
     {:else}
       Unknown overlay: &quot;{overlay}&quot;
     {/if}
+    {JSON.stringify(data.currently_edited)}
   </svelte:fragment>
 </View>
 

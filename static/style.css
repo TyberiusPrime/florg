@@ -228,17 +228,40 @@ button {
   font-family: monospace;
 }
 
-pre,
-code {
+pre {
   overflow: scroll;
   background: #eeeeee;
   border: 1px solid #cccccc;
   border-radius: 5px;
-
+  padding-left: 1em;
 }
 
-pre {
-  padding-left: 1em;
+.highlightjs {
+	background:#eeeee;
+	padding-left: 0em;
+
+  border: 1px solid #cccccc;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+  white-space:pre;
+  overflow:scroll;
+}
+
+
+p code 
+{
+	line-height:1.0em;
+}
+.highlightjs {
+	line-height:1.0em;
+	background:#eeeeee;
+}
+
+.hljs {e;
+}
+
+.hljs {
+	background:#eeeeee !important;
 }
 
 pre .line {
@@ -321,15 +344,6 @@ pre {
   margin-left: 1em;
   padding-top: 0.25em;
   padding-bottom: 0.25em;
-}
-
-pre .hljs {
-  padding-top: 0;
-  padding-bottom: 0;
-  padding: 0 !important;
-  background-color: #eeeeee;
-  margin: 0;
-  border: 0px;
 }
 
 .focused::before {

@@ -9,7 +9,7 @@ export async function render_text(text: string) {
       doctype: "article",
       showtitle: true,
       "source-highlighter": "highlight.js",
-      "highlightjs-languages": "rust, swift",
+      "highlightjs-languages": "rust, swift, python, bash",
     },
   });
   rendered = rendered.replace(/<a/g, '<a target="_blank"');
@@ -42,7 +42,7 @@ export async function render_text(text: string) {
 }
 
 export async function render_text_cached(path: string, raw: string) {
-  let rendered_cached = await invoke("get_cached_node", { path });
+  let rendered_cached = await invoke("get_cached_node", { path: path + "" });
   if (rendered_cached == null) {
     let start_time = performance.now();
 

@@ -527,9 +527,9 @@ fn list_open_paths() -> Vec<String> {
 }
 
 #[tauri::command]
-fn date_to_path(date_str: &str) -> Option<TreePath> {
+fn date_to_path(date_str: &str) -> Option<String> {
     let date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()?;
-    Some(chrono_date_to_path(date))
+    Some(chrono_date_to_path(date).to_human())
 }
 
 fn chrono_date_to_path(date: chrono::NaiveDate) -> TreePath {

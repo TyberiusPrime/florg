@@ -247,7 +247,13 @@ pre {
   overflow:scroll;
 }
 
-
+.literalblock {
+  background:#eeeeee;
+  margin-top:0;
+}
+.literalblock p {
+  white-space:pre;
+  }
 p code 
 {
 	line-height:1.0em;
@@ -391,12 +397,12 @@ pre:hover + .copy-button {
 .tags {
   display: inline-block;
   margin-left: 5px !important;
-  padding: 3px 8px !important;
+  padding: 1px 8px !important;
   border-radius: 10px;
   font-size: 0.8em;
   font-weight: bold;
   background-color: #3b9cff;
-  float: left;
+  float:right;
 }
 
 .tag_0 {

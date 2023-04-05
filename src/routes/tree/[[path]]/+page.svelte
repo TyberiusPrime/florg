@@ -239,7 +239,7 @@
         nav_start_path = nav_path;
         nav_start_index = activeIndex;
         nav_start_tree = structuredClone(data.tree);
-		nav_siblings = find_siblings(data.flat, activeIndex);
+        nav_siblings = find_siblings(data.flat, activeIndex);
         move_and_goto = false;
         viewComponent.enter_overlay("nav");
       } else {
@@ -510,7 +510,7 @@
       new_node.node.header.title
     );
     let p = data.current_item;
-    if (p.length <= 1) {
+    if (p.length == 0) {
       data.tree = await invoke("get_tree", { path: "", maxDepth: 2 });
     } else {
       can_expand(event.payload, false);
@@ -625,6 +625,9 @@
 
   function push_into_move_history() {
     //first filter all that match path
+	if (data.flat[activeIndex] == undefined) {
+	return;
+	}
     let path = data.current_item ?? "";
     if (path == "") {
       return;
@@ -647,14 +650,16 @@
   }
 
   async function goto_node(path) {
-    push_into_move_history();
+    if (path != data.current_item) {
+      push_into_move_history();
+    }
     await expand_path(data.tree, path, 1);
     data.flat = flattenObject(data.tree);
     //push current.
     let found = false;
     let expanded = false;
     for (let ii = 0; ii < data.flat.length; ii++) {
-	console.log(path, data.flat[ii].path);
+      console.log(path, data.flat[ii].path);
       if (path.startsWith(data.flat[ii].path)) {
         activeIndex = ii;
         if (path == data.flat[ii].path) {
@@ -662,12 +667,11 @@
           break;
         }
       } else if (data.flat[ii].path > path) {
-	    //todo: omptimize this whole thing by using binary search
-		// problem: the naive string comparison is wrong, since we sort
-		//A26 after AZ
-		//also the recursive setting of activeIndex is nice when navigatiing interactivly.
-		//though technically, we only noeed to try path[..-1] recursivly iff not found.
-
+        //todo: omptimize this whole thing by using binary search
+        // problem: the naive string comparison is wrong, since we sort
+        //A26 after AZ
+        //also the recursive setting of activeIndex is nice when navigatiing interactivly.
+        //though technically, we only noeed to try path[..-1] recursivly iff not found.
         //break;
       }
     }
@@ -757,7 +761,7 @@
       await toggle_node(parent, true);
       await toggle_node(parent, false);
       await goto_node(new_path);
-	  console.log("nav siblings", nav_siblings);
+      console.log("nav siblings", nav_siblings);
       await handle_move_and_goto(nav_siblings);
       scroll_to_active();
       highlight_node = new_path;
@@ -922,10 +926,13 @@
       toast.push("Can't promote root");
     }
     let node = await invoke("get_node", { path: data.current_item });
+    console.log(node);
 
-    let parent = data.current_item.substring(0, data.current_item.length - 1);
+    let parent = await invoke("get_parent", { path: data.current_item });
+    toast.push(parent);
     for (let ii = 0; ii < node.children.length; ii++) {
       let child_path = node.children[ii].path;
+      toast.push(child_path);
       let new_path = await invoke("find_next_empty_child", { path: parent });
       await invoke("move_node", {
         orgPath: child_path,
@@ -936,8 +943,9 @@
     await invoke("commit", {
       text: `promoted children of ${data.current_item}`,
     });
-
-    console.log(node);
+    can_contract(parent, true);
+    can_expand(parent, true);
+    goto_node(data.current_item);
   }
 
   async function move_node_to_parents_parent() {
@@ -1192,7 +1200,7 @@
   }
 
   function filter_tags(tags) {
-	return tags.filter((item) => Object.values(data.tags?? {}).includes(item));
+    return tags.filter((item) => Object.values(data.tags ?? {}).includes(item));
   }
 
   async function handle_copy(ev) {
@@ -1552,12 +1560,10 @@
     const parentPath = data.current_item;
     await mergeChildrenRecursively(parentPath);
 
-	//I need to reload the parent!
-	let grandparent = await invoke("get_parent", {path: parentPath});
-	let subtree = await invoke("get_tree", { path: grandparent, maxDepth: 1 });
-	patch_tree(data.tree, grandparent, subtree.children);
-
-
+    //I need to reload the parent!
+    let grandparent = await invoke("get_parent", { path: parentPath });
+    let subtree = await invoke("get_tree", { path: grandparent, maxDepth: 1 });
+    patch_tree(data.tree, grandparent, subtree.children);
 
     can_contract(parentPath.slice(0, -1), true);
     goto_node(parentPath);

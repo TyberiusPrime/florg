@@ -541,10 +541,11 @@ fn date_to_path(date_str: &str) -> Option<String> {
 }
 
 fn chrono_date_to_path(date: chrono::NaiveDate) -> TreePath {
-    let mut kw = date.iso_week().week0();
+    let iso_year = date.iso_week().year();
+    let kw = if iso_year != date.year() { 0 } else { date.iso_week().week()};
     //range is 0..52
     let quarter = kw / 13;
-    kw = kw % 13;
+    let kw = kw % 13;
     let mut path = vec![match quarter {
         0 => 0,
         1 => 1,
@@ -582,9 +583,9 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
     }
     for q in 1..5 {
         let path = parent_path.append(match q {
-            1 => 1,
-            2 => 2,
-            3 => 3,
+            1 => 0,
+            2 => 1,
+            3 => 2,
             4 => 3,
             _ => unreachable!(),
         });
@@ -592,19 +593,22 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
         let node = Node::new(&path, &text);
         ss.replace_node(node, false)?;
     }
-    let mut last_kw = 500;
+    let mut last_kw = 500u32;
     let start = chrono::NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
     for date in start.iter_days().take_while(|x| x.year() == year) {
-        let kw = date.iso_week().week();
+        let iso_year = date.iso_week().year();
+        let kw = if iso_year != year { 0 } else { date.iso_week().week()};
+
         if kw != last_kw {
             let pp = chrono_date_to_path(date).parent();
             let path = parent_path.concat(&pp);
-            let text = format!("KW {kw}\n");
+            let text = format!("KW {}\n", kw+1);
             let node = Node::new(&path, &text);
             ss.replace_node(node, false)?;
             last_kw = kw;
         }
         let path = parent_path.concat(&chrono_date_to_path(date));
+        println!("{} {}", date, path);
         let text = date.format("%Y-%m-%d %a\n").to_string();
         let node = Node::new(&path, &text);
         ss.replace_node(node, false)?;

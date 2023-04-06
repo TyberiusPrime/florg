@@ -777,27 +777,45 @@ impl Storage {
             .enumerate()
             .map(|(ii, (_title, old_path))| (old_path, path.append(ii as u32)))
             .collect();
+        self.remap_children(path.clone(), children)?;
+        self.add_and_commit(&format!("Sorted children of {path}"))?;
+        Ok(())
+    }
+
+    pub fn compact_children(&mut self, path: &TreePath) -> Result<()> {
+        let children = self.children_for(path);
+        let mapping: Vec<_> = children
+            .iter()
+            .enumerate()
+            .map(|(ii, x)| (x.path.clone(), path.append(ii as u32)))
+            .collect();
+        self.remap_children(path.clone(), mapping)
+    }
+
+    fn remap_children(
+        &mut self,
+        parent: TreePath,
+        mapping: Vec<(TreePath, TreePath)>,
+    ) -> Result<()> {
         //I have a mapping old->new
         //and I need to swap the old into the new positions,
         //where the new position might already be occupied.
         //I want to use only a single temp variable.
 
         //parent = path minus last char
-        let parent = path.clone();
         let temp_root = parent.concat(&TreePath::temp_path());
         let temp_dir = Node::dirname_from_path(&self.data_path, &temp_root);
         std::fs::create_dir_all(&temp_dir)?;
-        for (old_path, _new_path) in children.iter() {
+        for (old_path, _new_path) in mapping.iter() {
             let temp_path = temp_root.append(*old_path.0.last().unwrap());
             self.move_node(old_path, &temp_path, false)?;
         }
-        for (old_path, new_path) in children.iter() {
+        for (old_path, new_path) in mapping.iter() {
             let temp_path = temp_root.append(*old_path.0.last().unwrap());
             self.move_node(&temp_path, &new_path, false)?;
         }
 
         self.make_nodes_sorted();
-        self.add_and_commit(&format!("Sorted children of {path}"))?;
         Ok(())
     }
 

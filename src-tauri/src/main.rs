@@ -104,13 +104,12 @@ fn parse_raw_content(raw_content: &str) -> &str {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize)]
-pub (crate) struct NodeForJSInner {
+pub(crate) struct NodeForJSInner {
     pub path: String,
     pub header: storage::Header,
     pub raw: String,
-    pub tags: Vec<String>,  
+    pub tags: Vec<String>,
     //children: Vec<Node>,
 }
 
@@ -121,7 +120,6 @@ pub(crate) struct NodeForJS {
     pub children: Vec<NodeForJSInner>,
     pub tags: Vec<String>,
 }
-
 
 impl From<&Node> for NodeForJSInner {
     fn from(node: &Node) -> Self {
@@ -138,7 +136,7 @@ fn get_node(path: &str) -> TauriResult<NodeForJS> {
     let s = STORAGE.get().unwrap().lock().unwrap();
     let path = TreePath::from_human(path)?;
     let node: Option<NodeForJSInner> = s.get_node(&path).map(|x| x.into());
-    let children: Vec<NodeForJSInner>= s.children_for(&path).iter().map(|x| (*x).into()).collect();
+    let children: Vec<NodeForJSInner> = s.children_for(&path).iter().map(|x| (*x).into()).collect();
     let tags = node.as_ref().map_or_else(|| Vec::new(), |x| x.tags.clone());
     Ok(NodeForJS {
         node,
@@ -287,9 +285,15 @@ fn delete_node(path: &str, commit: Option<bool>) -> TauriResult<()> {
 fn sort_children(path: &str) -> TauriResult<()> {
     let mut s = STORAGE.get().unwrap().lock().unwrap();
     let path = TreePath::from_human(path)?;
-    let e = s.sort_children(&path);
-    dbg!(&e);
-    e?;
+    s.sort_children(&path)?;
+    TauriResult::Ok(())
+}
+
+#[tauri::command]
+fn compact_children(path: &str) -> TauriResult<()> {
+    let mut s = STORAGE.get().unwrap().lock().unwrap();
+    let path = TreePath::from_human(path)?;
+    s.compact_children(&path)?;
     TauriResult::Ok(())
 }
 
@@ -310,7 +314,11 @@ fn edit_node(path: &str, window_title: &str, new_text: Option<&str>) -> TauriRes
             let node_folder = Node::dirname_from_path(&ss.data_path, &path);
             let tf_folder = node_folder;
             std::fs::create_dir_all(&tf_folder).unwrap();
-            let tf = tf_folder.join(format!("{}.temp{}", path.to_human().replace("/","_"), storage::FLORG_SUFFIX));
+            let tf = tf_folder.join(format!(
+                "{}.temp{}",
+                path.to_human().replace("/", "_"),
+                storage::FLORG_SUFFIX
+            ));
             dbg!(&tf);
 
             let mut content = "".to_string();
@@ -1127,9 +1135,12 @@ fn editor_ended() {
                 if path != "settings.toml" {
                     let lock = RUNTIME_STATE.get().unwrap().lock().unwrap();
                     let mut ss = STORAGE.get().unwrap().lock().unwrap();
-                    ss.remove_placeholder(&TreePath::from_human(&path).expect("Failed to parse path from open editors")); //todo
+                    ss.remove_placeholder(
+                        &TreePath::from_human(&path)
+                            .expect("Failed to parse path from open editors"),
+                    ); //todo
                     lock.app_handle.emit_all("node-unchanged", &path).ok();
-            }
+                }
             }
         }
     }
@@ -1171,7 +1182,10 @@ fn update_from_edited_file(
         let content = parse_raw_content(&raw_contents);
         println!("parsed contents {}", path);
 
-        let node = storage::Node::new(&TreePath::from_human(path).expect("Failed to parse treepath from open editor"), content);
+        let node = storage::Node::new(
+            &TreePath::from_human(path).expect("Failed to parse treepath from open editor"),
+            content,
+        );
         ss.replace_node(node, true)?;
         println!("Replaced node");
 
@@ -1299,6 +1313,7 @@ fn main() -> Result<()> {
             swap_node_with_next,
             delete_node,
             sort_children,
+            compact_children,
             list_open_paths,
             date_to_path,
             create_calendar,

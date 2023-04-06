@@ -94,6 +94,16 @@
     { key: "m", text: "merge into text of parent", target_path: "merge" },
     { key: "p", text: "promote one level", target_path: "promote" },
     { key: "P", text: "promote all chidren", target_path: "promote_children" },
+    {
+      key: "c",
+      text: "compact children address space",
+      target_path: "compact_children",
+    },
+    {
+      key: "!",
+      text: "sort children alphabetically",
+      target_path: "sort_children",
+    },
   ];
 
   let copy_entries = [
@@ -118,11 +128,6 @@
       key: "m",
       text: "merge all children into parent",
       target_path: "merge_all_children_with_parent",
-    },
-    {
-      key: "!",
-      text: "sort children alphabetically",
-      target_path: "sort_children",
     },
   ];
 
@@ -923,6 +928,10 @@
       await move_node_to_parents_parent();
     } else if (mode == "promote_children") {
       await promote_all_children();
+    } else if (mode == "sort_children") {
+      await sort_children();
+    } else if (mode == "compact_children") {
+      await compact_children();
     } else {
       toast.push("Unknown delete mode " + mode);
     }
@@ -1079,6 +1088,16 @@
     await goto_node(data.current_item);
   }
 
+  async function compact_children() {
+    try {
+      await invoke("compact_children", { path: data.current_item });
+    } catch (e) {
+      toast.push("Failed to compact children: " + JSON.stringify(e));
+    }
+    can_contract(data.current_item);
+    await goto_node(data.current_item);
+  }
+
   async function handle_palette(ev) {
     viewComponent.leave_overlay();
     let cmd = ev.detail;
@@ -1094,8 +1113,6 @@
       await extract_sections();
     } else if (cmd == "merge_all_children_with_parent") {
       await merge_all_children_with_parent();
-    } else if (cmd == "sort_children") {
-      await sort_children();
     } else if (cmd == "settings") {
       return await invoke("edit_settings", {});
     } else if (cmd == "terminal") {

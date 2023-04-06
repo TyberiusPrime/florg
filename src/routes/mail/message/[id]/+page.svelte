@@ -371,6 +371,12 @@
   function onMessage(msg) {
     toast.push(msg);
   }
+
+  function make_links_target_blank(html) {
+	return html.replace("<a", "<a target='_blank' ");
+  }
+
+
 </script>
 
 <svelte:window onMessage={on_message} />
@@ -442,7 +448,7 @@
 
     {#if show_html}
       <iframe
-        srcdoc={csp(data.html)}
+        srcdoc={make_links_target_blank(csp(data.html))}
         sandbox="allow-same-origin"
         style="width:95%; border: 3px solid purple;height:100vh; font-size:18pt;"
         id="mail_content_iframe"
@@ -450,7 +456,7 @@
     {:else if data.text == null}
       {#if data.html != null}
         (extracted from html)
-        <pre>{wrap(linkifyStr(extractContent(data.html)))}</pre>
+        <pre>{wrap(make_links_target_blank(linkifyStr(extractContent(data.html))))}</pre>
       {:else}
         (no text, no html)
       {/if}
@@ -458,7 +464,7 @@
       {#if data.html != null && data.html != ""}
         (html available){/if}
       <pre class="my_pre">{@html wrap(
-          linkifyStr(data.text, { defaultProtocol: "https" })
+          make_links_target_blank(linkifyStr(data.text, { defaultProtocol: "https" }))
         )}</pre>
     {/if}
     <!-- <pre>

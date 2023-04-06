@@ -52,7 +52,7 @@ export async function render_text_cached(path: string, raw: string) {
     if (end_time - start_time > 100) {
       // probably just as fast to not cache...
       await invoke("set_cached_node", {
-        path: path,
+        path: path + "",
         raw: raw,
         rendered: rendered_cached,
       });

@@ -542,7 +542,11 @@ fn date_to_path(date_str: &str) -> Option<String> {
 
 fn chrono_date_to_path(date: chrono::NaiveDate) -> TreePath {
     let iso_year = date.iso_week().year();
-    let kw = if iso_year != date.year() { 0 } else { date.iso_week().week()};
+    let kw = if iso_year != date.year() {
+        0
+    } else {
+        date.iso_week().week()
+    };
     //range is 0..52
     let quarter = kw / 13;
     let kw = kw % 13;
@@ -597,12 +601,16 @@ fn create_calendar(parent_path: &str, year: i32) -> TauriResult<()> {
     let start = chrono::NaiveDate::from_ymd_opt(year as i32, 1, 1).unwrap();
     for date in start.iter_days().take_while(|x| x.year() == year) {
         let iso_year = date.iso_week().year();
-        let kw = if iso_year != year { 0 } else { date.iso_week().week()};
+        let kw = if iso_year != year {
+            0
+        } else {
+            date.iso_week().week()
+        };
 
         if kw != last_kw {
             let pp = chrono_date_to_path(date).parent();
             let path = parent_path.concat(&pp);
-            let text = format!("KW {}\n", kw+1);
+            let text = format!("KW {}\n", kw + 1);
             let node = Node::new(&path, &text);
             ss.replace_node(node, false)?;
             last_kw = kw;
@@ -748,7 +756,7 @@ fn ripgrep_below_node(
                     title,
                     parent_titles,
                     lines: hits,
-                    tags: tags,
+                    tags,
                 })
             }
             result.sort_by(|a, b| a.path.cmp(&b.path));
@@ -759,6 +767,21 @@ fn ripgrep_below_node(
             None
         }
     }
+}
+
+#[tauri::command]
+fn find_first_below(path: &str, query: &str) -> Option<String> {
+    let ss = STORAGE.get().unwrap().lock().unwrap();
+    let path = TreePath::from_human(path).ok()?;
+    //now depth first search into the children of path
+    let qs = query.to_string();
+    ss.depth_first_search(
+        &path,
+        &Box::new(&move |node: &storage::Node| -> bool {
+            return node.raw.contains(&qs);
+        }),
+    )
+    .map(|node| node.path.to_human())
 }
 #[tauri::command]
 fn get_cached_node(path: &str) -> Option<String> {
@@ -1330,6 +1353,7 @@ fn main() -> Result<()> {
             get_mail_search_folders,
             find_next_empty_child,
             ripgrep_below_node,
+            find_first_below,
             get_cached_node,
             set_cached_node,
             query_mail,

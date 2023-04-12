@@ -258,6 +258,11 @@ p code
 {
 	line-height:1.0em;
 }
+
+p.highlightjs {
+	padding-bottom:1em !important;
+}
+
 .highlightjs {
 	line-height:1.0em;
 	background:#eeeeee;

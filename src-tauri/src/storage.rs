@@ -546,6 +546,27 @@ impl Storage {
         res
     }
 
+    //perform a depth first iteration of the tree
+    //abort if the callback returns false
+    pub(crate) fn depth_first_search(
+        &self,
+        path: &TreePath,
+        callback: &Box<&dyn Fn(&Node) -> bool>,
+    ) -> Option<&Node> {
+        for child in self.children_for(path) {
+            let r = callback(child);
+            if r {
+                return Some(child);
+            }
+            let r = self.depth_first_search(&child.path, callback);
+            match r {
+                Some(node) => return Some(node),
+                None => {}
+            }
+        }
+        None
+    }
+
     fn get_letter_set(start: char, stop: char) -> HashSet<char> {
         let mut res = HashSet::new();
         for c in start..=stop {

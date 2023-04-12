@@ -784,25 +784,33 @@
     }
   }
 
+  async function find_first_below(prefix, query) {
+    let res = await invoke("find_first_below", {
+      path: prefix,
+      query: query,
+    });
+    return res;
+  }
+
   async function parse_path(path) {
+    let out = path;
     if (path.startsWith("today:")) {
       let prefix = path.slice(6);
-      let date_suffix = await invoke("date_to_path", {
-        dateStr: iso_date(new Date()),
-      });
-      path = prefix + date_suffix;
+      let query = iso_date(new Date());
+      console.log("searching for", query, "below", prefix);
+      out = await find_first_below(prefix, query);
+      if (out == null) {
+        return null;
+      }
     }
-    return path;
+    return out;
   }
 
   let handle_goto = async (path) => {
     viewComponent.leave_overlay();
     if (path.startsWith("today:")) {
-      let prefix = path.slice(6);
-      let date_suffix = await invoke("date_to_path", {
-        dateStr: iso_date(new Date()),
-      });
-      path = prefix + date_suffix;
+      path = await parse_path(path);
+      console.log("parsed path", path);
     } else if (path.startsWith("date:")) {
       viewComponent.enter_overlay("date_pick");
       date_pick_mode = "goto";
@@ -1314,10 +1322,10 @@
   }
 
   async function update_date_pick_choice() {
-    let date_suffix = await invoke("date_to_path", {
-      dateStr: date_pick_value,
-    });
-    let path = date_pick_prefix + date_suffix;
+    let path = await find_first_below(date_pick_prefix, date_pick_value);
+    if (path == null) {
+      path = date_pick_prefix;
+    }
     let found = await goto_node(path);
     let el = document.getElementById("date_pick_target");
     let text = "";
@@ -1355,10 +1363,11 @@
   async function handle_date_action() {
     viewComponent.leave_overlay();
     if (date_pick_mode == "move") {
-      let date_suffix = await invoke("date_to_path", {
-        dateStr: date_pick_value,
-      });
-      let path = date_pick_prefix + date_suffix;
+      let path = await find_first_below(date_pick_prefix, date_pick_value);
+      if (path == null) {
+        toast.push("Target not found");
+        return;
+      }
 
       await move_by_nav(path);
       if (!move_and_goto) {

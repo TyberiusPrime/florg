@@ -55,6 +55,7 @@
   let cache = {};
   let activeIndex;
   let scroll_to_active;
+  let show_keys = false;
   let overlay = "";
   let nav_text = "";
   let nav_mode = "nav";
@@ -148,6 +149,7 @@
   }
 
   function start_nav() {
+  show_keys = true;
     nav_path = data.flat[activeIndex].path;
     nav_start_path = nav_path;
     nav_start_index = activeIndex;
@@ -333,6 +335,9 @@
         goto_bookmark(0);
       }
     },
+	v: (ev) => {
+		show_keys = !show_keys;
+	}
   };
 
   function goto_bookmark(num) {
@@ -1652,7 +1657,7 @@
             <td>
               <div class="node">
                 <div class="node-path">
-                  {@html node.indention}{node.path}{#if node.has_children && !node.children_shown}<span
+                  {@html node.indention}{#if show_keys}{node.path}{/if}{#if node.has_children && !node.children_shown}<span
                       class="more">+</span
                     >{/if}
                 </div>

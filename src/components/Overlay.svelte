@@ -5,7 +5,6 @@
   import { toast } from "@zerodevx/svelte-toast";
   import {
     no_text_inputs_focused,
-    dispatch_keyup,
     focus_first_in_node,
   } from "$lib/util.ts";
 

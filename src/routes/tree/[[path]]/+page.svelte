@@ -89,6 +89,7 @@
     { key: "s", text: "search" },
     { key: "n", text: "search: (next hit)" },
     { key: "N", text: "search: (prev hit)" },
+    { key: "b", text: "move around history" },
   ];
   let delete_entries = [
     { key: "d", text: "delete node & children", target_path: "delete" },
@@ -149,7 +150,7 @@
   }
 
   function start_nav() {
-  show_keys = true;
+    show_keys = true;
     nav_path = data.flat[activeIndex].path;
     nav_start_path = nav_path;
     nav_start_index = activeIndex;
@@ -158,7 +159,7 @@
   }
 
   let tag_entries = map_tags(data.tags);
-  let keys = {
+  let early_keys = {
     " ": () => {
       nav_text = "nav";
       nav_mode = "nav";
@@ -193,7 +194,22 @@
       viewComponent.enter_overlay("search");
       return true;
     },
+    d: () => {
+      viewComponent.enter_overlay("delete");
+    },
+    p: () => {
+      viewComponent.enter_overlay("palette");
+    },
 
+    b: () => {
+      if (move_history_entries.length > 0) {
+        viewComponent.enter_overlay("move_history");
+      } else {
+        toast.push("no history yet");
+      }
+    },
+  };
+  let keys = {
     n: () => {
       if (in_page_search_term != "") {
         window.find(in_page_search_term, false, false, true, false);
@@ -216,27 +232,12 @@
     A: () => {
       add_node_same_level();
     },
-    d: () => {
-      viewComponent.enter_overlay("delete");
-    },
-    p: () => {
-      viewComponent.enter_overlay("palette");
-    },
-
     x: async () => {
       fetch_url_text = await read_clipboard();
       if (!fetch_url_text.startsWith("http")) {
         fetch_url_text = "";
       }
       viewComponent.enter_overlay("fetch_url");
-    },
-
-    b: () => {
-      if (move_history_entries.length > 0) {
-        viewComponent.enter_overlay("move_history");
-      } else {
-        toast.push("no history yet");
-      }
     },
 
     m: (ev) => {
@@ -335,9 +336,9 @@
         goto_bookmark(0);
       }
     },
-	v: (ev) => {
-		show_keys = !show_keys;
-	}
+    v: (ev) => {
+      show_keys = !show_keys;
+    },
   };
 
   function goto_bookmark(num) {
@@ -619,7 +620,7 @@
   afterUpdate(async () => {
     window.setTimeout(() => {
       document.querySelectorAll("code").forEach((el) => {
-        hljs.highlightElement(el);
+        //hljs.highlightElement(el);
       });
     }, 10);
   });
@@ -1616,12 +1617,20 @@
     let target_path = ev.detail;
     goto_node(target_path);
   }
+
 </script>
 
 <svelte:window on:focus={handle_window_focus} />
 <View
   single_column="false"
   on:keyup={dispatch_keyup(keys, () => {
+    if (Date.now() - focus_time < 500) {
+      // toast.push("ignored keypress");
+      return true;
+    }
+    return overlay != "";
+  })}
+  on:keydown={dispatch_keyup(early_keys, () => {
     if (Date.now() - focus_time < 500) {
       // toast.push("ignored keypress");
       return true;

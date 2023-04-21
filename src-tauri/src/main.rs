@@ -770,15 +770,20 @@ fn ripgrep_below_node(
 }
 
 #[tauri::command]
-fn find_first_below(path: &str, query: &str) -> Option<String> {
+fn find_first_below(path: &str, query: &str, title_only: Option<bool>) -> Option<String> {
     let ss = STORAGE.get().unwrap().lock().unwrap();
     let path = TreePath::from_human(path).ok()?;
     //now depth first search into the children of path
     let qs = query.to_string();
+    let to = title_only.unwrap_or(false);
     ss.depth_first_search(
         &path,
         &Box::new(&move |node: &storage::Node| -> bool {
-            return node.raw.contains(&qs);
+            if to {
+                return node.header.title.contains(&qs);
+            } else {
+                return node.raw.contains(&qs);
+            }
         }),
     )
     .map(|node| node.path.to_human())

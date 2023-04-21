@@ -793,6 +793,7 @@
     let res = await invoke("find_first_below", {
       path: prefix,
       query: query,
+	  titleOnly: true,
     });
     return res;
   }

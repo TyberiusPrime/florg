@@ -55,7 +55,7 @@
         window.history.back();
       }
     } else if (e.key == "o" && no_text_inputs_focused()) {
-      goto("/chatgpt");
+//      goto("/chatgpt");
       //} else if (e.key == "p" && no_text_inputs_focused()) {
       //goto("/palette");
     } else if (e.key == "F5") {

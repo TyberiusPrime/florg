@@ -37,6 +37,12 @@
 	let today = iso_date(new Date());		
 	return str_date.indexOf(today) != -1;
   }
+
+  function add_day(str_date){
+	let date = new Date(Date.parse(str_date));	
+	return date.toLocaleDateString("en-us", { weekday: 'short' }) + " " + str_date;
+	
+  }
 </script>
 
 <View bind:this={viewComponent} bind:overlay>
@@ -46,23 +52,29 @@
       <input type="date" on:change={handle_change} bind:value={stop_date} />
     </div>
   <div slot="content" on:keyup={handle_keys}>
+  <!--
+  <pre>
+  {JSON.stringify(data.hits, null,2)}
+  </pre>
+  -->
 
   <Picker on:action={handle_action} >
     <svelte:fragment slot="entries">
       {#each data.hits as hit, index}
 	   {#if index === 0 || extract_kw(hit.str_date) !== extract_kw(data.hits[index - 1].str_date)}
       <tr data-skip="true">
-        <td colspan="3">KW {extract_kw(hit.str_date)}</td>
+        <td colspan="4">KW {extract_kw(hit.str_date)}</td>
       </tr>
     {/if}
         <tr data-cmd={hit.rg.path}>
-          <td class="shrink">
+          <td class="shrink" style="padding-left:1.5em;">
 		  {#if is_today(hit.str_date)}
-		  <b>{hit.str_date}</b>
+		  <b>{add_day(hit.str_date)}</b>
 		  {:else}
-		  {hit.str_date}
+		  {add_day(hit.str_date)}
 		  {/if}
 		  </td>
+		  <td>{hit.text}</td>
           <td class="shrink">{hit.rg.path}</td>
 		  <td><div style="float:left">{hit.rg.title.replace(/<\d{4}-\d{1,2}-\d{1,2}>/, "")}</div>
 		  {@html render_tags(hit.rg.tags)}</td>

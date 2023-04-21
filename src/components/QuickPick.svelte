@@ -8,15 +8,22 @@
   export let action = "";
   export let text = "";
   export let entries = "";
+  let last_key_down = null;
+
+  function handle_key_down(ev) {
+    last_key_down = ev.key;
+  }
 
   function handle_key_up(ev) {
     console.log("quick pick key up", ev.key);
-    for (let entry of entries) {
-      if (entry.key == ev.key) {
-        console.log("quick pick hit");
-        ev.stopPropagation();
-        ev.preventDefault();
-        dispatch("action", entry.target_path);
+    if (ev.key == last_key_down) { //ignore otherwise, it's the keyup from showing the overlay
+      for (let entry of entries) {
+        if (entry.key == ev.key) {
+          console.log("quick pick hit");
+          ev.stopPropagation();
+          ev.preventDefault();
+          dispatch("action", entry.target_path);
+        }
       }
     }
   }
@@ -48,7 +55,7 @@
   }
 </script>
 
-<div on:keyup={handle_key_up} tabIndex="0">
+<div on:keyup={handle_key_up} on:keydown={handle_key_down} tabIndex="0">
   {text}
   {#each entries as entry}
     <div class="qp_entry" on:click={fake_key_up(entry.key)}>

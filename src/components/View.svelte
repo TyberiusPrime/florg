@@ -134,7 +134,7 @@
 	<slot name="overlays" />
   </div>
 {/if}
-<div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1">
+<div id="wrapper" class="wrapper" on:keyup on:click={focus} tabindex="-1" on:keydown>
   <div class="wrapper">
     <div class="Top">
       <div on:click={show_help}>

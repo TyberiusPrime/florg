@@ -6,7 +6,7 @@ export async function load({ params }: { params: any }) {
 
   let rg_results = await invoke("ripgrep_below_node", {
     queryPath: "",
-    searchTerm: "<\\d{4}-\\d{1,2}-\\d{1,2}( \\d{2}:\\d{2})?>",
+    searchTerm: "<\\d{4}-\\d{1,2}-\\d{1,2}( \\d{2}:\\d{2})?>.*",
     onlyMatching: true,
   });
 
@@ -14,17 +14,26 @@ export async function load({ params }: { params: any }) {
   for (let ii = 0; ii < rg_results.length; ii++) {
     let rg_result = rg_results[ii];
     for (let ll = 0; ll < rg_result.lines.length; ll++) {
-      let str_date = rg_result.lines[ll][1].slice(1, -1);
+      let str_date = rg_result.lines[ll][1].slice(
+        1,
+        rg_result.lines[ll][1].indexOf(">"),
+      );
+	  let text = rg_result.lines[ll][1].slice(
+        rg_result.lines[ll][1].indexOf(">") + 1,
+		rg_result.lines[ll][1].length,
+      );
+
       let date = new Date(str_date);
       if ((start_date <= date) && (date <= stop_date)) {
         hits.push({
           str_date,
           date,
           rg: rg_results[ii],
+		  text: text,
         });
       }
     }
-	hits.sort((a, b) => a.date - b.date);
+    hits.sort((a, b) => a.date - b.date);
   }
 
   return {
